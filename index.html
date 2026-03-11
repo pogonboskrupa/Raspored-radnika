@@ -505,15 +505,102 @@ if (FIREBASE_ENABLED) {
 
   /* MOBILE */
   @media (max-width: 768px) {
-    .sidebar { display: none; }
-    .right-panel { display: none; }
-    .app-layout { display: block; }
-    .main-content { padding: 1rem; }
-    .nav-tab { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
-    .stats-row { gap: 0.5rem; }
-    .stat-card { min-width: 80px; }
-    .date-bar { gap: 0.5rem; }
+    .app-header {
+      flex-wrap: wrap;
+      height: auto;
+      padding: 0;
+    }
+    .app-header > .app-title {
+      padding: 0.5rem 1rem;
+      width: 100%;
+    }
+    .nav-tabs {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tab { padding: 0.5rem 0.75rem; font-size: 0.75rem; white-space: nowrap; height: 42px; flex-shrink: 0; }
     .app-title .subtitle { display: none; }
+
+    .sidebar { display: none; }
+    .app-layout { display: block; }
+    .main-content { padding: 0.75rem; }
+
+    /* Right panel hidden on mobile — content shown inline via mobile-sidebar-panel */
+    .right-panel { display: none; }
+
+    /* Date bar compact */
+    .date-bar {
+      padding: 0.75rem;
+      gap: 0.5rem;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .date-bar > div:first-child { width: 100%; }
+    .date-bar > div:last-child {
+      margin-left: 0;
+      justify-content: stretch;
+    }
+    .date-bar > div:last-child .btn { flex: 1; font-size: 0.72rem; padding: 0.4rem 0.5rem; }
+
+    /* Stats compact */
+    .stats-row { gap: 0.4rem; margin-bottom: 0.75rem; }
+    .stat-card { min-width: 0; padding: 0.5rem 0.6rem; flex: 1 1 0; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.62rem; }
+
+    /* Schedule table → mobile card layout */
+    .schedule-table { font-size: 0.8rem; }
+    .schedule-table thead { display: none; }
+    .schedule-table tbody tr {
+      display: block;
+      border-bottom: 1px solid var(--border);
+      padding: 0.6rem 0.75rem;
+    }
+    .schedule-table tbody tr:last-child { border-bottom: none; }
+    .schedule-table tbody td {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.2rem 0;
+      border: none;
+      text-align: left;
+    }
+    .schedule-table tbody td::before {
+      content: attr(data-label);
+      font-family: var(--mono);
+      font-size: 0.58rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      min-width: 55px;
+      padding-top: 0.15rem;
+      flex-shrink: 0;
+    }
+    .schedule-table tbody td:first-child { margin-bottom: 0.15rem; }
+    .schedule-table tbody td:last-child {
+      margin-top: 0.3rem;
+      padding-top: 0.3rem;
+      border-top: 1px dashed var(--border);
+    }
+    .schedule-table tbody td:last-child::before { display: none; }
+
+    /* Dept header compact */
+    .dept-header { padding: 0.5rem 0.75rem; }
+    .dept-name { font-size: 0.82rem; }
+
+    /* Cards */
+    .card { margin-bottom: 0.75rem; }
+
+    /* Section header */
+    .section-header { margin-bottom: 0.75rem; }
+    .section-title { font-size: 0.9rem; }
+
+    /* Mobile bottom toolbar */
     .mobile-fab {
       display: flex !important;
       position: fixed;
@@ -532,8 +619,34 @@ if (FIREBASE_ENABLED) {
       box-shadow: 0 4px 16px rgba(0,0,0,0.2);
       cursor: pointer;
     }
+
+    /* Mobile sidebar toggle panel */
+    .mobile-sidebar-panel {
+      display: block !important;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 0.75rem;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .mobile-sidebar-panel .sidebar-section { padding: 0.25rem 0; border: none; }
+    .mobile-sidebar-panel .sidebar-label { padding: 0.3rem 0.75rem; font-size: 0.6rem; }
+    .mobile-sidebar-panel .sidebar-item { padding: 0.35rem 0.75rem; font-size: 0.78rem; }
+
+    /* Modal full-width on mobile */
+    .modal-overlay { padding: 0.5rem; align-items: flex-start; }
+    .modal { max-width: 100%; }
+    .modal-body { padding: 0.9rem; }
+    .modal-header { padding: 0.75rem 0.9rem; }
+    .modal-footer { padding: 0.6rem 0.9rem; }
+
+    /* Worker pills wrap better */
+    .worker-pill { font-size: 0.72rem; padding: 0.2rem 0.4rem; }
   }
   .mobile-fab { display: none; }
+  .mobile-sidebar-panel { display: none; }
+  .mobile-right-panel { display: none; }
 
   /* PRINT */
   @media print {
@@ -996,6 +1109,7 @@ function App() {
               workers={workers} departments={departments}
               wName={wName} dName={dName}
               totalToday={totalToday} statsByJob={statsByJob} statsByDept={statsByDept}
+              sidebarFilter={sidebarFilter} setSidebarFilter={setSidebarFilter}
               prevDay={prevDay} nextDay={nextDay}
               onAdd={() => setModal({type:'entry', data:{date:selectedDate}})}
               onEdit={s => setModal({type:'entry', data:s, isEdit:true})}
@@ -1004,6 +1118,8 @@ function App() {
               copyFromDate={copyFromDate}
               handlePrint={handlePrint}
               yesterday={yesterday()}
+              godisnji={godisnji}
+              onWorkerClick={onWorkerClick}
             />
           )}
           {activeTab === 'ekipa' && (
@@ -1124,9 +1240,12 @@ function App() {
 // ─── SCHEDULE VIEW ────────────────────────────────────────────────────────────
 function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, workers, departments,
   wName, dName, totalToday, statsByJob, statsByDept,
-  prevDay, nextDay, onAdd, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday }) {
+  sidebarFilter, setSidebarFilter, godisnji,
+  prevDay, nextDay, onAdd, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday, onWorkerClick }) {
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
 
   // Group by dept
   const byDept = useMemo(() => {
@@ -1211,8 +1330,8 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               <tbody>
                 {rows.map(row => (
                   <tr key={row.id}>
-                    <td><span className={jobBadgeClass(row.jobType)}>{row.jobType}</span></td>
-                    <td>
+                    <td data-label="Posao"><span className={jobBadgeClass(row.jobType)}>{row.jobType}</span></td>
+                    <td data-label="Radnici">
                       <div style={{display:'flex',flexWrap:'wrap',gap:'2px'}}>
                         {row.jobType === 'Primka' ? (
                           <>
@@ -1226,8 +1345,8 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                         )}
                       </div>
                     </td>
-                    <td style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{row.note || '—'}</td>
-                    <td className="no-print">
+                    <td data-label="Napomena" style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{row.note || '—'}</td>
+                    <td data-label="" className="no-print">
                       <div style={{display:'flex',gap:'0.25rem'}}>
                         <button className="btn btn-ghost btn-icon btn-sm" title="Historija" onClick={() => onHistory(row)}>📜</button>
                         <button className="btn btn-ghost btn-icon btn-sm" title="Uredi" onClick={() => onEdit(row)}>✏️</button>
@@ -1241,6 +1360,130 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </div>
         ))
       )}
+
+      {/* MOBILE: Department filter (visible only on small screens via CSS) */}
+      <div className="mobile-sidebar-panel" style={{marginTop:'0.75rem'}}>
+        <div
+          onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+          style={{padding:'0.6rem 0.75rem',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',background:'#fafaf8',borderBottom: mobileFilterOpen ? '1px solid var(--border)' : 'none'}}
+        >
+          <span style={{fontFamily:'var(--mono)',fontSize:'0.7rem',fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-muted)'}}>
+            🏕️ Filter po odjelu {sidebarFilter ? `(${departments.find(d=>d.id===sidebarFilter)?.brojOdjela || '?'})` : '(svi)'}
+          </span>
+          <span style={{fontSize:'0.7rem',color:'var(--text-light)'}}>{mobileFilterOpen ? '▲' : '▼'}</span>
+        </div>
+        {mobileFilterOpen && (
+          <div style={{padding:'0.25rem 0'}}>
+            <button className={`sidebar-item ${!sidebarFilter?'active':''}`} onClick={() => { setSidebarFilter(null); setMobileFilterOpen(false); }}>
+              <span>Svi odjeli</span>
+              <span className="count">{Object.values(statsByDept).reduce((a,s)=>a+s.size,0)}</span>
+            </button>
+            {departments.map(d => (
+              <button key={d.id} className={`sidebar-item ${sidebarFilter===d.id?'active':''}`} onClick={() => { setSidebarFilter(d.id); setMobileFilterOpen(false); }}>
+                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dName(d.id)}</span>
+                <span className="count">{statsByDept[d.id]?.size || 0}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* MOBILE: Unassigned & absent workers (visible only on small screens via CSS) */}
+      {(() => {
+        const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
+        const absentWorkerIds = new Set(
+          Object.entries(godisnji || {}).filter(([wId, entries]) =>
+            entries.some(e => e.date === selectedDate)
+          ).map(([wId]) => wId)
+        );
+        const activeWorkers = workers.filter(w => w.status === 'aktivan');
+        const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkerIds.has(w.id));
+        const absentList = [...absentWorkerIds].map(wId => {
+          const w = workers.find(x => x.id === wId);
+          const entry = ((godisnji || {})[wId] || []).find(e => e.date === selectedDate);
+          return w && entry ? { worker: w, entry } : null;
+        }).filter(Boolean);
+        const ODSUTNOST_SHORT = {
+          'Godišnji odmor': { short:'GO', icon:'🏖️', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9' },
+          'Bolovanje':      { short:'B',  icon:'🏥', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0' },
+          'Slobodan dan':   { short:'SD', icon:'☀️', bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a' },
+          'Neplaćeno':      { short:'N',  icon:'📋', bg:'#f0f0f0', color:'#555',    border:'#ccc' },
+        };
+        const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
+          cat, workers: unassigned.filter(w => w.category === cat.id),
+        })).filter(g => g.workers.length > 0);
+
+        return (
+          <div className="mobile-sidebar-panel" style={{marginTop:'0.75rem'}}>
+            <div
+              onClick={() => setMobileUnassignedOpen(!mobileUnassignedOpen)}
+              style={{padding:'0.6rem 0.75rem',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',background:'#fafaf8',borderBottom: mobileUnassignedOpen ? '1px solid var(--border)' : 'none'}}
+            >
+              <span style={{fontFamily:'var(--mono)',fontSize:'0.7rem',fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-muted)'}}>
+                👷 Neraspoređeni ({unassigned.length}) {absentList.length > 0 && `· Odsutni (${absentList.length})`}
+              </span>
+              <span style={{fontSize:'0.7rem',color:'var(--text-light)'}}>{mobileUnassignedOpen ? '▲' : '▼'}</span>
+            </div>
+            {mobileUnassignedOpen && (
+              <div style={{padding:'0.5rem 0.75rem'}}>
+                {unassigned.length === 0 ? (
+                  <div style={{fontSize:'0.8rem',color:'var(--green)',fontWeight:500,padding:'0.25rem 0'}}>✓ Svi raspoređeni</div>
+                ) : (
+                  unassignedByCat.map(({ cat, workers: ws }) => (
+                    <div key={cat.id} style={{marginBottom:'0.5rem'}}>
+                      <div style={{fontSize:'0.62rem',fontWeight:700,color:cat.color,letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.2rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                        <span>{cat.icon}</span>{cat.short}
+                      </div>
+                      {ws.map(w => (
+                        <div key={w.id}
+                          onClick={() => onWorkerClick(w)}
+                          style={{
+                            display:'flex',alignItems:'center',gap:'0.4rem',
+                            padding:'0.35rem 0.5rem',marginBottom:'0.15rem',
+                            fontSize:'0.8rem',fontWeight:500,
+                            background:cat.pale, border:`1px solid ${cat.border}`,
+                            borderLeft:`3px solid ${cat.color}`,
+                            borderRadius:4, cursor:'pointer', color:cat.color,
+                          }}
+                        >
+                          <span style={{fontSize:'0.85rem'}}>{cat.icon}</span>
+                          <span style={{flex:1}}>{w.name}</span>
+                          <span style={{fontSize:'0.6rem',opacity:0.6}}>→</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                )}
+                {absentList.length > 0 && (
+                  <>
+                    <div style={{height:1,background:'var(--border)',margin:'0.5rem 0'}}/>
+                    <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.4rem'}}>
+                      Odsutni ({absentList.length})
+                    </div>
+                    {absentList.map(({ worker: w, entry }) => {
+                      const s = ODSUTNOST_SHORT[entry.type] || { short:'?', icon:'❓', bg:'#f0f0f0', color:'#555', border:'#ccc' };
+                      return (
+                        <div key={w.id} style={{
+                          display:'flex',alignItems:'center',gap:'0.4rem',
+                          padding:'0.35rem 0.5rem',marginBottom:'0.15rem',
+                          fontSize:'0.8rem',fontWeight:500,
+                          background:s.bg, border:`1px solid ${s.border}`,
+                          borderLeft:`3px solid ${s.color}`,
+                          borderRadius:4, color:s.color, opacity:0.85,
+                        }}>
+                          <span style={{fontSize:'0.85rem'}}>{s.icon}</span>
+                          <span style={{flex:1}}>{w.name}</span>
+                          <span style={{fontSize:'0.6rem',fontWeight:700,fontFamily:'var(--mono)'}}>{s.short}</span>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
