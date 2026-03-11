@@ -990,7 +990,7 @@ function App() {
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
   const [history, setHistory] = useStorage('sumarija_history', []);
 
-  const [activeTab, setActiveTab] = useState('radnici');
+  const [activeTab, setActiveTab] = useState('raspored');
   const [selectedDate, setSelectedDate] = useState(today());
   const [sidebarFilter, setSidebarFilter] = useState(null);
   const [modal, setModal] = useState(null);
