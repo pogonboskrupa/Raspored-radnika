@@ -503,6 +503,29 @@ if (FIREBASE_ENABLED) {
   /* DIVIDER */
   .divider { height: 1px; background: var(--border); margin: 0.9rem 0; }
 
+  /* CATEGORY & WORKER GRIDS */
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+  }
+  .category-card {
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.12s;
+  }
+  .category-card-icon { font-size: 1.2rem; }
+  .category-card-count { font-family: var(--mono); font-size: 1.4rem; font-weight: 700; }
+  .category-card-label { font-size: 0.75rem; font-weight: 600; margin-top: 0.3rem; }
+  .worker-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.75rem;
+  }
+
   /* MOBILE */
   @media (max-width: 768px) {
     .app-header {
@@ -643,6 +666,54 @@ if (FIREBASE_ENABLED) {
 
     /* Worker pills wrap better */
     .worker-pill { font-size: 0.72rem; padding: 0.2rem 0.4rem; }
+
+    /* Category cards: horizontal scroll strip */
+    .category-grid {
+      display: flex;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      gap: 0.4rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.25rem;
+    }
+    .category-grid::-webkit-scrollbar { display: none; }
+    .category-card {
+      min-width: 100px;
+      flex-shrink: 0;
+      padding: 0.45rem 0.6rem;
+      border-radius: 6px;
+    }
+    .category-card-icon { font-size: 0.9rem; }
+    .category-card-count { font-size: 1rem; }
+    .category-card-label { font-size: 0.6rem; margin-top: 0.1rem; }
+
+    /* Worker cards: compact list on mobile */
+    .worker-cards-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .worker-card { border-radius: 6px !important; }
+    .worker-card-stripe { height: 3px !important; }
+    .worker-card-body { padding: 0.5rem 0.6rem !important; }
+    .worker-card-top { margin-bottom: 0.3rem !important; gap: 0.35rem !important; }
+    .worker-card-avatar { width: 30px !important; height: 30px !important; font-size: 1rem !important; border-radius: 6px !important; }
+    .worker-card-name { font-size: 0.82rem !important; }
+    .worker-card-stats {
+      display: flex !important;
+      gap: 0.3rem !important;
+      margin-bottom: 0.3rem !important;
+    }
+    .worker-card-stats > div { padding: 0.2rem 0.4rem !important; flex: 1; }
+    .worker-card-stats > div > div:first-child { font-size: 0.82rem !important; }
+    .worker-card-actions { margin-top: 0.3rem !important; padding-top: 0.3rem !important; gap: 0.2rem !important; }
+    .worker-card-actions .btn-sm { font-size: 0.68rem; padding: 0.25rem 0.35rem; }
+    .worker-card-transfer { font-size: 0.65rem !important; }
+
+    /* Filter bar responsive */
+    .form-input[placeholder*="Pretraži"] { max-width: 100% !important; flex: 1 1 100% !important; }
+    .filter-chip { font-size: 0.7rem; padding: 0.3rem 0.5rem; }
   }
   .mobile-fab { display: none; }
   .mobile-sidebar-panel { display: none; }
@@ -3006,26 +3077,24 @@ function WorkersView({ workers, setWorkers, schedules }) {
       </div>
 
       {/* CATEGORY SUMMARY CARDS */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'0.6rem',marginBottom:'1.1rem'}}>
+      <div className="category-grid">
         {WORKER_CATEGORIES.map(cat => {
           const cnt     = catCounts[cat.id] || 0;
           const active  = activeCat === cat.id;
           return (
             <button key={cat.id}
               onClick={() => setActiveCat(active ? 'sve' : cat.id)}
+              className="category-card"
               style={{
                 border:`2px solid ${active ? cat.color : 'var(--border)'}`,
-                borderRadius:8, padding:'0.7rem 0.9rem',
                 background: active ? cat.pale : 'var(--surface)',
-                cursor:'pointer', textAlign:'left',
                 boxShadow: active ? `0 0 0 1px ${cat.border}` : 'var(--shadow)',
-                transition:'all 0.12s',
               }}>
-              <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.3rem'}}>
-                <span style={{fontSize:'1.2rem'}}>{cat.icon}</span>
-                <span style={{fontFamily:'var(--mono)',fontSize:'1.4rem',fontWeight:700,color:cat.color}}>{cnt}</span>
+              <div style={{display:'flex',alignItems:'center',gap:'0.3rem'}}>
+                <span className="category-card-icon">{cat.icon}</span>
+                <span className="category-card-count" style={{color:cat.color}}>{cnt}</span>
               </div>
-              <div style={{fontSize:'0.75rem',fontWeight:600,color: active ? cat.color : 'var(--text-muted)'}}>{cat.label}</div>
+              <div className="category-card-label" style={{color: active ? cat.color : 'var(--text-muted)'}}>{cat.label}</div>
             </button>
           );
         })}
@@ -3052,7 +3121,7 @@ function WorkersView({ workers, setWorkers, schedules }) {
 
       {/* VIEW: KARTICE */}
       {viewMode === 'kartice' && (
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:'0.75rem'}}>
+        <div className="worker-cards-grid">
           {filtered.length === 0 && (
             <div className="empty-state" style={{gridColumn:'1/-1'}}>
               <span className="icon">👷</span><p>Nema radnika za odabrane filtere.</p>
@@ -3063,20 +3132,20 @@ function WorkersView({ workers, setWorkers, schedules }) {
             const sc  = workerSchedCount[w.id] || 0;
             const ls  = workerLastSeen[w.id];
             return (
-              <div key={w.id} style={{
+              <div key={w.id} className="worker-card" style={{
                 background:'var(--surface)', border:`1px solid ${w.status==='aktivan'?'var(--border)':'#f0c0c0'}`,
                 borderRadius:8, overflow:'hidden', boxShadow:'var(--shadow)',
                 opacity: w.status==='aktivan' ? 1 : 0.72,
                 transition:'box-shadow 0.12s',
               }}>
                 {/* category stripe */}
-                <div style={{
+                <div className="worker-card-stripe" style={{
                   height:4, background:`linear-gradient(90deg,${cat?.color||'#999'},${cat?.border||'#ccc'})`,
                 }}/>
-                <div style={{padding:'0.9rem'}}>
+                <div className="worker-card-body" style={{padding:'0.9rem'}}>
                   {/* top row */}
-                  <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem',marginBottom:'0.6rem'}}>
-                    <div style={{
+                  <div className="worker-card-top" style={{display:'flex',alignItems:'flex-start',gap:'0.5rem',marginBottom:'0.6rem'}}>
+                    <div className="worker-card-avatar" style={{
                       width:38,height:38,borderRadius:8,
                       background: cat?.pale||'#f0f0f0',
                       display:'flex',alignItems:'center',justifyContent:'center',
@@ -3084,10 +3153,10 @@ function WorkersView({ workers, setWorkers, schedules }) {
                       border:`1px solid ${cat?.border||'#ccc'}`,
                     }}>{cat?.icon||'👤'}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:'0.88rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</div>
+                      <div className="worker-card-name" style={{fontWeight:700,fontSize:'0.88rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</div>
                       <CatBadge catId={w.category} size="small" />
                     </div>
-                    <span style={{
+                    <span className="worker-card-status" style={{
                       fontSize:'0.65rem',fontWeight:700,padding:'0.15rem 0.4rem',borderRadius:10,
                       background: w.status==='aktivan'?'#d4edda':'#f8d7da',
                       color: w.status==='aktivan'?'#155724':'#721c24',
@@ -3096,7 +3165,7 @@ function WorkersView({ workers, setWorkers, schedules }) {
                   </div>
 
                   {/* info */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.4rem',marginBottom:'0.6rem'}}>
+                  <div className="worker-card-stats" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.4rem',marginBottom:'0.6rem'}}>
                     <div style={{background:'var(--bg)',borderRadius:4,padding:'0.3rem 0.5rem',textAlign:'center'}}>
                       <div style={{fontFamily:'var(--mono)',fontSize:'1rem',fontWeight:700,color:'var(--green)'}}>{sc}</div>
                       <div style={{fontSize:'0.62rem',color:'var(--text-light)'}}>rasporeda</div>
@@ -3107,21 +3176,21 @@ function WorkersView({ workers, setWorkers, schedules }) {
                     </div>
                   </div>
 
-                  {w.phone && <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:'0.3rem'}}>📞 {w.phone}</div>}
-                  {w.note  && <div style={{fontSize:'0.72rem',color:'var(--text-muted)',fontStyle:'italic',marginBottom:'0.4rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.note}</div>}
+                  {w.phone && <div className="worker-card-phone" style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:'0.3rem'}}>📞 {w.phone}</div>}
+                  {w.note  && <div className="worker-card-note" style={{fontSize:'0.72rem',color:'var(--text-muted)',fontStyle:'italic',marginBottom:'0.4rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.note}</div>}
 
                   {/* actions */}
-                  <div style={{display:'flex',gap:'0.3rem',marginTop:'0.5rem',borderTop:'1px solid var(--border)',paddingTop:'0.5rem',flexWrap:'wrap'}}>
+                  <div className="worker-card-actions" style={{display:'flex',gap:'0.3rem',marginTop:'0.5rem',borderTop:'1px solid var(--border)',paddingTop:'0.5rem',flexWrap:'wrap'}}>
                     <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={() => setDetail(w)}>👁 Detalji</button>
                     {w.category === 'primac_panj' && (
-                      <button className="btn btn-sm" title="Prebaci u pomoćnog radnika"
+                      <button className="btn btn-sm worker-card-transfer" title="Prebaci u pomoćnog radnika"
                         style={{flex:'1 0 100%',background:'#e4edf5',color:'#1a3d5c',border:'1px solid #9bbfd9',fontSize:'0.72rem'}}
                         onClick={() => { if(confirm(`Prebaciti "${w.name}" u Pomoćnog radnika?`)) setWorkers(ws => ws.map(x => x.id===w.id ? {...x, category:'pomocni'} : x)); }}>
                         🔄 Prebaci u pomoćnog
                       </button>
                     )}
                     {w.category === 'pomocni' && (
-                      <button className="btn btn-sm" title="Vrati u primača"
+                      <button className="btn btn-sm worker-card-transfer" title="Vrati u primača"
                         style={{flex:'1 0 100%',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',fontSize:'0.72rem'}}
                         onClick={() => { if(confirm(`Vratiti "${w.name}" u Primača na šuma panju?`)) setWorkers(ws => ws.map(x => x.id===w.id ? {...x, category:'primac_panj'} : x)); }}>
                         🔄 Vrati u primača
