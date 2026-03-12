@@ -3809,6 +3809,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [selWorker, setSelWorker] = useState('');
   const [goModal, setGoModal] = useState(null); // { workerId } or null
   const [goForm, setGoForm] = useState({ date:'', type:'Godišnji odmor', note:'' });
+  const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji'
 
   const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
   const ODSUTNOST_COLOR = {
@@ -3881,30 +3882,113 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
 
   const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
 
+  // ── Yearly overview data ──
+  const yearlyStats = useMemo(() => {
+    if (sihtView !== 'godisnji') return [];
+    return workers.filter(w => w.status === 'aktivan').map(w => {
+      const months = Array.from({length:12}, (_,mi) => {
+        const dim = new Date(selYear, mi+1, 0).getDate();
+        let radnih=0, odsutnih=0, vikenda=0, praznih=0;
+        const odsutTypes = {};
+        for (let d=1; d<=dim; d++) {
+          const iso = `${selYear}-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dw = new Date(selYear, mi, d).getDay();
+          if (dw===0||dw===6) { vikenda++; continue; }
+          const entry = workerDayMap[w.id]?.[iso];
+          if (!entry) { praznih++; continue; }
+          if (entry.type==='rad') radnih++;
+          else { odsutnih++; odsutTypes[entry.oType]=(odsutTypes[entry.oType]||0)+1; }
+        }
+        return { radnih, odsutnih, vikenda, praznih, odsutTypes };
+      });
+      const total = months.reduce((a,m)=>({
+        radnih:a.radnih+m.radnih, odsutnih:a.odsutnih+m.odsutnih,
+        vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih
+      }),{radnih:0,odsutnih:0,vikenda:0,praznih:0});
+      return { ...w, months, total };
+    });
+  }, [sihtView, selYear, workerDayMap, workers]);
+
+  // ── Per-worker monthly detail ──
+  const singleWorkerData = useMemo(() => {
+    if (sihtView !== 'radnik' || !selWorker) return null;
+    const w = workers.find(x => x.id === selWorker);
+    if (!w) return null;
+    const months = Array.from({length:12}, (_,mi) => {
+      const dim = new Date(selYear, mi+1, 0).getDate();
+      const daysList = [];
+      let radnih=0, odsutnih=0, vikenda=0, praznih=0;
+      const odsutTypes = {};
+      for (let d=1; d<=dim; d++) {
+        const iso = `${selYear}-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dw = new Date(selYear, mi, d).getDay();
+        const entry = workerDayMap[w.id]?.[iso];
+        const wknd = dw===0||dw===6;
+        if (wknd) vikenda++;
+        else if (!entry) praznih++;
+        else if (entry.type==='rad') radnih++;
+        else { odsutnih++; odsutTypes[entry.oType]=(odsutTypes[entry.oType]||0)+1; }
+        daysList.push({ d, iso, dw, wknd, entry });
+      }
+      return { mi, days: daysList, radnih, odsutnih, vikenda, praznih, odsutTypes };
+    });
+    const total = months.reduce((a,m)=>({
+      radnih:a.radnih+m.radnih, odsutnih:a.odsutnih+m.odsutnih,
+      vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih
+    }),{radnih:0,odsutnih:0,vikenda:0,praznih:0});
+    return { worker: w, months, total };
+  }, [sihtView, selYear, selWorker, workerDayMap, workers]);
+
   return (
     <div>
       {/* HEADER */}
-      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'0.75rem',flexWrap:'wrap'}}>
         <div className="section-title">📄 Šihtarica</div>
 
-        {/* Month/Year nav */}
-        <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
-          <button className="date-nav-btn" onClick={() => { if(selMonth===0){setSelMonth(11);setSelYear(y=>y-1);}else setSelMonth(m=>m-1); }}>◀</button>
-          <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.9rem',minWidth:140,textAlign:'center'}}>
-            {MONTH_NAMES[selMonth]} {selYear}
-          </span>
-          <button className="date-nav-btn" onClick={() => { if(selMonth===11){setSelMonth(0);setSelYear(y=>y+1);}else setSelMonth(m=>m+1); }}>▶</button>
+        {/* View tabs */}
+        <div style={{display:'flex',gap:0,borderRadius:6,overflow:'hidden',border:'1px solid var(--border)'}}>
+          {[['mjesecni','Mjesečni'],['radnik','Po radniku'],['godisnji','Godišnji']].map(([k,l])=>(
+            <button key={k} onClick={()=>setSihtView(k)} style={{
+              padding:'0.35rem 0.7rem',fontSize:'0.75rem',fontWeight:sihtView===k?700:400,
+              border:'none',cursor:'pointer',
+              background:sihtView===k?'var(--green)':'var(--bg)',
+              color:sihtView===k?'white':'var(--text-muted)',
+            }}>{l}</button>
+          ))}
         </div>
+      </div>
+
+      {/* NAV ROW */}
+      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+        {sihtView !== 'godisnji' ? (
+          <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
+            <button className="date-nav-btn" onClick={() => { if(selMonth===0){setSelMonth(11);setSelYear(y=>y-1);}else setSelMonth(m=>m-1); }}>◀</button>
+            <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.9rem',minWidth:140,textAlign:'center'}}>
+              {MONTH_NAMES[selMonth]} {selYear}
+            </span>
+            <button className="date-nav-btn" onClick={() => { if(selMonth===11){setSelMonth(0);setSelYear(y=>y+1);}else setSelMonth(m=>m+1); }}>▶</button>
+          </div>
+        ) : (
+          <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
+            <button className="date-nav-btn" onClick={() => setSelYear(y=>y-1)}>◀</button>
+            <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.9rem',minWidth:60,textAlign:'center'}}>
+              {selYear}
+            </span>
+            <button className="date-nav-btn" onClick={() => setSelYear(y=>y+1)}>▶</button>
+          </div>
+        )}
 
         {/* Worker filter */}
         <select className="form-select" value={selWorker} onChange={e=>setSelWorker(e.target.value)} style={{maxWidth:220}}>
-          <option value="">Svi radnici</option>
+          <option value="">{sihtView==='radnik' ? '— Odaberi radnika —' : 'Svi radnici'}</option>
           {workers.filter(w=>w.status==='aktivan').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
 
         <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨️ Štampaj</button>
       </div>
 
+      {/* ═══════ MJESEČNI VIEW ═══════ */}
+      {sihtView === 'mjesecni' && (<>
       {/* LEGENDA */}
       <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginBottom:'1rem',alignItems:'center'}}>
         <span style={{fontSize:'0.72rem',color:'var(--text-muted)',fontWeight:700}}>Kategorije:</span>
@@ -4058,6 +4142,196 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           })}
         </div>
       </div>
+
+      </>)}
+
+      {/* ═══════ PO RADNIKU VIEW ═══════ */}
+      {sihtView === 'radnik' && (
+        !selWorker ? (
+          <div className="empty-state">
+            <span className="icon">👷</span>
+            <p>Odaberi radnika iz padajućeg menija iznad.</p>
+          </div>
+        ) : !singleWorkerData ? (
+          <div className="empty-state"><p>Radnik nije pronađen.</p></div>
+        ) : (() => {
+          const { worker: w, months: wMonths, total: wTotal } = singleWorkerData;
+          const cat = getCatById(w.category);
+          return (
+            <div>
+              {/* Worker header */}
+              <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem',padding:'0.75rem 1rem',background:cat?.pale||'#f0f0f0',border:`2px solid ${cat?.border||'#ccc'}`,borderLeft:`5px solid ${cat?.color||'#999'}`,borderRadius:6}}>
+                <span style={{fontSize:'1.4rem'}}>{cat?.icon||'👤'}</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:'1rem',color:cat?.color||'var(--text)'}}>{w.name}</div>
+                  <div style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>{cat?.label} · {selYear}</div>
+                </div>
+                <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                  <span style={{fontFamily:'var(--mono)',fontSize:'0.82rem',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',borderRadius:4,padding:'0.2rem 0.6rem',fontWeight:700}}>{wTotal.radnih} radnih</span>
+                  <span style={{fontFamily:'var(--mono)',fontSize:'0.82rem',background:'#fde8e8',color:'#8b2020',border:'1px solid #e0a0a0',borderRadius:4,padding:'0.2rem 0.6rem',fontWeight:700}}>{wTotal.odsutnih} ods.</span>
+                  <span style={{fontFamily:'var(--mono)',fontSize:'0.82rem',background:'var(--bg)',color:'var(--text-muted)',border:'1px solid var(--border)',borderRadius:4,padding:'0.2rem 0.6rem'}}>{wTotal.praznih} praznih</span>
+                </div>
+              </div>
+
+              {/* Monthly tables */}
+              {wMonths.map(mo => {
+                if (mo.radnih === 0 && mo.odsutnih === 0 && mo.praznih === 0) return null;
+                return (
+                  <div key={mo.mi} className="card" style={{marginBottom:'0.75rem'}}>
+                    <div style={{background:'linear-gradient(135deg,var(--green),var(--green-light))',color:'white',padding:'0.5rem 0.75rem',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <span style={{fontWeight:700,fontSize:'0.85rem'}}>{MONTH_NAMES[mo.mi]} {selYear}</span>
+                      <div style={{display:'flex',gap:'0.4rem'}}>
+                        <span style={{fontFamily:'var(--mono)',fontSize:'0.72rem',background:'rgba(255,255,255,0.2)',padding:'0.15rem 0.4rem',borderRadius:10}}>{mo.radnih} R</span>
+                        {mo.odsutnih > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.72rem',background:'rgba(255,255,255,0.2)',padding:'0.15rem 0.4rem',borderRadius:10}}>{mo.odsutnih} ods</span>}
+                      </div>
+                    </div>
+                    <div style={{overflowX:'auto'}}>
+                      <table style={{borderCollapse:'collapse',fontSize:'0.75rem',width:'100%'}}>
+                        <thead>
+                          <tr>
+                            {mo.days.map(({d,dw,wknd}) => (
+                              <th key={d} style={{
+                                background:wknd?'#ece9e2':'#f0ede6',padding:'0.25rem 0.15rem',textAlign:'center',
+                                border:'1px solid var(--border)',minWidth:26,fontFamily:'var(--mono)',fontSize:'0.62rem',
+                                color:wknd?'var(--text-light)':'var(--text-muted)',
+                              }}>
+                                <div>{d}</div>
+                                <div style={{fontSize:'0.5rem',opacity:0.7}}>{'NPUSČPS'[dw]}</div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            {mo.days.map(({d,iso,wknd,entry}) => {
+                              let bg = wknd ? '#f0ede6' : 'white';
+                              let content = wknd ? <span style={{color:'#ccc8c0',fontSize:'0.5rem'}}>—</span> : null;
+                              let border = wknd ? '#ddd9d0' : '#ece9e2';
+                              if (entry?.type==='rad') {
+                                bg = cat?.pale||'#e8f0e6';
+                                border = cat?.border||'#9bc492';
+                                content = <span style={{color:cat?.color||'#2d5a27',fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>{cat?.icon||'R'}</span>;
+                              } else if (entry?.type==='odsutnost') {
+                                const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan'];
+                                bg = oc.bg; border = oc.border;
+                                content = <span style={{color:oc.color,fontWeight:700,fontSize:'0.58rem',fontFamily:'var(--mono)'}}>{oc.short}</span>;
+                              }
+                              return <td key={d} title={entry?.type==='rad'?entry.jobType:entry?.oType||''} style={{padding:'0.2rem 0.1rem',border:`1px solid ${border}`,textAlign:'center',background:bg}}>{content}</td>;
+                            })}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Month detail */}
+                    <div style={{padding:'0.4rem 0.75rem',display:'flex',gap:'0.4rem',flexWrap:'wrap',borderTop:'1px solid var(--border)',fontSize:'0.72rem'}}>
+                      <span style={{fontFamily:'var(--mono)',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',borderRadius:3,padding:'0.1rem 0.4rem',fontWeight:700}}>{mo.radnih} rad</span>
+                      {Object.entries(mo.odsutTypes||{}).map(([k,v])=>{
+                        const oc=ODSUTNOST_COLOR[k]||{bg:'#f0f0f0',color:'#555',border:'#ccc',short:'?'};
+                        return <span key={k} style={{fontFamily:'var(--mono)',background:oc.bg,color:oc.color,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.1rem 0.4rem',fontWeight:700}}>{v} {oc.short}</span>;
+                      })}
+                      {mo.praznih > 0 && <span style={{fontFamily:'var(--mono)',color:'var(--text-light)',padding:'0.1rem 0.4rem'}}>{mo.praznih} praznih</span>}
+                      <span style={{fontFamily:'var(--mono)',color:'var(--text-light)',padding:'0.1rem 0.4rem'}}>{mo.vikenda} vik</span>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Yearly total */}
+              <div className="card" style={{background:'#fafaf8'}}>
+                <div style={{padding:'0.75rem 1rem'}}>
+                  <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.4rem'}}>UKUPNO ZA {selYear}</div>
+                  <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                    <span style={{fontFamily:'var(--mono)',fontSize:'0.85rem',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',borderRadius:4,padding:'0.2rem 0.6rem',fontWeight:700}}>{wTotal.radnih} radnih dana</span>
+                    <span style={{fontFamily:'var(--mono)',fontSize:'0.85rem',background:'#fde8e8',color:'#8b2020',border:'1px solid #e0a0a0',borderRadius:4,padding:'0.2rem 0.6rem',fontWeight:700}}>{wTotal.odsutnih} odsutnih</span>
+                    <span style={{fontFamily:'var(--mono)',fontSize:'0.85rem',background:'var(--bg)',color:'var(--text-muted)',border:'1px solid var(--border)',borderRadius:4,padding:'0.2rem 0.6rem'}}>{wTotal.praznih} praznih</span>
+                    <span style={{fontFamily:'var(--mono)',fontSize:'0.85rem',background:'var(--bg)',color:'var(--text-muted)',border:'1px solid var(--border)',borderRadius:4,padding:'0.2rem 0.6rem'}}>{wTotal.vikenda} vikend</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      )}
+
+      {/* ═══════ GODIŠNJI VIEW ═══════ */}
+      {sihtView === 'godisnji' && (
+        <div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',fontSize:'0.75rem',width:'100%',minWidth:'max-content'}}>
+              <thead>
+                <tr>
+                  <th style={{background:'#f0ede6',padding:'0.5rem 0.75rem',textAlign:'left',border:'1px solid var(--border)',minWidth:160,position:'sticky',left:0,zIndex:2,fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.08em'}}>RADNIK</th>
+                  {MONTH_NAMES.map((mn,i) => (
+                    <th key={i} style={{background:'#f0ede6',padding:'0.35rem 0.3rem',textAlign:'center',border:'1px solid var(--border)',fontFamily:'var(--mono)',fontSize:'0.62rem',minWidth:44,cursor:'pointer'}}
+                      onClick={()=>{setSelMonth(i);setSihtView('mjesecni')}} title={`Otvori ${mn}`}>
+                      {mn.substring(0,3).toUpperCase()}
+                    </th>
+                  ))}
+                  <th style={{background:'var(--green)',color:'white',padding:'0.35rem 0.5rem',border:'1px solid var(--green)',fontFamily:'var(--mono)',fontSize:'0.65rem',textAlign:'center',minWidth:48}}>UKUP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {yearlyStats.map(w => {
+                  const cat = getCatById(w.category);
+                  return (
+                    <tr key={w.id}>
+                      <td style={{
+                        padding:'0.35rem 0.6rem',border:`2px solid ${cat?.border||'#ccc'}`,borderLeft:`4px solid ${cat?.color||'#999'}`,
+                        fontWeight:600,background:cat?.pale||'#f0f0f0',position:'sticky',left:0,zIndex:1,
+                      }}>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.3rem'}}>
+                          <span style={{fontSize:'0.8rem'}}>{cat?.icon||'👤'}</span>
+                          <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:cat?.color||'var(--text)',cursor:'pointer'}}
+                            onClick={()=>{setSelWorker(w.id);setSihtView('radnik')}} title="Otvori detalj">
+                            {w.name}
+                          </span>
+                        </div>
+                      </td>
+                      {w.months.map((m,mi) => {
+                        const hasData = m.radnih > 0 || m.odsutnih > 0;
+                        const go = m.odsutTypes?.['Godišnji odmor']||0;
+                        const bol = m.odsutTypes?.['Bolovanje']||0;
+                        return (
+                          <td key={mi} style={{padding:'0.2rem 0.15rem',border:'1px solid var(--border)',textAlign:'center',background:hasData?'white':'#fafaf8',cursor:'pointer'}}
+                            onClick={()=>{setSelMonth(mi);setSihtView('mjesecni')}} title={`${MONTH_NAMES[mi]}: ${m.radnih}R ${m.odsutnih}O`}>
+                            {hasData ? (
+                              <div>
+                                <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'var(--green)'}}>{m.radnih}</div>
+                                {(go>0||bol>0) && (
+                                  <div style={{display:'flex',justifyContent:'center',gap:'0.1rem',marginTop:'0.05rem'}}>
+                                    {go>0 && <span style={{fontSize:'0.5rem',fontFamily:'var(--mono)',color:'#1a3d5c',fontWeight:700}}>{go}GO</span>}
+                                    {bol>0 && <span style={{fontSize:'0.5rem',fontFamily:'var(--mono)',color:'#8b2020',fontWeight:700}}>{bol}B</span>}
+                                  </div>
+                                )}
+                              </div>
+                            ) : <span style={{color:'#ddd',fontSize:'0.6rem'}}>—</span>}
+                          </td>
+                        );
+                      })}
+                      <td style={{textAlign:'center',border:'1px solid var(--green)',background:'#e8f0e6',fontFamily:'var(--mono)',fontWeight:700,color:'var(--green)',padding:'0.3rem 0.4rem',fontSize:'0.82rem'}}>
+                        {w.total.radnih}
+                        {w.total.odsutnih > 0 && <div style={{fontSize:'0.55rem',color:'#8b2020',fontWeight:600}}>{w.total.odsutnih} ods</div>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style={{background:'var(--green)',color:'white',padding:'0.4rem 0.75rem',fontWeight:700,fontSize:'0.75rem',position:'sticky',left:0,zIndex:2,border:'1px solid var(--green)'}}>UKUPNO</td>
+                  {Array.from({length:12},(_,mi) => {
+                    const sum = yearlyStats.reduce((a,w) => a+w.months[mi].radnih, 0);
+                    return <td key={mi} style={{textAlign:'center',border:'1px solid var(--border)',background:'#f0ede6',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'var(--green)',padding:'0.3rem 0.2rem'}}>{sum||'—'}</td>;
+                  })}
+                  <td style={{textAlign:'center',border:'1px solid var(--green)',background:'var(--green)',color:'white',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.85rem',padding:'0.3rem 0.4rem'}}>
+                    {yearlyStats.reduce((a,w)=>a+w.total.radnih,0)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* MODAL — dodaj odsutnost */}
       {goModal && (
