@@ -3817,7 +3817,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
   const [selWorker, setSelWorker] = useState('');
   const [goModal, setGoModal] = useState(null); // { workerId } or null
-  const [goForm, setGoForm] = useState({ date:'', type:'Godišnji odmor', note:'' });
+  const [goForm, setGoForm] = useState({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
   const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji'
 
   const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
@@ -3872,17 +3872,29 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     });
   }, [workerDayMap, days, selYear, selMonth]);
 
-  // Add odsutnost
+  // Add odsutnost (supports date range)
   const saveGodisnji = () => {
     if (!goForm.date) return alert('Odaberi datum!');
     const wId = goModal.workerId;
+    const startDate = new Date(goForm.date);
+    const endDate = goForm.dateDo ? new Date(goForm.dateDo) : startDate;
+    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    // Collect all dates in range
+    const dates = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
+      const dw = d.getDay();
+      if (dw !== 0 && dw !== 6) { // skip weekends
+        dates.push(d.toISOString().slice(0,10));
+      }
+    }
+    if (dates.length === 0) return alert('Nema radnih dana u odabranom periodu!');
     setGodisnji(g => {
-      const prev = g[wId] || [];
-      const filtered = prev.filter(e => e.date !== goForm.date);
-      return { ...g, [wId]: [...filtered, { date: goForm.date, type: goForm.type, note: goForm.note }] };
+      const prev = (g[wId] || []).filter(e => !dates.includes(e.date));
+      const newEntries = dates.map(dt => ({ date: dt, type: goForm.type, note: goForm.note }));
+      return { ...g, [wId]: [...prev, ...newEntries] };
     });
     setGoModal(null);
-    setGoForm({ date:'', type:'Godišnji odmor', note:'' });
+    setGoForm({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
   };
 
   const deleteGodisnji = (wId, date) => {
@@ -4063,7 +4075,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:catColor}}>{w.name}</span>
                     </div>
                     <button
-                      onClick={() => { setGoModal({workerId:w.id}); setGoForm({date:isoDate(new Date().getDate()), type:'Godišnji odmor', note:''}); }}
+                      onClick={() => { setGoModal({workerId:w.id}); setGoForm({date:isoDate(new Date().getDate()), dateDo:'', type:'Godišnji odmor', note:''}); }}
                       style={{background:catColor,color:'white',border:'none',borderRadius:4,padding:'0.15rem 0.35rem',fontSize:'0.65rem',cursor:'pointer',flexShrink:0,fontWeight:700}}
                       title="Dodaj odsutnost">+GO
                     </button>
@@ -4410,10 +4422,22 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
               <button className="btn btn-ghost btn-icon" onClick={()=>setGoModal(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Datum *</label>
-                <input type="date" className="form-input" value={goForm.date} onChange={e=>setGoForm(f=>({...f,date:e.target.value}))} />
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem'}}>
+                <div className="form-group">
+                  <label className="form-label">Od *</label>
+                  <input type="date" className="form-input" value={goForm.date} onChange={e=>setGoForm(f=>({...f,date:e.target.value, dateDo: f.dateDo && f.dateDo < e.target.value ? e.target.value : f.dateDo}))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Do <span style={{color:'var(--text-light)',fontWeight:400}}>(opciono)</span></label>
+                  <input type="date" className="form-input" value={goForm.dateDo} min={goForm.date||undefined} onChange={e=>setGoForm(f=>({...f,dateDo:e.target.value}))} />
+                </div>
               </div>
+              {goForm.date && goForm.dateDo && goForm.dateDo >= goForm.date && (() => {
+                const s = new Date(goForm.date), e = new Date(goForm.dateDo);
+                let count = 0;
+                for (let d = new Date(s); d <= e; d.setDate(d.getDate()+1)) { const dw=d.getDay(); if(dw!==0&&dw!==6) count++; }
+                return <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginTop:'-0.3rem',marginBottom:'0.3rem'}}>📅 {count} radni{count===1?'':count<5?'a':'h'} dan{count===1?'':count<5?'a':'a'} u periodu</div>;
+              })()}
               <div className="form-group">
                 <label className="form-label">Vrsta odsutnosti</label>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.4rem'}}>
