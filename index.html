@@ -4121,39 +4121,46 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           const catPale  = cat?.pale  || '#e8f0e6';
           const catBorder= cat?.border|| '#9bc492';
           return (
-            <div key={w.id} style={{background:'var(--surface)',border:`1px solid ${catBorder}`,borderLeft:`4px solid ${catColor}`,borderRadius:6,marginBottom:'0.5rem',overflow:'hidden'}}>
+            <div key={w.id} style={{background:'var(--surface)',border:`1px solid ${catBorder}`,borderLeft:`4px solid ${catColor}`,borderRadius:6,marginBottom:'0.4rem',overflow:'hidden'}}>
               {/* Worker name + stats */}
-              <div style={{display:'flex',alignItems:'center',gap:'0.35rem',padding:'0.35rem 0.5rem',background:catPale}}>
-                <span style={{fontSize:'0.8rem'}}>{cat?.icon||'👤'}</span>
-                <span style={{fontWeight:700,fontSize:'0.78rem',color:catColor,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
-                <span style={{fontFamily:'var(--mono)',fontSize:'0.65rem',fontWeight:700,color:catColor,background:'rgba(255,255,255,0.6)',borderRadius:3,padding:'0.1rem 0.3rem'}}>{stats.radnih||0}R</span>
-                {(stats.odsutTypes?.['Godišnji odmor']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.58rem',fontWeight:700,color:'#1a3d5c',background:'#e4edf5',borderRadius:3,padding:'0.1rem 0.25rem'}}>{stats.odsutTypes['Godišnji odmor']}GO</span>}
-                {(stats.odsutTypes?.['Bolovanje']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.58rem',fontWeight:700,color:'#8b2020',background:'#fde8e8',borderRadius:3,padding:'0.1rem 0.25rem'}}>{stats.odsutTypes['Bolovanje']}B</span>}
+              <div style={{display:'flex',alignItems:'center',gap:'0.3rem',padding:'0.3rem 0.45rem',background:catPale}}>
+                <span style={{fontSize:'0.75rem'}}>{cat?.icon||'👤'}</span>
+                <span style={{fontWeight:700,fontSize:'0.75rem',color:catColor,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
+                <span style={{fontFamily:'var(--mono)',fontSize:'0.6rem',fontWeight:700,color:catColor,background:'rgba(255,255,255,0.6)',borderRadius:3,padding:'0.05rem 0.25rem'}}>{stats.radnih||0}R</span>
+                {(stats.odsutTypes?.['Godišnji odmor']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.55rem',fontWeight:700,color:'#1a3d5c',background:'#e4edf5',borderRadius:3,padding:'0.05rem 0.2rem'}}>{stats.odsutTypes['Godišnji odmor']}GO</span>}
+                {(stats.odsutTypes?.['Bolovanje']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.55rem',fontWeight:700,color:'#8b2020',background:'#fde8e8',borderRadius:3,padding:'0.05rem 0.2rem'}}>{stats.odsutTypes['Bolovanje']}B</span>}
                 <button onClick={()=>{setGoModal({workerId:w.id});setGoForm({date:isoDate(new Date().getDate()),type:'Godišnji odmor',note:''});}}
-                  style={{background:catColor,color:'white',border:'none',borderRadius:3,padding:'0.1rem 0.25rem',fontSize:'0.55rem',cursor:'pointer',fontWeight:700}}>+GO</button>
+                  style={{background:catColor,color:'white',border:'none',borderRadius:3,padding:'0.05rem 0.2rem',fontSize:'0.55rem',cursor:'pointer',fontWeight:700}}>+GO</button>
               </div>
-              {/* Heatmap day row */}
-              <div style={{padding:'0.2rem 0.35rem 0.15rem',display:'grid',gridTemplateColumns:`repeat(${daysInMonth}, 1fr)`,gap:'1px'}}>
+              {/* Day cells grid — each cell shows day number with colored background */}
+              <div style={{padding:'0.2rem 0.3rem 0.25rem',display:'grid',gridTemplateColumns:`repeat(${daysInMonth}, 1fr)`,gap:'1px'}}>
                 {days.map(d => {
                   const date = isoDate(d);
                   const entry = workerDayMap[w.id]?.[date];
                   const wknd = isWeekend(d);
-                  let bg = wknd ? '#e8e5de' : '#eee';
-                  if (entry?.type === 'rad') bg = catColor;
-                  else if (entry?.type === 'odsutnost') {
+                  let bg = wknd ? '#e8e5de' : '#f5f3ee';
+                  let color = wknd ? '#b5b0a6' : '#c5c0b6';
+                  let fontW = 400;
+                  let label = String(d);
+                  if (entry?.type === 'rad') {
+                    bg = catPale; color = catColor; fontW = 700;
+                  } else if (entry?.type === 'odsutnost') {
                     const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan'];
-                    bg = oc.color;
+                    bg = oc.bg; color = oc.color; fontW = 700; label = oc.short;
                   }
-                  return <div key={d} title={`${d}. ${entry?.type==='rad'?entry.jobType:entry?.oType||wknd?'vikend':'prazno'}`}
-                    style={{height:10,background:bg,borderRadius:1,cursor:entry?.type==='odsutnost'?'pointer':'default'}}
-                    onClick={()=>{if(entry?.type==='odsutnost')deleteGodisnji(w.id,date);}} />;
-                })}
-              </div>
-              {/* Day numbers */}
-              <div style={{padding:'0 0.35rem 0.25rem',display:'grid',gridTemplateColumns:`repeat(${daysInMonth}, 1fr)`,gap:'1px'}}>
-                {days.map(d => {
-                  const wknd = isWeekend(d);
-                  return <div key={d} style={{textAlign:'center',fontSize:'0.38rem',fontFamily:'var(--mono)',color:wknd?'#bbb':'#999',lineHeight:1}}>{d}</div>;
+                  return (
+                    <div key={d} title={`${d}. ${entry?.type==='rad'?(cat?.short||'Rad')+' · '+entry.jobType : entry?.oType || (wknd?'vikend':'')}`}
+                      style={{
+                        height:20, background:bg, borderRadius:2,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:'0.42rem', fontWeight:fontW, fontFamily:'var(--mono)', color,
+                        cursor: entry?.type==='odsutnost' ? 'pointer' : 'default',
+                        border: entry?.type==='rad' ? `1px solid ${catBorder}` : entry?.type==='odsutnost' ? `1px solid ${(ODSUTNOST_COLOR[entry.oType]||{border:'#ccc'}).border}` : '1px solid transparent',
+                      }}
+                      onClick={()=>{if(entry?.type==='odsutnost')deleteGodisnji(w.id,date);}}>
+                      {label}
+                    </div>
+                  );
                 })}
               </div>
             </div>
