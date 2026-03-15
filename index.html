@@ -550,7 +550,7 @@ if (FIREBASE_ENABLED) {
 
     .sidebar { display: none; }
     .app-layout { display: block; }
-    .main-content { padding: 0.75rem; }
+    .main-content { padding: 0.5rem; }
 
     /* Right panel hidden on mobile — content shown inline via mobile-sidebar-panel */
     .right-panel { display: none; }
@@ -4135,39 +4135,39 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           return (
             <div key={w.id} style={{background:'var(--surface)',border:`1px solid ${catBorder}`,borderLeft:`4px solid ${catColor}`,borderRadius:6,marginBottom:'0.4rem',overflow:'hidden'}}>
               {/* Worker name + stats */}
-              <div style={{display:'flex',alignItems:'center',gap:'0.3rem',padding:'0.3rem 0.45rem',background:catPale}}>
-                <span style={{fontSize:'0.75rem'}}>{cat?.icon||'👤'}</span>
-                <span style={{fontWeight:700,fontSize:'0.75rem',color:catColor,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
-                <span style={{fontFamily:'var(--mono)',fontSize:'0.6rem',fontWeight:700,color:catColor,background:'rgba(255,255,255,0.6)',borderRadius:3,padding:'0.05rem 0.25rem'}}>{stats.radnih||0}R</span>
-                {(stats.odsutTypes?.['Godišnji odmor']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.55rem',fontWeight:700,color:'#1a3d5c',background:'#e4edf5',borderRadius:3,padding:'0.05rem 0.2rem'}}>{stats.odsutTypes['Godišnji odmor']}GO</span>}
-                {(stats.odsutTypes?.['Bolovanje']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.55rem',fontWeight:700,color:'#8b2020',background:'#fde8e8',borderRadius:3,padding:'0.05rem 0.2rem'}}>{stats.odsutTypes['Bolovanje']}B</span>}
-                <button onClick={()=>{setGoModal({workerId:w.id});setGoForm({date:isoDate(new Date().getDate()),type:'Godišnji odmor',note:''});}}
-                  style={{background:catColor,color:'white',border:'none',borderRadius:3,padding:'0.05rem 0.2rem',fontSize:'0.55rem',cursor:'pointer',fontWeight:700}}>+GO</button>
+              <div style={{display:'flex',alignItems:'center',gap:'0.3rem',padding:'0.35rem 0.5rem',background:catPale}}>
+                <span style={{fontSize:'0.8rem'}}>{cat?.icon||'👤'}</span>
+                <span style={{fontWeight:700,fontSize:'0.8rem',color:catColor,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
+                <span style={{fontFamily:'var(--mono)',fontSize:'0.65rem',fontWeight:700,color:'white',background:catColor,borderRadius:3,padding:'0.1rem 0.3rem'}}>{stats.radnih||0}R</span>
+                {(stats.odsutTypes?.['Godišnji odmor']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.6rem',fontWeight:700,color:'white',background:'#1a3d5c',borderRadius:3,padding:'0.1rem 0.25rem'}}>{stats.odsutTypes['Godišnji odmor']}GO</span>}
+                {(stats.odsutTypes?.['Bolovanje']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.6rem',fontWeight:700,color:'white',background:'#8b2020',borderRadius:3,padding:'0.1rem 0.25rem'}}>{stats.odsutTypes['Bolovanje']}B</span>}
+                <button onClick={()=>{setGoModal({workerId:w.id});setGoForm({date:isoDate(new Date().getDate()), dateDo:'', type:'Godišnji odmor',note:''});}}
+                  style={{background:catColor,color:'white',border:'none',borderRadius:4,padding:'0.15rem 0.35rem',fontSize:'0.6rem',cursor:'pointer',fontWeight:700}}>+GO</button>
               </div>
-              {/* Day cells grid — each cell shows day number with colored background */}
-              <div style={{padding:'0.2rem 0.3rem 0.25rem',display:'grid',gridTemplateColumns:`repeat(${daysInMonth}, 1fr)`,gap:'1px'}}>
+              {/* Day cells grid — vivid colored cells */}
+              <div style={{padding:'0.25rem 0.35rem 0.3rem',display:'grid',gridTemplateColumns:`repeat(${daysInMonth}, 1fr)`,gap:'1.5px'}}>
                 {days.map(d => {
                   const date = isoDate(d);
                   const entry = workerDayMap[w.id]?.[date];
                   const wknd = isWeekend(d);
-                  let bg = wknd ? '#e8e5de' : '#f5f3ee';
-                  let color = wknd ? '#b5b0a6' : '#c5c0b6';
-                  let fontW = 400;
-                  let label = String(d);
+                  let bg, color, fontW = 400, label = String(d);
                   if (entry?.type === 'rad') {
-                    bg = catPale; color = catColor; fontW = 700;
+                    bg = catColor; color = 'white'; fontW = 700;
                   } else if (entry?.type === 'odsutnost') {
                     const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan'];
-                    bg = oc.bg; color = oc.color; fontW = 700; label = oc.short;
+                    bg = oc.color; color = 'white'; fontW = 700; label = oc.short;
+                  } else if (wknd) {
+                    bg = '#d5d0c8'; color = '#fff';
+                  } else {
+                    bg = '#e8e4dc'; color = '#a09888';
                   }
                   return (
                     <div key={d} title={`${d}. ${entry?.type==='rad'?(cat?.short||'Rad')+' · '+entry.jobType : entry?.oType || (wknd?'vikend':'')}`}
                       style={{
-                        height:20, background:bg, borderRadius:2,
+                        height:22, background:bg, borderRadius:2,
                         display:'flex', alignItems:'center', justifyContent:'center',
                         fontSize:'0.42rem', fontWeight:fontW, fontFamily:'var(--mono)', color,
                         cursor: entry?.type==='odsutnost' ? 'pointer' : 'default',
-                        border: entry?.type==='rad' ? `1px solid ${catBorder}` : entry?.type==='odsutnost' ? `1px solid ${(ODSUTNOST_COLOR[entry.oType]||{border:'#ccc'}).border}` : '1px solid transparent',
                       }}
                       onClick={()=>{if(entry?.type==='odsutnost')deleteGodisnji(w.id,date);}}>
                       {label}
