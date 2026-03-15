@@ -138,6 +138,7 @@ if (FIREBASE_ENABLED) {
     width: 100%;
     overflow-x: hidden;
   }
+  .main-content > * { max-width: 100%; }
   .right-panel {
     width: 340px;
     flex-shrink: 0;
@@ -1143,7 +1144,7 @@ function App() {
   const onWorkerClick = (worker) => setQuickModal({ worker });
 
   return (
-    <div>
+    <div style={{width:'100%',maxWidth:'100vw',overflowX:'hidden'}}>
       {/* HEADER */}
       <header className="app-header">
         <div className="app-title">
@@ -1350,7 +1351,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   }, [daySchedules]);
 
   return (
-    <div>
+    <div style={{maxWidth:'100%',overflowX:'hidden'}}>
       {/* DATE BAR */}
       <div className="date-bar">
         <div>
@@ -3126,7 +3127,7 @@ function WorkersView({ workers, setWorkers, schedules }) {
   };
 
   return (
-    <div>
+    <div style={{maxWidth:'100%',overflowX:'hidden'}}>
       {/* HEADER ROW */}
       <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
         <div className="section-title">Evidencija radnika</div>
@@ -3166,7 +3167,7 @@ function WorkersView({ workers, setWorkers, schedules }) {
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1rem',flexWrap:'wrap',alignItems:'center'}}>
         <input className="form-input" placeholder="🔍 Pretraži ime, telefon..."
           value={search} onChange={e=>setSearch(e.target.value)}
-          style={{maxWidth:240,flex:'0 0 auto'}} />
+          style={{flex:'1 1 150px',minWidth:0,maxWidth:300}} />
         <div style={{display:'flex',gap:'0.3rem'}}>
           {['sve','aktivan','neaktivan'].map(s => (
             <button key={s} className={`filter-chip ${statusFilter===s?'active':''}`}
@@ -3450,7 +3451,7 @@ function PregledView({ schedules, workers, departments, wName, dName, filterWork
 
       <div className="card" style={{marginBottom:'1rem'}}>
         <div className="card-body">
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'0.75rem'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(200px,100%),1fr))',gap:'0.75rem'}}>
             <div className="form-group" style={{margin:0}}>
               <label className="form-label">Radnik</label>
               <select className="form-select" value={filterWorker} onChange={e=>setFilterWorker(e.target.value)}>
@@ -3652,7 +3653,7 @@ function SpisakView({ workers, setWorkers }) {
         <span style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>{workers.filter(w=>w.status==='aktivan').length} aktivnih / {workers.length} ukupno</span>
       </div>
 
-      <div style={{overflowX:'auto'}}>
+      <div style={{overflowX:'auto',maxWidth:'100%'}}>
         <table style={{borderCollapse:'collapse',width:'100%',minWidth:'max-content'}}>
           <thead>
             <tr>
@@ -4195,7 +4196,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.75rem'}}>
           Pregled po radniku — {MONTH_NAMES[selMonth]} {selYear}
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'0.5rem'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(200px,100%),1fr))',gap:'0.5rem'}}>
           {displayWorkers.filter(w=>w.status==='aktivan').map(w => {
             const stats = workerStats.find(s=>s.id===w.id)||{radnih:0,odsutnih:0,praznih:0};
             const goUpcoming = (godisnji[w.id]||[]).filter(e => e.date >= today()).sort((a,b)=>a.date.localeCompare(b.date));
