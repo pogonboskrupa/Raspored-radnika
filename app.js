@@ -436,6 +436,8 @@ function App() {
   const [ekipa, setEkipa] = useStorage('sumarija_ekipa', {});
   // godisnji: { workerId: [ { date, type, note } ] }
   const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
+  // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
+  const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
   const addHistory = (action, scheduleId, oldData, newData) => {
     setHistory(h => [{
       id: uid(),
@@ -591,7 +593,7 @@ function App() {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['ekipa', '👥 Ekipa'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
+  }, [['raspored', '📋 Raspored'], ['ekipa', '👥 Ekipa'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozaci', '🚗 Vozači'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
     let [k, l] = _ref;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
@@ -659,6 +661,7 @@ function App() {
     schedules: schedules,
     workers: workers,
     departments: departments,
+    vehicles: vehicles,
     wName: wName,
     dName: dName,
     totalToday: totalToday,
@@ -717,6 +720,10 @@ function App() {
   }), activeTab === 'spisak' && /*#__PURE__*/React.createElement(SpisakView, {
     workers: workers,
     setWorkers: setWorkers
+  }), activeTab === 'vozaci' && /*#__PURE__*/React.createElement(VozaciView, {
+    vehicles: vehicles,
+    setVehicles: setVehicles,
+    workers: workers
   }), activeTab === 'sihtarica' && /*#__PURE__*/React.createElement(SihtaricaView, {
     schedules: schedules,
     workers: workers,
@@ -802,6 +809,7 @@ function App() {
     setDepartments: setDepartments,
     schedules: schedules,
     checkConflict: checkConflict,
+    vehicles: vehicles,
     onSave: d => {
       saveSchedule(d, modal.isEdit);
       setModal(null);
@@ -828,6 +836,7 @@ function ScheduleView(_ref2) {
     schedules,
     workers,
     departments,
+    vehicles,
     wName,
     dName,
     totalToday,
@@ -976,7 +985,7 @@ function ScheduleView(_ref2) {
       className: "dept-count"
     }, new Set(rows.flatMap(r => r.allWorkers)).size, " radnika")), /*#__PURE__*/React.createElement("table", {
       className: "schedule-table"
-    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Vrsta posla"), /*#__PURE__*/React.createElement("th", null, "Radnici"), /*#__PURE__*/React.createElement("th", null, "Napomena"), /*#__PURE__*/React.createElement("th", {
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Vrsta posla"), /*#__PURE__*/React.createElement("th", null, "Radnici"), /*#__PURE__*/React.createElement("th", null, "Vozilo"), /*#__PURE__*/React.createElement("th", null, "Napomena"), /*#__PURE__*/React.createElement("th", {
       className: "no-print",
       style: {
         width: '90px'
@@ -1018,6 +1027,36 @@ function ScheduleView(_ref2) {
     }, /*#__PURE__*/React.createElement("span", {
       className: "role-dot"
     }), wName(w))))), /*#__PURE__*/React.createElement("td", {
+      "data-label": "Vozilo",
+      style: {
+        fontSize: '0.8rem'
+      }
+    }, (() => {
+      const v = vehicles?.find(v => v.id === row.vehicleId);
+      if (!v) return '—';
+      const driver = workers.find(w => w.id === v.driverId);
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1px'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 600
+        }
+      }, "\uD83D\uDE97 ", v.registracija), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.7rem',
+          color: 'var(--text-muted)'
+        }
+      }, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), driver && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.7rem',
+          color: '#2a6478'
+        }
+      }, "\uD83D\uDE97 ", driver.name));
+    })()), /*#__PURE__*/React.createElement("td", {
       "data-label": "Napomena",
       style: {
         color: 'var(--text-muted)',
@@ -2264,6 +2303,7 @@ function EntryModal(_ref14) {
     setDepartments,
     schedules,
     checkConflict,
+    vehicles,
     onSave,
     onClose,
     wName
@@ -2279,12 +2319,14 @@ function EntryModal(_ref14) {
     extraWorkers: data.extraWorkers || [],
     allWorkers: data.allWorkers || [],
     note: data.note || '',
+    vehicleId: data.vehicleId || '',
     overrides: data.overrides || []
   });
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
+  const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
 
   // Radnici koji su već raspoređeni za isti datum u drugim unosima
   const alreadyScheduled = new Set(schedules.filter(s => s.date === form.date && (!isEdit || s.id !== form.id)).flatMap(s => s.allWorkers || []));
@@ -2705,6 +2747,25 @@ function EntryModal(_ref14) {
       },
       title: "Ukloni prima\u010Da"
     }, "\u2715"));
+  }))), availableVehicles.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "\uD83D\uDE97 Vozilo (prevoz radnika)"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.vehicleId,
+    onChange: e => setForm(f => ({
+      ...f,
+      vehicleId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Bez vozila \u2014"), availableVehicles.map(v => {
+    const driver = workers.find(w => w.id === v.driverId);
+    return /*#__PURE__*/React.createElement("option", {
+      key: v.id,
+      value: v.id
+    }, v.registracija, " \u2014 ", v.tipVozila, " (", v.brojMjesta, " mj.)", driver ? ` — ${driver.name}` : '');
   }))), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
@@ -5556,8 +5617,367 @@ function SpisakView(_ref29) {
   }, "\uD83D\uDCA1 Klikni na ime ili telefon za direktno editovanje \xB7 Klikni \u2705/\u26D4 za aktivaciju \xB7 Koristite dropdown za premje\u0161tanje u drugu kategoriju"));
 }
 
+// ─── VOZAČI VIEW ────────────────────────────────────────────────────────────
+function VozaciView(_ref30) {
+  let {
+    vehicles,
+    setVehicles,
+    workers
+  } = _ref30;
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    driverId: '',
+    tipVozila: '',
+    registracija: '',
+    brojMjesta: 5,
+    status: 'vozno'
+  });
+  const drivers = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+  const resetForm = () => {
+    setForm({
+      driverId: '',
+      tipVozila: '',
+      registracija: '',
+      brojMjesta: 5,
+      status: 'vozno'
+    });
+    setAdding(false);
+    setEditing(null);
+  };
+  const startEdit = v => {
+    setEditing(v.id);
+    setForm({
+      driverId: v.driverId || '',
+      tipVozila: v.tipVozila || '',
+      registracija: v.registracija || '',
+      brojMjesta: v.brojMjesta || 5,
+      status: v.status || 'vozno'
+    });
+  };
+  const saveVehicle = () => {
+    if (!form.registracija.trim()) return alert('Unesite registarske oznake!');
+    if (!form.tipVozila.trim()) return alert('Unesite tip vozila!');
+    if (editing) {
+      setVehicles(vs => vs.map(v => v.id === editing ? {
+        ...v,
+        ...form
+      } : v));
+    } else {
+      setVehicles(vs => [...vs, {
+        id: uid(),
+        ...form
+      }]);
+    }
+    resetForm();
+  };
+  const deleteVehicle = v => {
+    if (confirm(`Obrisati vozilo "${v.registracija}"?`)) setVehicles(vs => vs.filter(x => x.id !== v.id));
+  };
+  const toggleStatus = v => {
+    setVehicles(vs => vs.map(x => x.id === v.id ? {
+      ...x,
+      status: x.status === 'vozno' ? 'popravka' : 'vozno'
+    } : x));
+  };
+  const driverName = dId => {
+    const w = workers.find(w => w.id === dId);
+    return w ? w.name : '—';
+  };
+  const vozna = vehicles.filter(v => v.status === 'vozno');
+  const popravka = vehicles.filter(v => v.status === 'popravka');
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      marginBottom: '1rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "\uD83D\uDE97 Voza\u010Di i vozila"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)'
+    }
+  }, vozna.length, " vozno \xB7 ", popravka.length, " na popravku \xB7 ", vehicles.length, " ukupno"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    style: {
+      marginLeft: 'auto'
+    },
+    onClick: () => {
+      setAdding(true);
+      setEditing(null);
+      setForm({
+        driverId: '',
+        tipVozila: '',
+        registracija: '',
+        brojMjesta: 5,
+        status: 'vozno'
+      });
+    }
+  }, "+ Dodaj vozilo")), drivers.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "alert alert-warning",
+    style: {
+      marginBottom: '1rem'
+    }
+  }, "Nemate voza\u010Da u Spisku. Prvo dodajte voza\u010De u kategoriju \"Voza\u010Di\" na tabu Spisak."), (adding || editing) && /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      marginBottom: '1rem',
+      padding: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      marginBottom: '0.75rem',
+      fontSize: '0.9rem'
+    }
+  }, editing ? '✏️ Uredi vozilo' : '+ Novo vozilo'), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      gap: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Voza\u010D"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.driverId,
+    onChange: e => setForm(f => ({
+      ...f,
+      driverId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi voza\u010Da \u2014"), drivers.map(w => /*#__PURE__*/React.createElement("option", {
+    key: w.id,
+    value: w.id
+  }, w.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Tip vozila"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    value: form.tipVozila,
+    onChange: e => setForm(f => ({
+      ...f,
+      tipVozila: e.target.value
+    })),
+    placeholder: "npr. Kombi, Autobus, Putni\u010Dko..."
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Registarske oznake"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    value: form.registracija,
+    onChange: e => setForm(f => ({
+      ...f,
+      registracija: e.target.value
+    })),
+    placeholder: "npr. A12-B-345"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Broj sjede\u0107ih mjesta"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    type: "number",
+    min: "1",
+    max: "60",
+    value: form.brojMjesta,
+    onChange: e => setForm(f => ({
+      ...f,
+      brojMjesta: parseInt(e.target.value) || 1
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Status"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.status,
+    onChange: e => setForm(f => ({
+      ...f,
+      status: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "vozno"
+  }, "U voznom stanju"), /*#__PURE__*/React.createElement("option", {
+    value: "popravka"
+  }, "Na popravku")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.5rem',
+      marginTop: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: saveVehicle
+  }, editing ? '💾 Spremi' : '+ Dodaj'), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    onClick: resetForm
+  }, "Odustani"))), vehicles.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDE97"), /*#__PURE__*/React.createElement("p", null, "Nema unesenih vozila."), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: () => setAdding(true)
+  }, "+ Dodaj prvo vozilo")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      borderCollapse: 'collapse',
+      width: '100%'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4f0f5',
+      border: '1px solid #8bbdd4',
+      padding: '0.6rem 0.75rem',
+      textAlign: 'left',
+      fontSize: '0.8rem',
+      fontWeight: 700
+    }
+  }, "Voza\u010D"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4f0f5',
+      border: '1px solid #8bbdd4',
+      padding: '0.6rem 0.75rem',
+      textAlign: 'left',
+      fontSize: '0.8rem',
+      fontWeight: 700
+    }
+  }, "Tip vozila"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4f0f5',
+      border: '1px solid #8bbdd4',
+      padding: '0.6rem 0.75rem',
+      textAlign: 'left',
+      fontSize: '0.8rem',
+      fontWeight: 700
+    }
+  }, "Registracija"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4f0f5',
+      border: '1px solid #8bbdd4',
+      padding: '0.6rem 0.75rem',
+      textAlign: 'center',
+      fontSize: '0.8rem',
+      fontWeight: 700
+    }
+  }, "Mjesta"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4f0f5',
+      border: '1px solid #8bbdd4',
+      padding: '0.6rem 0.75rem',
+      textAlign: 'center',
+      fontSize: '0.8rem',
+      fontWeight: 700
+    }
+  }, "Status"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4f0f5',
+      border: '1px solid #8bbdd4',
+      padding: '0.6rem 0.75rem',
+      textAlign: 'center',
+      fontSize: '0.8rem',
+      fontWeight: 700
+    },
+    className: "no-print"
+  }, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, vehicles.map(v => {
+    const isPopravka = v.status === 'popravka';
+    return /*#__PURE__*/React.createElement("tr", {
+      key: v.id,
+      style: {
+        opacity: isPopravka ? 0.6 : 1
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        border: '1px solid #ccc',
+        padding: '0.5rem 0.75rem',
+        fontSize: '0.82rem'
+      }
+    }, v.driverId ? /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE97 ", driverName(v.driverId)) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, "\u2014")), /*#__PURE__*/React.createElement("td", {
+      style: {
+        border: '1px solid #ccc',
+        padding: '0.5rem 0.75rem',
+        fontSize: '0.82rem',
+        fontWeight: 600
+      }
+    }, v.tipVozila), /*#__PURE__*/React.createElement("td", {
+      style: {
+        border: '1px solid #ccc',
+        padding: '0.5rem 0.75rem',
+        fontSize: '0.82rem',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        letterSpacing: '0.05em'
+      }
+    }, v.registracija), /*#__PURE__*/React.createElement("td", {
+      style: {
+        border: '1px solid #ccc',
+        padding: '0.5rem 0.75rem',
+        fontSize: '0.82rem',
+        textAlign: 'center'
+      }
+    }, v.brojMjesta), /*#__PURE__*/React.createElement("td", {
+      style: {
+        border: '1px solid #ccc',
+        padding: '0.5rem 0.75rem',
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      onClick: () => toggleStatus(v),
+      style: {
+        cursor: 'pointer',
+        display: 'inline-block',
+        padding: '0.2rem 0.5rem',
+        borderRadius: 12,
+        fontSize: '0.72rem',
+        fontWeight: 700,
+        background: isPopravka ? '#fde8e8' : '#e6f5ea',
+        color: isPopravka ? '#c53030' : '#2d5a27',
+        border: `1px solid ${isPopravka ? '#f5b5b5' : '#9bc492'}`
+      }
+    }, isPopravka ? '🔧 Na popravku' : '✅ Vozno')), /*#__PURE__*/React.createElement("td", {
+      style: {
+        border: '1px solid #ccc',
+        padding: '0.5rem 0.75rem',
+        textAlign: 'center'
+      },
+      className: "no-print"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '0.25rem',
+        justifyContent: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon btn-sm",
+      title: "Uredi",
+      onClick: () => startEdit(v)
+    }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-danger btn-icon btn-sm",
+      title: "Bri\u0161i",
+      onClick: () => deleteVehicle(v)
+    }, "\uD83D\uDDD1\uFE0F"))));
+  })))));
+}
+
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView(_ref30) {
+function SihtaricaView(_ref31) {
   let {
     schedules,
     workers,
@@ -5566,7 +5986,7 @@ function SihtaricaView(_ref30) {
     setGodisnji,
     wName,
     dName
-  } = _ref30;
+  } = _ref31;
   const now = new Date();
   const [selYear, setSelYear] = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
@@ -5635,8 +6055,8 @@ function SihtaricaView(_ref30) {
       });
     });
     // Odsutnost
-    Object.entries(godisnji).forEach(_ref31 => {
-      let [wId, entries] = _ref31;
+    Object.entries(godisnji).forEach(_ref32 => {
+      let [wId, entries] = _ref32;
       if (!m[wId]) return;
       entries.forEach(e => {
         m[wId][e.date] = {
@@ -5863,8 +6283,8 @@ function SihtaricaView(_ref30) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref32 => {
-    let [k, l] = _ref32;
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref33 => {
+    let [k, l] = _ref33;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       onClick: () => setSihtView(k),
@@ -5990,8 +6410,8 @@ function SihtaricaView(_ref30) {
       color: 'var(--text-muted)',
       fontWeight: 700
     }
-  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref33 => {
-    let [k, v] = _ref33;
+  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref34 => {
+    let [k, v] = _ref34;
     return /*#__PURE__*/React.createElement("span", {
       key: k,
       style: {
@@ -6463,8 +6883,8 @@ function SihtaricaView(_ref30) {
         borderRadius: 3,
         padding: '0.1rem 0.4rem'
       }
-    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref34 => {
-      let [k, v] = _ref34;
+    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref35 => {
+      let [k, v] = _ref35;
       const oc = ODSUTNOST_COLOR[k] || {
         bg: '#f0f0f0',
         color: '#555',
@@ -6671,12 +7091,12 @@ function SihtaricaView(_ref30) {
           fontSize: '0.75rem',
           width: '100%'
         }
-      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref35 => {
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref36 => {
         let {
           d,
           dw,
           wknd
-        } = _ref35;
+        } = _ref36;
         return /*#__PURE__*/React.createElement("th", {
           key: d,
           style: {
@@ -6695,13 +7115,13 @@ function SihtaricaView(_ref30) {
             opacity: 0.7
           }
         }, 'NPUSČPS'[dw]));
-      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref36 => {
+      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref37 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref36;
+        } = _ref37;
         let bg = wknd ? '#f0ede6' : 'white';
         let content = wknd ? /*#__PURE__*/React.createElement("span", {
           style: {
@@ -6752,13 +7172,13 @@ function SihtaricaView(_ref30) {
           gridTemplateColumns: `repeat(${mo.days.length}, 1fr)`,
           gap: '1.5px'
         }
-      }, mo.days.map(_ref37 => {
+      }, mo.days.map(_ref38 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref37;
+        } = _ref38;
         let bg,
           color,
           label = String(d),
@@ -6814,8 +7234,8 @@ function SihtaricaView(_ref30) {
           padding: '0.1rem 0.4rem',
           fontWeight: 700
         }
-      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref38 => {
-        let [k, v] = _ref38;
+      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref39 => {
+        let [k, v] = _ref39;
         const oc = ODSUTNOST_COLOR[k] || {
           bg: '#f0f0f0',
           color: '#555',
