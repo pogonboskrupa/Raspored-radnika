@@ -593,7 +593,7 @@ function App() {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['ekipa', '👥 Ekipa'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozaci', '🚗 Vozači'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
+  }, [['raspored', '📋 Raspored'], ['ekipa', '👥 Ekipa'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
     let [k, l] = _ref;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
@@ -720,7 +720,7 @@ function App() {
   }), activeTab === 'spisak' && /*#__PURE__*/React.createElement(SpisakView, {
     workers: workers,
     setWorkers: setWorkers
-  }), activeTab === 'vozaci' && /*#__PURE__*/React.createElement(VozaciView, {
+  }), activeTab === 'vozila' && /*#__PURE__*/React.createElement(VozaciView, {
     vehicles: vehicles,
     setVehicles: setVehicles,
     workers: workers
