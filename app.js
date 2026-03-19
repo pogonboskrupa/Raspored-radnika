@@ -2277,6 +2277,10 @@ function EntryModal(_ref14) {
   const [forceOverride, setForceOverride] = useState(false);
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
+
+  // Radnici koji su već raspoređeni za isti datum u drugim unosima
+  const alreadyScheduled = new Set(schedules.filter(s => s.date === form.date && (!isEdit || s.id !== form.id)).flatMap(s => s.allWorkers || []));
+  const availableWorkers = activeWorkers.filter(w => !alreadyScheduled.has(w.id));
   useEffect(() => {
     if (isPrimka) {
       const ws = [form.primatWorker, ...(form.extraWorkers || [])].filter(Boolean);
@@ -2507,7 +2511,7 @@ function EntryModal(_ref14) {
     }))
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Odaberi prima\u010Da \u2014"), activeWorkers.filter(w => w.category === 'primac_panj').map(w => /*#__PURE__*/React.createElement("option", {
+  }, "\u2014 Odaberi prima\u010Da \u2014"), availableWorkers.filter(w => w.category === 'primac_panj').map(w => /*#__PURE__*/React.createElement("option", {
     key: w.id,
     value: w.id
   }, w.name)))), /*#__PURE__*/React.createElement("div", {
@@ -2519,9 +2523,9 @@ function EntryModal(_ref14) {
   }, (() => {
     const selectedPrimac = form.primatWorker;
     const selected12 = [form.helper1Worker, form.helper2Worker].filter(Boolean);
-    const radniciPrimka = activeWorkers.filter(w => w.category === 'radnik_primka' && w.id !== selectedPrimac);
-    const pomocni = activeWorkers.filter(w => w.category === 'pomocni' && w.id !== selectedPrimac);
-    const ostaliPrimaci = activeWorkers.filter(w => w.category === 'primac_panj' && w.id !== selectedPrimac);
+    const radniciPrimka = availableWorkers.filter(w => w.category === 'radnik_primka' && w.id !== selectedPrimac);
+    const pomocni = availableWorkers.filter(w => w.category === 'pomocni' && w.id !== selectedPrimac);
+    const ostaliPrimaci = availableWorkers.filter(w => w.category === 'primac_panj' && w.id !== selectedPrimac);
     const allOptions = [...radniciPrimka.map(w => ({
       ...w,
       _group: 'Radnici u primci'
@@ -2577,7 +2581,7 @@ function EntryModal(_ref14) {
     className: "form-label"
   }, "Radnici"), /*#__PURE__*/React.createElement("div", {
     className: "worker-selector"
-  }, activeWorkers.filter(w => !form.allWorkers.includes(w.id)).map(w => {
+  }, availableWorkers.filter(w => !form.allWorkers.includes(w.id)).map(w => {
     const cat = getCatById(w.category);
     return /*#__PURE__*/React.createElement("div", {
       key: w.id,
@@ -2599,14 +2603,14 @@ function EntryModal(_ref14) {
         fontFamily: 'var(--mono)'
       }
     }, cat?.short));
-  }), activeWorkers.filter(w => !form.allWorkers.includes(w.id)).length === 0 && /*#__PURE__*/React.createElement("div", {
+  }), availableWorkers.filter(w => !form.allWorkers.includes(w.id)).length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '0.6rem 0.75rem',
       fontSize: '0.78rem',
       color: 'var(--text-muted)',
       fontStyle: 'italic'
     }
-  }, "Svi radnici su odabrani."))), form.allWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "Svi raspolo\u017Eivi radnici su odabrani."))), form.allWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'var(--green-pale)',
       border: '1px solid #9bc492',
