@@ -432,8 +432,6 @@ function App() {
   const [filterWorker, setFilterWorker] = useState('');
   const [filterDept, setFilterDept] = useState('');
   const [filterJob, setFilterJob] = useState('');
-  // Ekipa: { [date]: { primac_panj: [{workerId, note}], radnik_primka: [...], pomocni: [...], otpremac: [...] } }
-  const [ekipa, setEkipa] = useStorage('sumarija_ekipa', {});
   // godisnji: { workerId: [ { date, type, note } ] }
   const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
   // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
@@ -595,7 +593,7 @@ function App() {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['ekipa', '👥 Ekipa'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
+  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
     let [k, l] = _ref;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
@@ -702,16 +700,6 @@ function App() {
     holidays: holidays,
     setHolidays: setHolidays,
     onWorkerClick: onWorkerClick
-  }), activeTab === 'ekipa' && /*#__PURE__*/React.createElement(EkipaView, {
-    workers: workers,
-    departments: departments,
-    ekipa: ekipa,
-    setEkipa: setEkipa,
-    selectedDate: selectedDate,
-    setSelectedDate: setSelectedDate,
-    prevDay: prevDay,
-    nextDay: nextDay,
-    yesterday: yesterday()
   }), activeTab === 'radnici' && /*#__PURE__*/React.createElement(WorkersView, {
     workers: workers,
     setWorkers: setWorkers,
@@ -3306,877 +3294,12 @@ function HistoryDetailModal(_ref16) {
   }, "Zatvori"))));
 }
 
-// ─── EKIPA VIEW ───────────────────────────────────────────────────────────────
-// Data shape per day:
-//   primci:    [ { id, primatId, radnici:[wId,...], pomocni:[wId,...], note } ]
-//   otpremaci: [ { id, workerId, deptId, note } ]
-function EkipaView(_ref17) {
-  let {
-    workers,
-    ekipa,
-    setEkipa,
-    selectedDate,
-    setSelectedDate,
-    prevDay,
-    nextDay,
-    yesterday,
-    departments
-  } = _ref17;
-  const isToday = selectedDate === new Date().toISOString().split('T')[0];
-  const emptyDay = () => ({
-    primci: [],
-    otpremaci: []
-  });
-  const dayData = ekipa[selectedDate] || emptyDay();
-  const save = newData => setEkipa(e => ({
-    ...e,
-    [selectedDate]: newData
-  }));
-
-  // ── all assigned worker IDs today ──────────────────────────────────────────
-  const assignedIds = useMemo(() => {
-    const s = new Set();
-    (dayData.primci || []).forEach(p => {
-      if (p.primatId) s.add(p.primatId);
-      (p.radnici || []).forEach(id => s.add(id));
-      (p.pomocni || []).forEach(id => s.add(id));
-    });
-    (dayData.otpremaci || []).forEach(o => {
-      if (o.workerId) s.add(o.workerId);
-    });
-    return s;
-  }, [dayData]);
-  const activeWorkers = workers.filter(w => w.status === 'aktivan');
-  const unassigned = activeWorkers.filter(w => !assignedIds.has(w.id));
-  const totalAssigned = assignedIds.size;
-  const wName = id => workers.find(w => w.id === id)?.name || '—';
-  const dName = id => (departments || []).find(d => d.id === id)?.name || '—';
-
-  // Available workers for a picker (excluding already-taken ones, optionally allowing current)
-  const available = function () {
-    let excludeIds = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
-    return activeWorkers.filter(w => !assignedIds.has(w.id) || excludeIds.includes(w.id));
-  };
-
-  // ── Primci operations ──────────────────────────────────────────────────────
-  const addPrimac = () => {
-    const row = {
-      id: uid(),
-      primatId: '',
-      radnici: [''],
-      pomocni: [''],
-      note: ''
-    };
-    save({
-      ...dayData,
-      primci: [...(dayData.primci || []), row]
-    });
-  };
-  const removePrimac = id => save({
-    ...dayData,
-    primci: dayData.primci.filter(p => p.id !== id)
-  });
-  const updatePrimac = (id, patch) => save({
-    ...dayData,
-    primci: dayData.primci.map(p => p.id === id ? {
-      ...p,
-      ...patch
-    } : p)
-  });
-
-  // Add/remove a slot in radnici or pomocni arrays
-  const addSlot = (primacId, field) => updatePrimac(primacId, {
-    [field]: [...(dayData.primci.find(p => p.id === primacId)[field] || []), '']
-  });
-  const removeSlot = (primacId, field, idx) => {
-    const arr = [...(dayData.primci.find(p => p.id === primacId)[field] || [])];
-    arr.splice(idx, 1);
-    updatePrimac(primacId, {
-      [field]: arr
-    });
-  };
-  const setSlotWorker = (primacId, field, idx, wId) => {
-    const arr = [...(dayData.primci.find(p => p.id === primacId)[field] || [])];
-    arr[idx] = wId;
-    updatePrimac(primacId, {
-      [field]: arr
-    });
-  };
-
-  // ── Otpremaci operations ──────────────────────────────────────────────────
-  const addOtpremac = () => {
-    const row = {
-      id: uid(),
-      workerId: '',
-      deptId: (departments || [])[0]?.id || '',
-      note: ''
-    };
-    save({
-      ...dayData,
-      otpremaci: [...(dayData.otpremaci || []), row]
-    });
-  };
-  const removeOtpremac = id => save({
-    ...dayData,
-    otpremaci: dayData.otpremaci.filter(o => o.id !== id)
-  });
-  const updateOtpremac = (id, patch) => save({
-    ...dayData,
-    otpremaci: dayData.otpremaci.map(o => o.id === id ? {
-      ...o,
-      ...patch
-    } : o)
-  });
-
-  // ── Copy from yesterday ───────────────────────────────────────────────────
-  const copyFromYesterday = () => {
-    const src = ekipa[yesterday];
-    if (!src || !src.primci?.length && !src.otpremaci?.length) return alert('Nema unesenih podataka za jučer.');
-    if (confirm('Kopirati ekipu od jučer? Trenutni unosi bit će zamijenjeni.')) save(JSON.parse(JSON.stringify(src)));
-  };
-
-  // ── Colours ───────────────────────────────────────────────────────────────
-  const C = {
-    panj: {
-      color: '#2d5a27',
-      pale: '#e8f0e6',
-      border: '#9bc492'
-    },
-    radnik: {
-      color: '#b5620a',
-      pale: '#fdf0e0',
-      border: '#e8c17a'
-    },
-    pomocni: {
-      color: '#1a3d5c',
-      pale: '#e4edf5',
-      border: '#9bbfd9'
-    },
-    otpr: {
-      color: '#6b3080',
-      pale: '#f0e8f5',
-      border: '#c4a0d8'
-    }
-  };
-
-  // ── Worker picker (inline select) ─────────────────────────────────────────
-  const WorkerSelect = _ref18 => {
-    let {
-      value,
-      onChange,
-      extraAllow = [],
-      placeholder = '— Odaberi —',
-      style = {}
-    } = _ref18;
-    const opts = activeWorkers.filter(w => !assignedIds.has(w.id) || w.id === value || extraAllow.includes(w.id));
-    return /*#__PURE__*/React.createElement("select", {
-      value: value || '',
-      onChange: e => onChange(e.target.value),
-      style: {
-        border: '1px solid var(--border)',
-        borderRadius: 5,
-        padding: '0.38rem 0.6rem',
-        fontSize: '0.82rem',
-        background: 'var(--bg)',
-        color: value ? 'var(--text)' : 'var(--text-light)',
-        fontFamily: 'var(--sans)',
-        width: '100%',
-        ...style
-      }
-    }, /*#__PURE__*/React.createElement("option", {
-      value: ""
-    }, placeholder), opts.map(w => /*#__PURE__*/React.createElement("option", {
-      key: w.id,
-      value: w.id
-    }, w.name)), value && !opts.find(w => w.id === value) && /*#__PURE__*/React.createElement("option", {
-      value: value
-    }, "\u26A0 ", wName(value)));
-  };
-
-  // ── Summary stats ─────────────────────────────────────────────────────────
-  const numPrimaci = (dayData.primci || []).filter(p => p.primatId).length;
-  const numRadnici = (dayData.primci || []).reduce((s, p) => s + (p.radnici || []).filter(Boolean).length, 0);
-  const numPomocni = (dayData.primci || []).reduce((s, p) => s + (p.pomocni || []).filter(Boolean).length, 0);
-  const numOtpremaci = (dayData.otpremaci || []).filter(o => o.workerId).length;
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "date-bar"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "date-label"
-  }, "DATUM \u2014 DNEVNA EKIPA"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      marginTop: '0.25rem'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "date-nav-btn",
-    onClick: prevDay
-  }, "\u2039"), /*#__PURE__*/React.createElement("input", {
-    type: "date",
-    className: "date-input",
-    value: selectedDate,
-    onChange: e => setSelectedDate(e.target.value)
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "date-nav-btn",
-    onClick: nextDay
-  }, "\u203A"), isToday && /*#__PURE__*/React.createElement("span", {
-    className: "today-chip"
-  }, "DANAS"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: '1.2rem',
-      alignItems: 'center',
-      flexWrap: 'wrap'
-    }
-  }, [{
-    label: 'Primači',
-    val: numPrimaci,
-    c: C.panj
-  }, {
-    label: 'Radnici/primka',
-    val: numRadnici,
-    c: C.radnik
-  }, {
-    label: 'Pomoćni',
-    val: numPomocni,
-    c: C.pomocni
-  }, {
-    label: 'Otpremači',
-    val: numOtpremaci,
-    c: C.otpr
-  }].map(_ref19 => {
-    let {
-      label,
-      val,
-      c
-    } = _ref19;
-    return /*#__PURE__*/React.createElement("div", {
-      key: label,
-      style: {
-        textAlign: 'center'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: '1.15rem',
-        fontWeight: 700,
-        color: c.color
-      }
-    }, val), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '0.6rem',
-        color: 'var(--text-muted)',
-        whiteSpace: 'nowrap'
-      }
-    }, label));
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 1,
-      height: 32,
-      background: 'var(--border)'
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: 'var(--mono)',
-      fontSize: '1.3rem',
-      fontWeight: 700,
-      color: 'var(--green)'
-    }
-  }, totalAssigned), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.6rem',
-      color: 'var(--text-muted)'
-    }
-  }, "UKUPNO"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginLeft: 'auto',
-      display: 'flex',
-      gap: '0.5rem',
-      flexWrap: 'wrap'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-secondary btn-sm no-print",
-    onClick: copyFromYesterday
-  }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-secondary btn-sm no-print",
-    onClick: () => window.print()
-  }, "\uD83D\uDDA8\uFE0F Print"))), unassigned.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: 'var(--amber-pale)',
-      border: '1px solid #e8c17a',
-      borderRadius: 6,
-      padding: '0.55rem 1rem',
-      fontSize: '0.8rem',
-      color: 'var(--amber)',
-      marginBottom: '1rem',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      flexWrap: 'wrap'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700
-    }
-  }, "\u26A0 Neraspore\u0111eni:"), unassigned.map(w => /*#__PURE__*/React.createElement("span", {
-    key: w.id,
-    style: {
-      background: 'white',
-      border: '1px solid #e8c17a',
-      borderRadius: 12,
-      padding: '0.1rem 0.5rem',
-      fontSize: '0.75rem'
-    }
-  }, w.name))), /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      marginBottom: '1rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: `linear-gradient(135deg,${C.panj.color},${C.panj.color}bb)`,
-      color: 'white',
-      padding: '0.75rem 1rem',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.75rem'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '1.4rem'
-    }
-  }, "\uD83C\uDF33"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: '0.95rem'
-    }
-  }, "Primaci na \u0161uma panju"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.7rem',
-      opacity: 0.8
-    }
-  }, "Svaki prima\u010D ima vlastiti tim: radnici u primci + pomo\u0107ni radnici")), /*#__PURE__*/React.createElement("button", {
-    onClick: addPrimac,
-    style: {
-      background: 'rgba(255,255,255,0.2)',
-      border: '1px solid rgba(255,255,255,0.4)',
-      color: 'white',
-      borderRadius: 6,
-      padding: '0.35rem 0.8rem',
-      fontSize: '0.8rem',
-      fontWeight: 600,
-      cursor: 'pointer'
-    }
-  }, "+ Dodaj prima\u010Da")), (dayData.primci || []).length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '2rem',
-      textAlign: 'center',
-      color: 'var(--text-light)',
-      fontSize: '0.85rem'
-    }
-  }, "Nema unesenih prima\u010Da za ovaj dan.", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("button", {
-    onClick: addPrimac,
-    style: {
-      marginTop: '0.75rem',
-      background: C.panj.color,
-      color: 'white',
-      border: 'none',
-      borderRadius: 6,
-      padding: '0.4rem 1rem',
-      fontSize: '0.82rem',
-      fontWeight: 600,
-      cursor: 'pointer'
-    }
-  }, "+ Dodaj prvog prima\u010Da")), (dayData.primci || []).map((primac, pi) => /*#__PURE__*/React.createElement("div", {
-    key: primac.id,
-    style: {
-      borderTop: pi === 0 ? 'none' : '2px solid var(--bg)',
-      padding: '1rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.6rem',
-      marginBottom: '0.8rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 28,
-      height: 28,
-      borderRadius: '50%',
-      background: C.panj.color,
-      color: 'white',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '0.8rem',
-      fontWeight: 700,
-      fontFamily: 'var(--mono)',
-      flexShrink: 0
-    }
-  }, pi + 1), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: '0.85rem',
-      color: C.panj.color
-    }
-  }, "Prima\u010D #", pi + 1), /*#__PURE__*/React.createElement("button", {
-    onClick: () => removePrimac(primac.id),
-    style: {
-      marginLeft: 'auto',
-      background: 'transparent',
-      border: '1px solid #e0a0a0',
-      color: 'var(--red)',
-      borderRadius: 5,
-      padding: '0.2rem 0.5rem',
-      fontSize: '0.75rem',
-      cursor: 'pointer'
-    }
-  }, "\uD83D\uDDD1 Ukloni")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr 1fr',
-      gap: '0.75rem',
-      alignItems: 'start'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.panj.pale,
-      border: `1px solid ${C.panj.border}`,
-      borderRadius: 8,
-      padding: '0.65rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.67rem',
-      fontWeight: 700,
-      color: C.panj.color,
-      textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      fontFamily: 'var(--mono)',
-      marginBottom: '0.45rem'
-    }
-  }, "\uD83C\uDF33 Prima\u010D na panju"), /*#__PURE__*/React.createElement(WorkerSelect, {
-    value: primac.primatId,
-    onChange: wId => updatePrimac(primac.id, {
-      primatId: wId
-    }),
-    extraAllow: primac.primatId ? [primac.primatId] : [],
-    placeholder: "\u2014 Odaberi prima\u010Da \u2014",
-    style: {
-      background: 'white'
-    }
-  }), /*#__PURE__*/React.createElement("input", {
-    value: primac.note || '',
-    onChange: e => updatePrimac(primac.id, {
-      note: e.target.value
-    }),
-    placeholder: "Napomena...",
-    style: {
-      marginTop: '0.4rem',
-      width: '100%',
-      fontSize: '0.72rem',
-      border: '1px solid var(--border)',
-      borderRadius: 4,
-      padding: '0.25rem 0.4rem',
-      fontFamily: 'var(--sans)',
-      background: 'white'
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.radnik.pale,
-      border: `1px solid ${C.radnik.border}`,
-      borderRadius: 8,
-      padding: '0.65rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      marginBottom: '0.45rem',
-      gap: '0.4rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.67rem',
-      fontWeight: 700,
-      color: C.radnik.color,
-      textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      fontFamily: 'var(--mono)',
-      flex: 1
-    }
-  }, "\uD83D\uDCCB Radnici u primci"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => addSlot(primac.id, 'radnici'),
-    style: {
-      background: C.radnik.color,
-      color: 'white',
-      border: 'none',
-      borderRadius: 4,
-      padding: '0.15rem 0.45rem',
-      fontSize: '0.7rem',
-      fontWeight: 700,
-      cursor: 'pointer'
-    }
-  }, "+")), (primac.radnici || ['']).map((wId, ri) => /*#__PURE__*/React.createElement("div", {
-    key: ri,
-    style: {
-      display: 'flex',
-      gap: '0.3rem',
-      marginBottom: '0.3rem',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement(WorkerSelect, {
-    value: wId,
-    onChange: v => setSlotWorker(primac.id, 'radnici', ri, v),
-    extraAllow: wId ? [wId] : [],
-    placeholder: `— Radnik ${ri + 1} —`,
-    style: {
-      flex: 1,
-      background: 'white'
-    }
-  }), (primac.radnici || []).length > 1 && /*#__PURE__*/React.createElement("button", {
-    onClick: () => removeSlot(primac.id, 'radnici', ri),
-    style: {
-      background: 'transparent',
-      border: 'none',
-      color: '#c0392b',
-      cursor: 'pointer',
-      fontSize: '0.9rem',
-      padding: '0 0.2rem',
-      lineHeight: 1,
-      flexShrink: 0
-    }
-  }, "\u2715")))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.pomocni.pale,
-      border: `1px solid ${C.pomocni.border}`,
-      borderRadius: 8,
-      padding: '0.65rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      marginBottom: '0.45rem',
-      gap: '0.4rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.67rem',
-      fontWeight: 700,
-      color: C.pomocni.color,
-      textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      fontFamily: 'var(--mono)',
-      flex: 1
-    }
-  }, "\uD83D\uDD27 Pomo\u0107ni radnici"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => addSlot(primac.id, 'pomocni'),
-    style: {
-      background: C.pomocni.color,
-      color: 'white',
-      border: 'none',
-      borderRadius: 4,
-      padding: '0.15rem 0.45rem',
-      fontSize: '0.7rem',
-      fontWeight: 700,
-      cursor: 'pointer'
-    }
-  }, "+")), (primac.pomocni || ['']).map((wId, hi) => /*#__PURE__*/React.createElement("div", {
-    key: hi,
-    style: {
-      display: 'flex',
-      gap: '0.3rem',
-      marginBottom: '0.3rem',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement(WorkerSelect, {
-    value: wId,
-    onChange: v => setSlotWorker(primac.id, 'pomocni', hi, v),
-    extraAllow: wId ? [wId] : [],
-    placeholder: `— Pomoćni ${hi + 1} —`,
-    style: {
-      flex: 1,
-      background: 'white'
-    }
-  }), (primac.pomocni || []).length > 1 && /*#__PURE__*/React.createElement("button", {
-    onClick: () => removeSlot(primac.id, 'pomocni', hi),
-    style: {
-      background: 'transparent',
-      border: 'none',
-      color: '#c0392b',
-      cursor: 'pointer',
-      fontSize: '0.9rem',
-      padding: '0 0.2rem',
-      lineHeight: 1,
-      flexShrink: 0
-    }
-  }, "\u2715")))))))), /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      marginBottom: '1.5rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: `linear-gradient(135deg,${C.otpr.color},${C.otpr.color}bb)`,
-      color: 'white',
-      padding: '0.75rem 1rem',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.75rem'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '1.4rem'
-    }
-  }, "\uD83D\uDE9B"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: '0.95rem'
-    }
-  }, "Otprema\u010Di"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.7rem',
-      opacity: 0.8
-    }
-  }, "Raspore\u0111uju se na odjel / radili\u0161te")), /*#__PURE__*/React.createElement("button", {
-    onClick: addOtpremac,
-    style: {
-      background: 'rgba(255,255,255,0.2)',
-      border: '1px solid rgba(255,255,255,0.4)',
-      color: 'white',
-      borderRadius: 6,
-      padding: '0.35rem 0.8rem',
-      fontSize: '0.8rem',
-      fontWeight: 600,
-      cursor: 'pointer'
-    }
-  }, "+ Dodaj otprema\u010Da")), (dayData.otpremaci || []).length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '1.5rem',
-      textAlign: 'center',
-      color: 'var(--text-light)',
-      fontSize: '0.85rem'
-    }
-  }, "Nema unesenih otprema\u010Da za ovaj dan.") : /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '0.75rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '0.5rem'
-    }
-  }, (dayData.otpremaci || []).map((otr, oi) => /*#__PURE__*/React.createElement("div", {
-    key: otr.id,
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'auto 1fr 1fr auto',
-      gap: '0.6rem',
-      alignItems: 'center',
-      background: C.otpr.pale,
-      border: `1px solid ${C.otpr.border}`,
-      borderRadius: 8,
-      padding: '0.6rem 0.8rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 26,
-      height: 26,
-      borderRadius: '50%',
-      background: C.otpr.color,
-      color: 'white',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '0.75rem',
-      fontWeight: 700,
-      fontFamily: 'var(--mono)',
-      flexShrink: 0
-    }
-  }, oi + 1), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.65rem',
-      fontWeight: 700,
-      color: C.otpr.color,
-      textTransform: 'uppercase',
-      letterSpacing: '0.06em',
-      fontFamily: 'var(--mono)',
-      marginBottom: '0.25rem'
-    }
-  }, "Otprema\u010D"), /*#__PURE__*/React.createElement(WorkerSelect, {
-    value: otr.workerId,
-    onChange: wId => updateOtpremac(otr.id, {
-      workerId: wId
-    }),
-    extraAllow: otr.workerId ? [otr.workerId] : [],
-    placeholder: "\u2014 Odaberi otprema\u010Da \u2014",
-    style: {
-      background: 'white'
-    }
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.65rem',
-      fontWeight: 700,
-      color: C.otpr.color,
-      textTransform: 'uppercase',
-      letterSpacing: '0.06em',
-      fontFamily: 'var(--mono)',
-      marginBottom: '0.25rem'
-    }
-  }, "Odjel / Radili\u0161te"), /*#__PURE__*/React.createElement("select", {
-    value: otr.deptId || '',
-    onChange: e => updateOtpremac(otr.id, {
-      deptId: e.target.value
-    }),
-    style: {
-      border: '1px solid var(--border)',
-      borderRadius: 5,
-      padding: '0.38rem 0.6rem',
-      fontSize: '0.82rem',
-      background: 'white',
-      fontFamily: 'var(--sans)',
-      width: '100%'
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\u2014 Odaberi odjel \u2014"), (departments || []).map(d => /*#__PURE__*/React.createElement("option", {
-    key: d.id,
-    value: d.id
-  }, d.name)))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => removeOtpremac(otr.id),
-    style: {
-      background: 'transparent',
-      border: '1px solid #e0a0a0',
-      color: 'var(--red)',
-      borderRadius: 5,
-      padding: '0.3rem 0.5rem',
-      fontSize: '0.75rem',
-      cursor: 'pointer',
-      alignSelf: 'flex-end'
-    }
-  }, "\uD83D\uDDD1"))))), /*#__PURE__*/React.createElement("div", {
-    className: "card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "card-header"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCCA"), /*#__PURE__*/React.createElement("div", {
-    className: "card-title"
-  }, "Pregled ekipe \u2014 ", fmtDate(selectedDate))), /*#__PURE__*/React.createElement("table", {
-    className: "schedule-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "#"), /*#__PURE__*/React.createElement("th", null, "Uloga"), /*#__PURE__*/React.createElement("th", null, "Radnik"), /*#__PURE__*/React.createElement("th", null, "Tim / Odjel"), /*#__PURE__*/React.createElement("th", null, "Napomena"))), /*#__PURE__*/React.createElement("tbody", null, (dayData.primci || []).flatMap((p, pi) => {
-    const rows = [];
-    // primač row
-    rows.push(/*#__PURE__*/React.createElement("tr", {
-      key: `p${pi}-prim`
-    }, /*#__PURE__*/React.createElement("td", {
-      style: {
-        fontFamily: 'var(--mono)',
-        color: 'var(--text-muted)',
-        fontSize: '0.72rem'
-      }
-    }, pi + 1), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        background: C.panj.pale,
-        color: C.panj.color,
-        border: `1px solid ${C.panj.border}`,
-        borderRadius: 4,
-        padding: '0.15rem 0.5rem',
-        fontSize: '0.68rem',
-        fontWeight: 700,
-        fontFamily: 'var(--mono)'
-      }
-    }, "\uD83C\uDF33 Prima\u010D/panj")), /*#__PURE__*/React.createElement("td", {
-      style: {
-        fontWeight: 700
-      }
-    }, p.primatId ? wName(p.primatId) : /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--text-light)'
-      }
-    }, "\u2014")), /*#__PURE__*/React.createElement("td", {
-      style: {
-        fontSize: '0.78rem',
-        color: 'var(--text-muted)'
-      }
-    }, /*#__PURE__*/React.createElement("div", null, "\uD83D\uDCCB ", (p.radnici || []).filter(Boolean).map(wName).join(', ') || '—'), /*#__PURE__*/React.createElement("div", null, "\uD83D\uDD27 ", (p.pomocni || []).filter(Boolean).map(wName).join(', ') || '—')), /*#__PURE__*/React.createElement("td", {
-      style: {
-        fontSize: '0.78rem',
-        color: 'var(--text-muted)'
-      }
-    }, p.note || '—')));
-    return rows;
-  }), (dayData.otpremaci || []).map((o, oi) => /*#__PURE__*/React.createElement("tr", {
-    key: `o${oi}`
-  }, /*#__PURE__*/React.createElement("td", {
-    style: {
-      fontFamily: 'var(--mono)',
-      color: 'var(--text-muted)',
-      fontSize: '0.72rem'
-    }
-  }, oi + 1), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '0.25rem',
-      background: C.otpr.pale,
-      color: C.otpr.color,
-      border: `1px solid ${C.otpr.border}`,
-      borderRadius: 4,
-      padding: '0.15rem 0.5rem',
-      fontSize: '0.68rem',
-      fontWeight: 700,
-      fontFamily: 'var(--mono)'
-    }
-  }, "\uD83D\uDE9B Otprema\u010D")), /*#__PURE__*/React.createElement("td", {
-    style: {
-      fontWeight: 700
-    }
-  }, o.workerId ? wName(o.workerId) : /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: 'var(--text-light)'
-    }
-  }, "\u2014")), /*#__PURE__*/React.createElement("td", {
-    style: {
-      fontSize: '0.78rem',
-      color: 'var(--text-muted)'
-    }
-  }, o.deptId ? dName(o.deptId) : '—'), /*#__PURE__*/React.createElement("td", {
-    style: {
-      fontSize: '0.78rem',
-      color: 'var(--text-muted)'
-    }
-  }, o.note || '—'))), totalAssigned === 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: 5,
-    style: {
-      textAlign: 'center',
-      padding: '2rem',
-      color: 'var(--text-light)'
-    }
-  }, "Nema unesenih radnika za ovaj dan."))))));
-}
-
 // ─── WORKER CATEGORY BADGE ────────────────────────────────────────────────────
-function CatBadge(_ref20) {
+function CatBadge(_ref17) {
   let {
     catId,
     size = 'normal'
-  } = _ref20;
+  } = _ref17;
   const cat = getCatById(catId);
   if (!cat) return null;
   const small = size === 'small';
@@ -4199,12 +3322,12 @@ function CatBadge(_ref20) {
 }
 
 // ─── WORKERS VIEW ─────────────────────────────────────────────────────────────
-function WorkersView(_ref21) {
+function WorkersView(_ref18) {
   let {
     workers,
     setWorkers,
     schedules
-  } = _ref21;
+  } = _ref18;
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState('');
   const [activeCat, setActiveCat] = useState('sve'); // 'sve' | catId
@@ -4253,11 +3376,11 @@ function WorkersView(_ref21) {
   };
 
   // ── WORKER MODAL ──
-  const WorkerModal = _ref22 => {
+  const WorkerModal = _ref19 => {
     let {
       worker,
       onClose
-    } = _ref22;
+    } = _ref19;
     const blank = {
       id: uid(),
       name: '',
@@ -4465,11 +3588,11 @@ function WorkersView(_ref21) {
   };
 
   // ── DETAIL MODAL ──
-  const DetailModal = _ref23 => {
+  const DetailModal = _ref20 => {
     let {
       worker,
       onClose
-    } = _ref23;
+    } = _ref20;
     const cat = getCatById(worker.category);
     const sc = workerSchedCount[worker.id] || 0;
     const ls = workerLastSeen[worker.id];
@@ -5061,19 +4184,19 @@ function WorkersView(_ref21) {
 }
 
 // ─── DEPARTMENTS VIEW ─────────────────────────────────────────────────────────
-function DepartmentsView(_ref24) {
+function DepartmentsView(_ref21) {
   let {
     departments,
     setDepartments,
     schedules,
     dName
-  } = _ref24;
+  } = _ref21;
   const [modal, setModal] = useState(null);
-  const DeptModal = _ref25 => {
+  const DeptModal = _ref22 => {
     let {
       dept,
       onClose
-    } = _ref25;
+    } = _ref22;
     const [form, setForm] = useState(dept || {
       id: uid(),
       gospodarskaJedinica: '',
@@ -5206,7 +4329,7 @@ function DepartmentsView(_ref24) {
 }
 
 // ─── PREGLED VIEW ─────────────────────────────────────────────────────────────
-function PregledView(_ref26) {
+function PregledView(_ref23) {
   let {
     schedules,
     workers,
@@ -5219,7 +4342,7 @@ function PregledView(_ref26) {
     setFilterDept,
     filterJob,
     setFilterJob
-  } = _ref26;
+  } = _ref23;
   const [tab, setTab] = useState('radnik');
   const filtered = useMemo(() => schedules.filter(s => (!filterWorker || s.allWorkers.includes(filterWorker)) && (!filterDept || s.deptId === filterDept) && (!filterJob || s.jobType === filterJob)).sort((a, b) => b.date.localeCompare(a.date)), [schedules, filterWorker, filterDept, filterJob]);
 
@@ -5319,8 +4442,8 @@ function PregledView(_ref26) {
     className: "stat-value"
   }, filtered.length), /*#__PURE__*/React.createElement("div", {
     className: "stat-label"
-  }, "Ukupno smjena")), Object.entries(workerStats).map(_ref27 => {
-    let [jt, cnt] = _ref27;
+  }, "Ukupno smjena")), Object.entries(workerStats).map(_ref24 => {
+    let [jt, cnt] = _ref24;
     return /*#__PURE__*/React.createElement("div", {
       className: "stat-card",
       key: jt
@@ -5379,14 +4502,14 @@ function PregledView(_ref26) {
 }
 
 // ─── HISTORIJA VIEW ───────────────────────────────────────────────────────────
-function HistorijaView(_ref28) {
+function HistorijaView(_ref25) {
   let {
     history,
     wName,
     dName,
     restoreVersion,
     schedules
-  } = _ref28;
+  } = _ref25;
   const grouped = useMemo(() => {
     const m = {};
     history.forEach(h => {
@@ -5406,8 +4529,8 @@ function HistorijaView(_ref28) {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
-  }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("p", null, "Historija je prazna.")) : grouped.map(_ref29 => {
-    let [date, items] = _ref29;
+  }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("p", null, "Historija je prazna.")) : grouped.map(_ref26 => {
+    let [date, items] = _ref26;
     return /*#__PURE__*/React.createElement("div", {
       key: date,
       style: {
@@ -5466,12 +4589,12 @@ function HistorijaView(_ref28) {
 }
 
 // ─── SPISAK VIEW ──────────────────────────────────────────────────────────────
-function SpisakView(_ref30) {
+function SpisakView(_ref27) {
   let {
     workers,
     setWorkers,
     vehicles
-  } = _ref30;
+  } = _ref27;
   // editing: { workerId, field } | null
   const [editing, setEditing] = useState(null);
   const [editVal, setEditVal] = useState('');
@@ -6192,12 +5315,12 @@ function SpisakView(_ref30) {
 }
 
 // ─── VOZAČI VIEW ────────────────────────────────────────────────────────────
-function VozaciView(_ref31) {
+function VozaciView(_ref28) {
   let {
     vehicles,
     setVehicles,
     workers
-  } = _ref31;
+  } = _ref28;
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
@@ -6557,7 +5680,7 @@ function VozaciView(_ref31) {
 }
 
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView(_ref32) {
+function SihtaricaView(_ref29) {
   let {
     schedules,
     workers,
@@ -6567,7 +5690,7 @@ function SihtaricaView(_ref32) {
     holidays,
     wName,
     dName
-  } = _ref32;
+  } = _ref29;
   const now = new Date();
   const [selYear, setSelYear] = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
@@ -6636,8 +5759,8 @@ function SihtaricaView(_ref32) {
       });
     });
     // Odsutnost
-    Object.entries(godisnji).forEach(_ref33 => {
-      let [wId, entries] = _ref33;
+    Object.entries(godisnji).forEach(_ref30 => {
+      let [wId, entries] = _ref30;
       if (!m[wId]) return;
       entries.forEach(e => {
         m[wId][e.date] = {
@@ -6649,8 +5772,8 @@ function SihtaricaView(_ref32) {
     });
     // Praznici — override za sve radnike (ako nemaju raspored, upisi praznik)
     if (holidays) {
-      Object.entries(holidays).forEach(_ref34 => {
-        let [date, name] = _ref34;
+      Object.entries(holidays).forEach(_ref31 => {
+        let [date, name] = _ref31;
         workers.forEach(w => {
           if (m[w.id] && !m[w.id][date]) {
             m[w.id][date] = {
@@ -6888,8 +6011,8 @@ function SihtaricaView(_ref32) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref35 => {
-    let [k, l] = _ref35;
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref32 => {
+    let [k, l] = _ref32;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       onClick: () => setSihtView(k),
@@ -7015,8 +6138,8 @@ function SihtaricaView(_ref32) {
       color: 'var(--text-muted)',
       fontWeight: 700
     }
-  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref36 => {
-    let [k, v] = _ref36;
+  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref33 => {
+    let [k, v] = _ref33;
     return /*#__PURE__*/React.createElement("span", {
       key: k,
       style: {
@@ -7521,8 +6644,8 @@ function SihtaricaView(_ref32) {
         borderRadius: 3,
         padding: '0.1rem 0.4rem'
       }
-    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref37 => {
-      let [k, v] = _ref37;
+    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref34 => {
+      let [k, v] = _ref34;
       const oc = ODSUTNOST_COLOR[k] || {
         bg: '#f0f0f0',
         color: '#555',
@@ -7729,12 +6852,12 @@ function SihtaricaView(_ref32) {
           fontSize: '0.75rem',
           width: '100%'
         }
-      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref38 => {
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref35 => {
         let {
           d,
           dw,
           wknd
-        } = _ref38;
+        } = _ref35;
         return /*#__PURE__*/React.createElement("th", {
           key: d,
           style: {
@@ -7753,13 +6876,13 @@ function SihtaricaView(_ref32) {
             opacity: 0.7
           }
         }, 'NPUSČPS'[dw]));
-      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref39 => {
+      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref36 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref39;
+        } = _ref36;
         let bg = wknd ? '#f0ede6' : 'white';
         let content = wknd ? /*#__PURE__*/React.createElement("span", {
           style: {
@@ -7821,13 +6944,13 @@ function SihtaricaView(_ref32) {
           gridTemplateColumns: `repeat(${mo.days.length}, 1fr)`,
           gap: '1.5px'
         }
-      }, mo.days.map(_ref40 => {
+      }, mo.days.map(_ref37 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref40;
+        } = _ref37;
         let bg,
           color,
           label = String(d),
@@ -7888,8 +7011,8 @@ function SihtaricaView(_ref32) {
           padding: '0.1rem 0.4rem',
           fontWeight: 700
         }
-      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref41 => {
-        let [k, v] = _ref41;
+      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref38 => {
+        let [k, v] = _ref38;
         const oc = ODSUTNOST_COLOR[k] || {
           bg: '#f0f0f0',
           color: '#555',
