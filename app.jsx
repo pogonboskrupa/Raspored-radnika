@@ -187,6 +187,8 @@ function App() {
   const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
   // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
+  // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
+  const [holidays, setHolidays] = useStorage('sumarija_holidays', {});
 
   const addHistory = (action, scheduleId, oldData, newData) => {
     setHistory(h => [{
@@ -375,6 +377,7 @@ function App() {
               handlePrint={handlePrint}
               yesterday={yesterday()}
               godisnji={godisnji}
+              holidays={holidays} setHolidays={setHolidays}
               onWorkerClick={onWorkerClick}
             />
           )}
@@ -407,6 +410,7 @@ function App() {
             <SihtaricaView
               schedules={schedules} workers={workers} departments={departments}
               godisnji={godisnji} setGodisnji={setGodisnji}
+              holidays={holidays}
               wName={wName} dName={dName}
             />
           )}
@@ -502,11 +506,34 @@ function App() {
 function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, workers, departments, vehicles,
   wName, dName, totalToday, statsByJob, statsByDept,
   sidebarFilter, setSidebarFilter, godisnji,
+  holidays, setHolidays,
   prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday, onWorkerClick }) {
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
+  const [holidayInput, setHolidayInput] = useState(false);
+  const [holidayName, setHolidayName] = useState('');
+  const currentHoliday = holidays?.[selectedDate] || null;
+
+  const toggleHoliday = () => {
+    if (currentHoliday) {
+      if (confirm(`Ukloniti praznik "${currentHoliday}" za ${selectedDate}?`)) {
+        setHolidays(h => { const n = {...h}; delete n[selectedDate]; return n; });
+      }
+    } else {
+      setHolidayInput(true);
+      setHolidayName('');
+    }
+  };
+
+  const saveHoliday = () => {
+    const name = holidayName.trim();
+    if (!name) return alert('Unesite naziv praznika!');
+    setHolidays(h => ({...h, [selectedDate]: name}));
+    setHolidayInput(false);
+    setHolidayName('');
+  };
 
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
@@ -543,7 +570,11 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
             {isToday && <span className="today-chip">DANAS</span>}
           </div>
         </div>
-        <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+        <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+          <button className="btn btn-sm no-print" onClick={toggleHoliday}
+            style={{background: currentHoliday ? '#c53030' : '#ed8936', color:'white', border:'none', fontSize:'0.72rem'}}>
+            {currentHoliday ? '🎉 Ukloni praznik' : '🎉 Praznik'}
+          </button>
           <button className="btn btn-secondary btn-sm no-print" onClick={() => copyFromDate(yesterday)}>
             📋 Kopiraj jučer
           </button>
@@ -555,6 +586,29 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </button>
         </div>
       </div>
+
+      {/* HOLIDAY BANNER / INPUT */}
+      {currentHoliday && (
+        <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.6rem 0.75rem',marginBottom:'0.5rem',background:'linear-gradient(135deg,#fff3e0,#ffe0b2)',border:'2px solid #ffb74d',borderRadius:8}}>
+          <span style={{fontSize:'1.3rem'}}>🎉</span>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:'0.9rem',color:'#e65100'}}>PRAZNIK</div>
+            <div style={{fontSize:'0.82rem',color:'#bf360c'}}>{currentHoliday}</div>
+          </div>
+          <span style={{fontSize:'0.7rem',color:'#e65100',fontStyle:'italic'}}>Automatski upisano svim radnicima u šihtu</span>
+        </div>
+      )}
+      {holidayInput && !currentHoliday && (
+        <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.5rem 0.75rem',marginBottom:'0.5rem',background:'#fff8e1',border:'1px solid #ffcc02',borderRadius:8}}>
+          <span style={{fontSize:'1rem'}}>🎉</span>
+          <input autoFocus className="form-input" placeholder="Naziv praznika (npr. Bajram, Nova godina...)"
+            value={holidayName} onChange={e=>setHolidayName(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter')saveHoliday();if(e.key==='Escape'){setHolidayInput(false);setHolidayName('');}}}
+            style={{flex:1,fontSize:'0.85rem',padding:'0.35rem 0.5rem'}} />
+          <button className="btn btn-primary btn-sm" onClick={saveHoliday} style={{whiteSpace:'nowrap'}}>Spremi</button>
+          <button className="btn btn-secondary btn-sm" onClick={()=>{setHolidayInput(false);setHolidayName('');}}>Odustani</button>
+        </div>
+      )}
 
       {/* STATS */}
       <div className="stats-row">
@@ -3414,7 +3468,7 @@ function VozaciView({ vehicles, setVehicles, workers }) {
             </div>
             <div className="form-group">
               <label className="form-label">Broj sjedećih mjesta</label>
-              <input className="form-input" type="number" min="1" max="60" value={form.brojMjesta} onChange={e=>setForm(f=>({...f,brojMjesta:parseInt(e.target.value)||1}))} />
+              <input className="form-input" type="number" min="1" max="60" value={form.brojMjesta} onChange={e=>setForm(f=>({...f,brojMjesta:e.target.value===''?'':parseInt(e.target.value)}))} onBlur={e=>{if(!e.target.value||isNaN(parseInt(e.target.value)))setForm(f=>({...f,brojMjesta:1}));}} />
             </div>
             <div className="form-group">
               <label className="form-label">Status</label>
@@ -3497,7 +3551,7 @@ function VozaciView({ vehicles, setVehicles, workers }) {
 }
 
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, wName, dName }) {
+function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, holidays, wName, dName }) {
   const now = new Date();
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
@@ -3521,7 +3575,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const isWeekend = d => { const dw = dayOfWeek(d); return dw===0||dw===6; };
   const MONTH_NAMES = ['Januar','Februar','Mart','April','Maj','Juni','Juli','August','Septembar','Oktobar','Novembar','Decembar'];
 
-  // Build map: workerId -> date -> { type: 'rad'|odsutnost }
+  // Build map: workerId -> date -> { type: 'rad'|'odsutnost'|'praznik' }
   const workerDayMap = useMemo(() => {
     const m = {};
     workers.forEach(w => { m[w.id] = {}; });
@@ -3538,13 +3592,23 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         m[wId][e.date] = { type: 'odsutnost', oType: e.type, note: e.note };
       });
     });
+    // Praznici — override za sve radnike (ako nemaju raspored, upisi praznik)
+    if (holidays) {
+      Object.entries(holidays).forEach(([date, name]) => {
+        workers.forEach(w => {
+          if (m[w.id] && !m[w.id][date]) {
+            m[w.id][date] = { type: 'praznik', holidayName: name };
+          }
+        });
+      });
+    }
     return m;
-  }, [schedules, godisnji, workers]);
+  }, [schedules, godisnji, workers, holidays]);
 
   // Stats per worker for selected month
   const workerStats = useMemo(() => {
     return workers.map(w => {
-      let radnih = 0, odsutnih = 0, vikenda = 0, praznih = 0;
+      let radnih = 0, odsutnih = 0, vikenda = 0, praznih = 0, praznika = 0;
       const odsutTypes = {};
       days.forEach(d => {
         const date = isoDate(d);
@@ -3552,9 +3616,10 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         if (isWeekend(d)) { vikenda++; return; }
         if (!entry) { praznih++; return; }
         if (entry.type === 'rad') radnih++;
+        else if (entry.type === 'praznik') praznika++;
         else { odsutnih++; odsutTypes[entry.oType] = (odsutTypes[entry.oType]||0)+1; }
       });
-      return { ...w, radnih, odsutnih, vikenda, praznih, odsutTypes };
+      return { ...w, radnih, odsutnih, vikenda, praznih, praznika, odsutTypes };
     });
   }, [workerDayMap, days, selYear, selMonth]);
 
@@ -3595,7 +3660,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     return workers.filter(w => w.status === 'aktivan').map(w => {
       const months = Array.from({length:12}, (_,mi) => {
         const dim = new Date(selYear, mi+1, 0).getDate();
-        let radnih=0, odsutnih=0, vikenda=0, praznih=0;
+        let radnih=0, odsutnih=0, vikenda=0, praznih=0, praznika=0;
         const odsutTypes = {};
         for (let d=1; d<=dim; d++) {
           const iso = `${selYear}-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -3604,14 +3669,15 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           const entry = workerDayMap[w.id]?.[iso];
           if (!entry) { praznih++; continue; }
           if (entry.type==='rad') radnih++;
+          else if (entry.type==='praznik') praznika++;
           else { odsutnih++; odsutTypes[entry.oType]=(odsutTypes[entry.oType]||0)+1; }
         }
-        return { radnih, odsutnih, vikenda, praznih, odsutTypes };
+        return { radnih, odsutnih, vikenda, praznih, praznika, odsutTypes };
       });
       const total = months.reduce((a,m)=>({
         radnih:a.radnih+m.radnih, odsutnih:a.odsutnih+m.odsutnih,
-        vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih
-      }),{radnih:0,odsutnih:0,vikenda:0,praznih:0});
+        vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih, praznika:a.praznika+m.praznika
+      }),{radnih:0,odsutnih:0,vikenda:0,praznih:0,praznika:0});
       return { ...w, months, total };
     });
   }, [sihtView, selYear, workerDayMap, workers]);
@@ -3624,7 +3690,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     const months = Array.from({length:12}, (_,mi) => {
       const dim = new Date(selYear, mi+1, 0).getDate();
       const daysList = [];
-      let radnih=0, odsutnih=0, vikenda=0, praznih=0;
+      let radnih=0, odsutnih=0, vikenda=0, praznih=0, praznika=0;
       const odsutTypes = {};
       for (let d=1; d<=dim; d++) {
         const iso = `${selYear}-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -3634,15 +3700,16 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         if (wknd) vikenda++;
         else if (!entry) praznih++;
         else if (entry.type==='rad') radnih++;
+        else if (entry.type==='praznik') praznika++;
         else { odsutnih++; odsutTypes[entry.oType]=(odsutTypes[entry.oType]||0)+1; }
         daysList.push({ d, iso, dw, wknd, entry });
       }
-      return { mi, days: daysList, radnih, odsutnih, vikenda, praznih, odsutTypes };
+      return { mi, days: daysList, radnih, odsutnih, vikenda, praznih, praznika, odsutTypes };
     });
     const total = months.reduce((a,m)=>({
       radnih:a.radnih+m.radnih, odsutnih:a.odsutnih+m.odsutnih,
-      vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih
-    }),{radnih:0,odsutnih:0,vikenda:0,praznih:0});
+      vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih, praznika:a.praznika+m.praznika
+    }),{radnih:0,odsutnih:0,vikenda:0,praznih:0,praznika:0});
     return { worker: w, months, total };
   }, [sihtView, selYear, selWorker, workerDayMap, workers]);
 
@@ -3712,6 +3779,8 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             <span style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>{k}</span>
           </span>
         ))}
+        <span style={{fontSize:'0.72rem',background:'#fff3e0',color:'#e65100',border:'1px solid #ffb74d',borderRadius:3,padding:'0.1rem 0.4rem',fontFamily:'var(--mono)',fontWeight:700}}>P</span>
+        <span style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>Praznik</span>
         <span style={{fontSize:'0.72rem',background:'#f0ede6',color:'#9e9589',border:'1px solid #d4cfc4',borderRadius:3,padding:'0.1rem 0.4rem',fontFamily:'var(--mono)'}}>—</span>
         <span style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>Vikend</span>
       </div>
@@ -3779,6 +3848,11 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       cellBorderColor = catBorder;
                       cellText = <span style={{color:catColor,fontWeight:700,fontSize:'0.65rem',fontFamily:'var(--mono)'}}>{cat?.icon||'R'}</span>;
                       title = (cat?.short||'Rad') + ' · ' + entry.jobType;
+                    } else if (entry?.type === 'praznik') {
+                      cellBg = '#fff3e0';
+                      cellBorderColor = '#ffb74d';
+                      cellText = <span style={{color:'#e65100',fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>P</span>;
+                      title = '🎉 Praznik: ' + (entry.holidayName||'');
                     } else if (entry?.type === 'odsutnost') {
                       const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
                       cellBg = oc.bg;
@@ -3839,6 +3913,8 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                   let bg, color, fontW = 400, label = String(d);
                   if (entry?.type === 'rad') {
                     bg = catColor; color = 'white'; fontW = 700;
+                  } else if (entry?.type === 'praznik') {
+                    bg = '#e65100'; color = 'white'; fontW = 700; label = 'P';
                   } else if (entry?.type === 'odsutnost') {
                     const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan'];
                     bg = oc.color; color = 'white'; fontW = 700; label = oc.short;
@@ -3848,7 +3924,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     bg = '#e8e4dc'; color = '#a09888';
                   }
                   return (
-                    <div key={d} title={`${d}. ${entry?.type==='rad'?(cat?.short||'Rad')+' · '+entry.jobType : entry?.oType || (wknd?'vikend':'')}`}
+                    <div key={d} title={`${d}. ${entry?.type==='rad'?(cat?.short||'Rad')+' · '+entry.jobType : entry?.type==='praznik'?'Praznik: '+(entry.holidayName||'') : entry?.oType || (wknd?'vikend':'')}`}
                       style={{
                         height:22, background:bg, borderRadius:2,
                         display:'flex', alignItems:'center', justifyContent:'center',
@@ -3974,12 +4050,15 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                                 bg = cat?.pale||'#e8f0e6';
                                 border = cat?.border||'#9bc492';
                                 content = <span style={{color:cat?.color||'#2d5a27',fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>{cat?.icon||'R'}</span>;
+                              } else if (entry?.type==='praznik') {
+                                bg = '#fff3e0'; border = '#ffb74d';
+                                content = <span style={{color:'#e65100',fontWeight:700,fontSize:'0.58rem',fontFamily:'var(--mono)'}}>P</span>;
                               } else if (entry?.type==='odsutnost') {
                                 const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan'];
                                 bg = oc.bg; border = oc.border;
                                 content = <span style={{color:oc.color,fontWeight:700,fontSize:'0.58rem',fontFamily:'var(--mono)'}}>{oc.short}</span>;
                               }
-                              return <td key={d} title={entry?.type==='rad'?entry.jobType:entry?.oType||''} style={{padding:'0.2rem 0.1rem',border:`1px solid ${border}`,textAlign:'center',background:bg}}>{content}</td>;
+                              return <td key={d} title={entry?.type==='rad'?entry.jobType:entry?.type==='praznik'?'Praznik: '+(entry.holidayName||''):entry?.oType||''} style={{padding:'0.2rem 0.1rem',border:`1px solid ${border}`,textAlign:'center',background:bg}}>{content}</td>;
                             })}
                           </tr>
                         </tbody>
@@ -3990,6 +4069,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       {mo.days.map(({d,iso,wknd,entry}) => {
                         let bg, color, label = String(d), fontW = 400;
                         if (entry?.type==='rad') { bg = cat?.color||'#2d5a27'; color = 'white'; fontW = 700; }
+                        else if (entry?.type==='praznik') { bg = '#e65100'; color = 'white'; fontW = 700; label = 'P'; }
                         else if (entry?.type==='odsutnost') { const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan']; bg = oc.color; color = 'white'; fontW = 700; label = oc.short; }
                         else if (wknd) { bg = '#d5d0c8'; color = '#fff'; }
                         else { bg = '#e8e4dc'; color = '#a09888'; }
