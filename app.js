@@ -1,0 +1,7420 @@
+"use strict";
+
+const {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo
+} = React;
+
+// ─── DEMO DATA ───────────────────────────────────────────────────────────────
+// Kategorije radnika u šumariji
+const WORKER_CATEGORIES = [{
+  id: 'primac_panj',
+  label: 'Primači na šuma panju',
+  short: 'Primač',
+  icon: '🌳',
+  color: '#2d5a27',
+  pale: '#e8f0e6',
+  border: '#9bc492'
+}, {
+  id: 'poslovoda_isk',
+  label: 'Poslovođa iskorištavanja šuma',
+  short: 'Posl/Isk',
+  icon: '🪵',
+  color: '#7a3b00',
+  pale: '#fdf0e0',
+  border: '#e8c17a'
+}, {
+  id: 'poslovoda_uzg',
+  label: 'Poslovođa uzgoja',
+  short: 'Posl/Uzg',
+  icon: '🌱',
+  color: '#1a5a2d',
+  pale: '#e6f5ea',
+  border: '#7bc492'
+}, {
+  id: 'otpremac',
+  label: 'Otpremač',
+  short: 'Otpremač',
+  icon: '🚛',
+  color: '#6b3080',
+  pale: '#f0e8f5',
+  border: '#c4a0d8'
+}, {
+  id: 'radnik_primka',
+  label: 'Radnici u primci',
+  short: 'Radnik/P',
+  icon: '📋',
+  color: '#b5620a',
+  pale: '#fdf0e0',
+  border: '#e8c17a'
+}, {
+  id: 'pomocni',
+  label: 'Pomoćni radnici',
+  short: 'Pomoćni',
+  icon: '🔧',
+  color: '#1a3d5c',
+  pale: '#e4edf5',
+  border: '#9bbfd9'
+}, {
+  id: 'vlastita_rezija',
+  label: 'Vlastita režija',
+  short: 'Vlast.Režija',
+  icon: '⚙️',
+  color: '#5a3d00',
+  pale: '#fdf5e8',
+  border: '#d4b06a'
+},
+// legacy — kept for backwards compat
+{
+  id: 'poslovoda',
+  label: 'Poslovođa',
+  short: 'Poslovođa',
+  icon: '📎',
+  color: '#5a4a00',
+  pale: '#fdf8e0',
+  border: '#d4c060'
+}];
+
+// Columns shown in the Spisak tab (ordered)
+const SPISAK_COLUMNS = ['primac_panj', 'poslovoda_isk', 'poslovoda_uzg', 'otpremac', 'radnik_primka', 'pomocni', 'vlastita_rezija'];
+const getCatById = id => WORKER_CATEGORIES.find(c => c.id === id);
+const INITIAL_WORKERS = [
+// PRIMAČI (kolona B)
+{
+  id: 'w1',
+  name: 'Tulić Amir',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+}, {
+  id: 'w2',
+  name: 'Sefić Almir',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+}, {
+  id: 'w3',
+  name: 'Velagić Jasmin',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+}, {
+  id: 'w4',
+  name: 'Čehić Nedžad',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+}, {
+  id: 'w5',
+  name: 'Duraković Arslan',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+}, {
+  id: 'w6',
+  name: 'Musić Adnan',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+}, {
+  id: 'w7',
+  name: 'Salkić Adnan',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+}, {
+  id: 'w8',
+  name: 'Salkić Jasmin',
+  status: 'aktivan',
+  category: 'primac_panj',
+  phone: '',
+  note: ''
+},
+// OTPREMAČI (kolona C)
+{
+  id: 'w9',
+  name: 'Arnautović Almir',
+  status: 'aktivan',
+  category: 'otpremac',
+  phone: '',
+  note: ''
+}, {
+  id: 'w10',
+  name: 'Čehajić Hasan',
+  status: 'aktivan',
+  category: 'otpremac',
+  phone: '',
+  note: ''
+}, {
+  id: 'w11',
+  name: 'Šabić Reuf',
+  status: 'aktivan',
+  category: 'otpremac',
+  phone: '',
+  note: ''
+}, {
+  id: 'w12',
+  name: 'Alidžanović Elvis',
+  status: 'aktivan',
+  category: 'otpremac',
+  phone: '',
+  note: ''
+}, {
+  id: 'w13',
+  name: 'Hadžipašić Ibrahim',
+  status: 'aktivan',
+  category: 'otpremac',
+  phone: '',
+  note: ''
+},
+// POSLOVOĐE (kolona D)
+{
+  id: 'w14',
+  name: 'Porić Jasmin',
+  status: 'aktivan',
+  category: 'poslovoda_isk',
+  phone: '',
+  note: ''
+}, {
+  id: 'w15',
+  name: 'Harbaš Mehmedalija',
+  status: 'aktivan',
+  category: 'poslovoda_isk',
+  phone: '',
+  note: ''
+}, {
+  id: 'w16',
+  name: 'Hadžipašić Irfan',
+  status: 'aktivan',
+  category: 'poslovoda_isk',
+  phone: '',
+  note: ''
+}, {
+  id: 'w17',
+  name: 'Eljazović Amir',
+  status: 'aktivan',
+  category: 'poslovoda_isk',
+  phone: '',
+  note: ''
+}, {
+  id: 'w18',
+  name: 'Kovačević Nurija',
+  status: 'aktivan',
+  category: 'poslovoda_isk',
+  phone: '',
+  note: ''
+}, {
+  id: 'w19',
+  name: 'Bećirević Omer',
+  status: 'aktivan',
+  category: 'poslovoda_isk',
+  phone: '',
+  note: ''
+}, {
+  id: 'w20',
+  name: 'Arnautović Mustafa',
+  status: 'aktivan',
+  category: 'poslovoda_isk',
+  phone: '',
+  note: ''
+},
+// RADNICI U PRIMCI (kolona E - idu sa primačem)
+{
+  id: 'w21',
+  name: 'Đulić Jasmin',
+  status: 'aktivan',
+  category: 'radnik_primka',
+  phone: '',
+  note: ''
+}, {
+  id: 'w22',
+  name: 'Mahmutović Mirza',
+  status: 'aktivan',
+  category: 'radnik_primka',
+  phone: '',
+  note: ''
+}, {
+  id: 'w23',
+  name: 'Jezerkić Reonaldo',
+  status: 'aktivan',
+  category: 'radnik_primka',
+  phone: '',
+  note: ''
+}, {
+  id: 'w24',
+  name: 'Hajrudinović Ajdin',
+  status: 'aktivan',
+  category: 'radnik_primka',
+  phone: '',
+  note: ''
+}, {
+  id: 'w25',
+  name: 'Došen Goran',
+  status: 'aktivan',
+  category: 'radnik_primka',
+  phone: '',
+  note: ''
+},
+// POMOĆNI RADNICI
+{
+  id: 'w26',
+  name: 'Hadžić Jasmin',
+  status: 'aktivan',
+  category: 'pomocni',
+  phone: '',
+  note: ''
+}, {
+  id: 'w27',
+  name: 'Arnautović Samir',
+  status: 'aktivan',
+  category: 'pomocni',
+  phone: '',
+  note: ''
+}, {
+  id: 'w28',
+  name: 'Rekić Emir',
+  status: 'aktivan',
+  category: 'pomocni',
+  phone: '',
+  note: ''
+}, {
+  id: 'w29',
+  name: 'Rekić Ahmet Kubi',
+  status: 'aktivan',
+  category: 'pomocni',
+  phone: '',
+  note: ''
+}, {
+  id: 'w30',
+  name: 'Gerzić Sabit',
+  status: 'aktivan',
+  category: 'pomocni',
+  phone: '',
+  note: ''
+}];
+const GOSPODARSKE_JEDINICE = ['RISOVAC KRUPA', 'GRMEČ JASENICA', 'VOJSKOVA', 'BAŠTRA ĆORKOVAČA', 'GOMILA'];
+const INITIAL_DEPARTMENTS = [];
+const JOB_TYPES = ['Primka', 'Priprema proizvodnje', 'Pošumljavanje', 'Prerada', 'Otprema', 'Sektor ekologije', 'Kancelarija', 'Teren', 'Ostalo'];
+const today = () => new Date().toISOString().split('T')[0];
+const yesterday = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+};
+const uid = () => Math.random().toString(36).slice(2, 10);
+function makeInitialSchedules() {
+  return [];
+}
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+const DATA_VERSION = 'v5';
+
+// Firebase ref helper
+const fbRef = key => FIREBASE_ENABLED ? firebase.database().ref('sumarija/' + key) : null;
+
+// useStorage: ako je Firebase dostupan, sync s Firebase; inače localStorage
+function useStorage(key, init) {
+  const [val, setVal] = useState(() => {
+    try {
+      if (key === 'sumarija_workers') {
+        const savedVer = localStorage.getItem('sumarija_data_version');
+        if (savedVer !== DATA_VERSION) {
+          localStorage.setItem('sumarija_data_version', DATA_VERSION);
+          localStorage.removeItem('sumarija_workers');
+          return init;
+        }
+      }
+      const s = localStorage.getItem(key);
+      return s ? JSON.parse(s) : init;
+    } catch {
+      return init;
+    }
+  });
+
+  // Firebase real-time listener
+  useEffect(() => {
+    if (!FIREBASE_ENABLED) return;
+    const ref = fbRef(key);
+    const handler = ref.on('value', snap => {
+      const data = snap.val();
+      if (data !== null && data !== undefined) {
+        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        setVal(parsed);
+        try {
+          localStorage.setItem(key, JSON.stringify(parsed));
+        } catch {}
+      }
+    });
+    return () => ref.off('value', handler);
+  }, [key]);
+
+  // Write to Firebase + localStorage on change
+  const setValAndSync = useCallback(updater => {
+    setVal(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Write to localStorage always
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {}
+      // Write to Firebase if enabled
+      if (FIREBASE_ENABLED) {
+        fbRef(key).set(JSON.stringify(next)).catch(e => console.warn('Firebase write error:', e));
+      }
+      return next;
+    });
+  }, [key]);
+  return [val, FIREBASE_ENABLED ? setValAndSync : updater => {
+    setVal(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }];
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const jobBadgeClass = t => {
+  if (t === 'Primka') return 'badge badge-primka';
+  if (t === 'Priprema proizvodnje') return 'badge badge-priprema';
+  if (t === 'Pošumljavanje') return 'badge badge-posumljavanje';
+  if (t === 'Prerada') return 'badge badge-prerada';
+  if (t === 'Otprema') return 'badge badge-otprema';
+  if (t === 'Sektor ekologije') return 'badge badge-ekologija';
+  if (t === 'Kancelarija') return 'badge badge-kancelarija';
+  if (t === 'Teren') return 'badge badge-teren';
+  return 'badge badge-ostalo';
+};
+const fmtDate = d => {
+  if (!d) return '';
+  const [y, m, dd] = d.split('-');
+  return `${dd}.${m}.${y}`;
+};
+const fmtTime = ts => {
+  const d = new Date(ts);
+  return d.toLocaleTimeString('bs-BA', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function App() {
+  const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
+  const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
+  const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
+  const [history, setHistory] = useStorage('sumarija_history', []);
+  const [activeTab, setActiveTab] = useState('raspored');
+  const [selectedDate, setSelectedDate] = useState(today());
+  const [sidebarFilter, setSidebarFilter] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [historyModal, setHistoryModal] = useState(null);
+  const [quickModal, setQuickModal] = useState(null); // { worker }
+  const [filterTab, setFilterTab] = useState('dan');
+  const [filterWorker, setFilterWorker] = useState('');
+  const [filterDept, setFilterDept] = useState('');
+  const [filterJob, setFilterJob] = useState('');
+  // Ekipa: { [date]: { primac_panj: [{workerId, note}], radnik_primka: [...], pomocni: [...], otpremac: [...] } }
+  const [ekipa, setEkipa] = useStorage('sumarija_ekipa', {});
+  // godisnji: { workerId: [ { date, type, note } ] }
+  const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
+  const addHistory = (action, scheduleId, oldData, newData) => {
+    setHistory(h => [{
+      id: uid(),
+      timestamp: Date.now(),
+      action,
+      scheduleId,
+      date: newData?.date || oldData?.date,
+      oldData,
+      newData
+    }, ...h].slice(0, 200));
+  };
+
+  // Day schedules
+  const daySchedules = useMemo(() => schedules.filter(s => s.date === selectedDate && (!sidebarFilter || s.deptId === sidebarFilter)), [schedules, selectedDate, sidebarFilter]);
+
+  // Dept summary for sidebar
+  const deptCounts = useMemo(() => {
+    const counts = {};
+    schedules.filter(s => s.date === selectedDate).forEach(s => {
+      counts[s.deptId] = (counts[s.deptId] || 0) + s.allWorkers.length;
+    });
+    return counts;
+  }, [schedules, selectedDate]);
+
+  // Stats
+  const totalToday = useMemo(() => new Set(daySchedules.flatMap(s => s.allWorkers)).size, [daySchedules]);
+  const statsByJob = useMemo(() => {
+    const m = {};
+    daySchedules.forEach(s => {
+      if (!m[s.jobType]) m[s.jobType] = new Set();
+      s.allWorkers.forEach(w => m[s.jobType].add(w));
+    });
+    return m;
+  }, [daySchedules]);
+  const statsByDept = useMemo(() => {
+    const m = {};
+    daySchedules.forEach(s => {
+      if (!m[s.deptId]) m[s.deptId] = new Set();
+      s.allWorkers.forEach(w => m[s.deptId].add(w));
+    });
+    return m;
+  }, [daySchedules]);
+
+  // Conflict check
+  const checkConflict = function (newSched) {
+    let excludeId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+    const conflicts = [];
+    newSched.allWorkers.forEach(wId => {
+      const existing = schedules.find(s => s.date === newSched.date && s.id !== excludeId && s.allWorkers.includes(wId));
+      if (existing) conflicts.push(wId);
+    });
+    return conflicts;
+  };
+  const wName = id => workers.find(w => w.id === id)?.name || id;
+  const dName = id => {
+    const d = departments.find(d => d.id === id);
+    return d ? `${d.gospodarskaJedinica} — Odjel ${d.brojOdjela}` : id;
+  };
+
+  // Save schedule
+  const saveSchedule = (data, isEdit) => {
+    if (isEdit) {
+      const old = schedules.find(s => s.id === data.id);
+      setSchedules(prev => prev.map(s => s.id === data.id ? data : s));
+      addHistory('edit', data.id, old, data);
+    } else {
+      const newId = uid();
+      const nd = {
+        ...data,
+        id: newId
+      };
+      setSchedules(prev => [...prev, nd]);
+      addHistory('create', newId, null, nd);
+    }
+  };
+  const deleteSchedule = id => {
+    const old = schedules.find(s => s.id === id);
+    setSchedules(prev => prev.filter(s => s.id !== id));
+    addHistory('delete', id, old, null);
+  };
+  const restoreVersion = histItem => {
+    if (!histItem.oldData) return;
+    const exists = schedules.find(s => s.id === histItem.scheduleId);
+    if (exists) {
+      setSchedules(prev => prev.map(s => s.id === histItem.scheduleId ? histItem.oldData : s));
+    } else {
+      setSchedules(prev => [...prev, histItem.oldData]);
+    }
+    addHistory('restore', histItem.scheduleId, exists, histItem.oldData);
+    setHistoryModal(null);
+  };
+  const copyFromDate = fromDate => {
+    const source = schedules.filter(s => s.date === fromDate);
+    const newOnes = source.map(s => ({
+      ...s,
+      id: uid(),
+      date: selectedDate
+    }));
+    setSchedules(prev => {
+      const cleaned = prev.filter(s => s.date !== selectedDate);
+      return [...cleaned, ...newOnes];
+    });
+    newOnes.forEach(s => addHistory('create', s.id, null, s));
+  };
+  const prevDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+  const nextDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  // Print
+  const handlePrint = () => window.print();
+
+  // Quick assign from panel click
+  const onWorkerClick = worker => setQuickModal({
+    worker
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: '100%',
+      maxWidth: '100vw',
+      overflowX: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "app-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "app-title"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Raspored"), FIREBASE_ENABLED ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.65rem',
+      background: 'rgba(255,255,255,0.15)',
+      padding: '0.15rem 0.5rem',
+      borderRadius: 10,
+      marginLeft: '0.25rem',
+      fontFamily: 'var(--mono)'
+    }
+  }, "\uD83D\uDD34 live sync") : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.65rem',
+      background: 'rgba(255,255,255,0.1)',
+      padding: '0.15rem 0.5rem',
+      borderRadius: 10,
+      marginLeft: '0.25rem',
+      fontFamily: 'var(--mono)',
+      opacity: 0.6
+    }
+  }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
+    className: "nav-tabs"
+  }, [['raspored', '📋 Raspored'], ['ekipa', '👥 Ekipa'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
+    let [k, l] = _ref;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      className: `nav-tab ${activeTab === k ? 'active' : ''}`,
+      onClick: () => setActiveTab(k)
+    }, l);
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "app-layout"
+  }, activeTab === 'raspored' && /*#__PURE__*/React.createElement("aside", {
+    className: "sidebar"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Odjeli"), /*#__PURE__*/React.createElement("button", {
+    className: `sidebar-item ${!sidebarFilter ? 'active' : ''}`,
+    onClick: () => setSidebarFilter(null)
+  }, /*#__PURE__*/React.createElement("span", null, "Svi odjeli"), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, Object.values(statsByDept).reduce((a, s) => a + s.size, 0))), departments.map(d => /*#__PURE__*/React.createElement("button", {
+    key: d.id,
+    className: `sidebar-item ${sidebarFilter === d.id ? 'active' : ''}`,
+    onClick: () => setSidebarFilter(d.id)
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
+    }
+  }, d.name), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, statsByDept[d.id]?.size || 0)))), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Vrste posla ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      opacity: 0.5,
+      fontSize: '0.5rem',
+      fontWeight: 400
+    }
+  }, "klikni za brzi unos")), JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+    key: jt,
+    className: "sidebar-item",
+    onClick: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate,
+        jobType: jt
+      }
+    })
+  }, /*#__PURE__*/React.createElement("span", {
+    className: jobBadgeClass(jt),
+    style: {
+      fontSize: '0.65rem'
+    }
+  }, jt), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, statsByJob[jt]?.size || 0))))), /*#__PURE__*/React.createElement("main", {
+    className: "main-content"
+  }, activeTab === 'raspored' && /*#__PURE__*/React.createElement(ScheduleView, {
+    selectedDate: selectedDate,
+    setSelectedDate: setSelectedDate,
+    daySchedules: daySchedules,
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    wName: wName,
+    dName: dName,
+    totalToday: totalToday,
+    statsByJob: statsByJob,
+    statsByDept: statsByDept,
+    sidebarFilter: sidebarFilter,
+    setSidebarFilter: setSidebarFilter,
+    prevDay: prevDay,
+    nextDay: nextDay,
+    onAdd: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate
+      }
+    }),
+    onAddWithJob: jobType => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate,
+        jobType
+      }
+    }),
+    onEdit: s => setModal({
+      type: 'entry',
+      data: s,
+      isEdit: true
+    }),
+    onDelete: id => {
+      if (confirm('Obrisati ovaj zapis?')) deleteSchedule(id);
+    },
+    onHistory: s => setHistoryModal(s),
+    copyFromDate: copyFromDate,
+    handlePrint: handlePrint,
+    yesterday: yesterday(),
+    godisnji: godisnji,
+    onWorkerClick: onWorkerClick
+  }), activeTab === 'ekipa' && /*#__PURE__*/React.createElement(EkipaView, {
+    workers: workers,
+    departments: departments,
+    ekipa: ekipa,
+    setEkipa: setEkipa,
+    selectedDate: selectedDate,
+    setSelectedDate: setSelectedDate,
+    prevDay: prevDay,
+    nextDay: nextDay,
+    yesterday: yesterday()
+  }), activeTab === 'radnici' && /*#__PURE__*/React.createElement(WorkersView, {
+    workers: workers,
+    setWorkers: setWorkers,
+    schedules: schedules
+  }), activeTab === 'odjeli' && /*#__PURE__*/React.createElement(DepartmentsView, {
+    departments: departments,
+    setDepartments: setDepartments,
+    schedules: schedules,
+    dName: dName
+  }), activeTab === 'spisak' && /*#__PURE__*/React.createElement(SpisakView, {
+    workers: workers,
+    setWorkers: setWorkers
+  }), activeTab === 'sihtarica' && /*#__PURE__*/React.createElement(SihtaricaView, {
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    godisnji: godisnji,
+    setGodisnji: setGodisnji,
+    wName: wName,
+    dName: dName
+  }), activeTab === 'pregled' && /*#__PURE__*/React.createElement(PregledView, {
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    wName: wName,
+    dName: dName,
+    filterWorker: filterWorker,
+    setFilterWorker: setFilterWorker,
+    filterDept: filterDept,
+    setFilterDept: setFilterDept,
+    filterJob: filterJob,
+    setFilterJob: setFilterJob
+  }), activeTab === 'historija' && /*#__PURE__*/React.createElement(HistorijaView, {
+    history: history,
+    wName: wName,
+    dName: dName,
+    restoreVersion: restoreVersion,
+    schedules: schedules
+  })), activeTab === 'raspored' && /*#__PURE__*/React.createElement(RightPanel, {
+    selectedDate: selectedDate,
+    daySchedules: daySchedules,
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    wName: wName,
+    dName: dName,
+    statsByJob: statsByJob,
+    statsByDept: statsByDept,
+    godisnji: godisnji,
+    onAdd: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate
+      }
+    }),
+    onAddWithJob: jobType => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate,
+        jobType
+      }
+    }),
+    copyFromDate: copyFromDate,
+    yesterday: yesterday(),
+    onWorkerClick: onWorkerClick
+  })), activeTab === 'raspored' && /*#__PURE__*/React.createElement("button", {
+    className: "mobile-fab",
+    onClick: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate
+      }
+    })
+  }, "+"), quickModal && /*#__PURE__*/React.createElement(QuickModal, {
+    worker: quickModal.worker,
+    workers: workers,
+    departments: departments,
+    setDepartments: setDepartments,
+    selectedDate: selectedDate,
+    schedules: schedules,
+    checkConflict: checkConflict,
+    onSave: d => {
+      saveSchedule(d, false);
+      setQuickModal(null);
+    },
+    onClose: () => setQuickModal(null),
+    wName: wName,
+    godisnji: godisnji,
+    setGodisnji: setGodisnji
+  }), modal?.type === 'entry' && /*#__PURE__*/React.createElement(EntryModal, {
+    data: modal.data,
+    isEdit: modal.isEdit,
+    workers: workers,
+    departments: departments,
+    setDepartments: setDepartments,
+    schedules: schedules,
+    checkConflict: checkConflict,
+    onSave: d => {
+      saveSchedule(d, modal.isEdit);
+      setModal(null);
+    },
+    onClose: () => setModal(null),
+    wName: wName
+  }), historyModal && /*#__PURE__*/React.createElement(HistoryDetailModal, {
+    schedule: historyModal,
+    history: history.filter(h => h.scheduleId === historyModal.id),
+    workers: workers,
+    wName: wName,
+    dName: dName,
+    restoreVersion: restoreVersion,
+    onClose: () => setHistoryModal(null)
+  }));
+}
+
+// ─── SCHEDULE VIEW ────────────────────────────────────────────────────────────
+function ScheduleView(_ref2) {
+  let {
+    selectedDate,
+    setSelectedDate,
+    daySchedules,
+    schedules,
+    workers,
+    departments,
+    wName,
+    dName,
+    totalToday,
+    statsByJob,
+    statsByDept,
+    sidebarFilter,
+    setSidebarFilter,
+    godisnji,
+    prevDay,
+    nextDay,
+    onAdd,
+    onAddWithJob,
+    onEdit,
+    onDelete,
+    onHistory,
+    copyFromDate,
+    handlePrint,
+    yesterday,
+    onWorkerClick
+  } = _ref2;
+  const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
+
+  // Group by dept
+  const byDept = useMemo(() => {
+    const m = {};
+    daySchedules.forEach(s => {
+      if (!m[s.deptId]) m[s.deptId] = [];
+      m[s.deptId].push(s);
+    });
+    return m;
+  }, [daySchedules]);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: '100%',
+      overflowX: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "date-bar"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "date-label"
+  }, "DATUM"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      marginTop: '0.25rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: prevDay
+  }, "\u2039"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "date-input",
+    value: selectedDate,
+    onChange: e => setSelectedDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: nextDay
+  }, "\u203A"), isToday && /*#__PURE__*/React.createElement("span", {
+    className: "today-chip"
+  }, "DANAS"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginLeft: 'auto',
+      display: 'flex',
+      gap: '0.5rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm no-print",
+    onClick: () => copyFromDate(yesterday)
+  }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm no-print",
+    onClick: handlePrint
+  }, "\uD83D\uDDA8\uFE0F Print"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm no-print",
+    onClick: onAdd
+  }, "+ Novi unos"))), /*#__PURE__*/React.createElement("div", {
+    className: "stats-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value"
+  }, totalToday), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, "Ukupno radnika")), Object.entries(statsByJob).map(_ref3 => {
+    let [jt, ws] = _ref3;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "stat-card",
+      key: jt,
+      style: {
+        cursor: 'pointer'
+      },
+      onClick: () => onAddWithJob(jt),
+      title: `+ Dodaj ${jt}`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "stat-value",
+      style: {
+        fontSize: '1.2rem'
+      }
+    }, ws.size), /*#__PURE__*/React.createElement("div", {
+      className: "stat-label"
+    }, jt));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.35rem',
+      flexWrap: 'wrap',
+      marginBottom: '1rem'
+    }
+  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+    key: jt,
+    className: jobBadgeClass(jt),
+    onClick: () => onAddWithJob(jt),
+    style: {
+      cursor: 'pointer',
+      fontSize: '0.72rem',
+      padding: '0.3rem 0.6rem',
+      border: '1px solid var(--border)',
+      borderRadius: 4
+    }
+  }, "+ ", jt))), /*#__PURE__*/React.createElement("div", {
+    className: "section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "Raspored za ", fmtDate(selectedDate)), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, daySchedules.length, " ", daySchedules.length === 1 ? 'stavka' : 'stavki')), daySchedules.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("p", null, "Nema unesenog rasporeda za ovaj dan."), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: onAdd
+  }, "+ Dodaj prvi unos")) : Object.entries(byDept).map(_ref4 => {
+    let [deptId, rows] = _ref4;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "card",
+      key: deptId
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "dept-header"
+    }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDFD5\uFE0F"), /*#__PURE__*/React.createElement("span", {
+      className: "dept-name"
+    }, dName(deptId)), /*#__PURE__*/React.createElement("span", {
+      className: "dept-count"
+    }, new Set(rows.flatMap(r => r.allWorkers)).size, " radnika")), /*#__PURE__*/React.createElement("table", {
+      className: "schedule-table"
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Vrsta posla"), /*#__PURE__*/React.createElement("th", null, "Radnici"), /*#__PURE__*/React.createElement("th", null, "Napomena"), /*#__PURE__*/React.createElement("th", {
+      className: "no-print",
+      style: {
+        width: '90px'
+      }
+    }, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, rows.map(row => /*#__PURE__*/React.createElement("tr", {
+      key: row.id
+    }, /*#__PURE__*/React.createElement("td", {
+      "data-label": "Posao"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: jobBadgeClass(row.jobType)
+    }, row.jobType)), /*#__PURE__*/React.createElement("td", {
+      "data-label": "Radnici"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '2px'
+      }
+    }, row.jobType === 'Primka' ? /*#__PURE__*/React.createElement(React.Fragment, null, row.primatWorker && /*#__PURE__*/React.createElement("span", {
+      className: "worker-pill primac"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "role-dot"
+    }), "P: ", wName(row.primatWorker)), row.helper1Worker && /*#__PURE__*/React.createElement("span", {
+      className: "worker-pill"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "role-dot"
+    }), wName(row.helper1Worker)), row.helper2Worker && /*#__PURE__*/React.createElement("span", {
+      className: "worker-pill"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "role-dot"
+    }), wName(row.helper2Worker)), (row.extraWorkers || []).map(w => /*#__PURE__*/React.createElement("span", {
+      key: w,
+      className: "worker-pill"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "role-dot"
+    }), wName(w)))) : row.allWorkers.map(w => /*#__PURE__*/React.createElement("span", {
+      key: w,
+      className: "worker-pill"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "role-dot"
+    }), wName(w))))), /*#__PURE__*/React.createElement("td", {
+      "data-label": "Napomena",
+      style: {
+        color: 'var(--text-muted)',
+        fontSize: '0.8rem'
+      }
+    }, row.note || '—'), /*#__PURE__*/React.createElement("td", {
+      "data-label": "",
+      className: "no-print"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '0.25rem'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon btn-sm",
+      title: "Historija",
+      onClick: () => onHistory(row)
+    }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon btn-sm",
+      title: "Uredi",
+      onClick: () => onEdit(row)
+    }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-danger btn-icon btn-sm",
+      title: "Bri\u0161i",
+      onClick: () => onDelete(row.id)
+    }, "\uD83D\uDDD1\uFE0F"))))))));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mobile-sidebar-panel",
+    style: {
+      marginTop: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0.6rem 0.75rem',
+      background: '#fafaf8',
+      borderBottom: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.7rem',
+      fontWeight: 600,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)'
+    }
+  }, "Vrsta posla \u2014 klikni za unos")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0.5rem 0.75rem',
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.3rem'
+    }
+  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+    key: jt,
+    className: jobBadgeClass(jt),
+    onClick: () => onAddWithJob(jt),
+    style: {
+      cursor: 'pointer',
+      fontSize: '0.68rem',
+      padding: '0.3rem 0.5rem',
+      borderRadius: 4,
+      border: '1px solid var(--border)'
+    }
+  }, "+ ", jt)))), /*#__PURE__*/React.createElement("div", {
+    className: "mobile-sidebar-panel",
+    style: {
+      marginTop: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setMobileFilterOpen(!mobileFilterOpen),
+    style: {
+      padding: '0.6rem 0.75rem',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      cursor: 'pointer',
+      background: '#fafaf8',
+      borderBottom: mobileFilterOpen ? '1px solid var(--border)' : 'none'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.7rem',
+      fontWeight: 600,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)'
+    }
+  }, "\uD83C\uDFD5\uFE0F Filter po odjelu ", sidebarFilter ? `(${departments.find(d => d.id === sidebarFilter)?.brojOdjela || '?'})` : '(svi)'), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.7rem',
+      color: 'var(--text-light)'
+    }
+  }, mobileFilterOpen ? '▲' : '▼')), mobileFilterOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0.25rem 0'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: `sidebar-item ${!sidebarFilter ? 'active' : ''}`,
+    onClick: () => {
+      setSidebarFilter(null);
+      setMobileFilterOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Svi odjeli"), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, Object.values(statsByDept).reduce((a, s) => a + s.size, 0))), departments.map(d => /*#__PURE__*/React.createElement("button", {
+    key: d.id,
+    className: `sidebar-item ${sidebarFilter === d.id ? 'active' : ''}`,
+    onClick: () => {
+      setSidebarFilter(d.id);
+      setMobileFilterOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
+    }
+  }, dName(d.id)), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, statsByDept[d.id]?.size || 0))))), (() => {
+    const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
+    const absentWorkerIds = new Set(Object.entries(godisnji || {}).filter(_ref5 => {
+      let [wId, entries] = _ref5;
+      return entries.some(e => e.date === selectedDate);
+    }).map(_ref6 => {
+      let [wId] = _ref6;
+      return wId;
+    }));
+    const activeWorkers = workers.filter(w => w.status === 'aktivan');
+    const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkerIds.has(w.id));
+    const absentList = [...absentWorkerIds].map(wId => {
+      const w = workers.find(x => x.id === wId);
+      const entry = ((godisnji || {})[wId] || []).find(e => e.date === selectedDate);
+      return w && entry ? {
+        worker: w,
+        entry
+      } : null;
+    }).filter(Boolean);
+    const ODSUTNOST_SHORT = {
+      'Godišnji odmor': {
+        short: 'GO',
+        icon: '🏖️',
+        bg: '#e4edf5',
+        color: '#1a3d5c',
+        border: '#9bbfd9'
+      },
+      'Bolovanje': {
+        short: 'B',
+        icon: '🏥',
+        bg: '#fde8e8',
+        color: '#8b2020',
+        border: '#e0a0a0'
+      },
+      'Slobodan dan': {
+        short: 'SD',
+        icon: '☀️',
+        bg: '#fdf0e0',
+        color: '#b5620a',
+        border: '#e8c17a'
+      },
+      'Neplaćeno': {
+        short: 'N',
+        icon: '📋',
+        bg: '#f0f0f0',
+        color: '#555',
+        border: '#ccc'
+      }
+    };
+    const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
+      cat,
+      workers: unassigned.filter(w => w.category === cat.id)
+    })).filter(g => g.workers.length > 0);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "mobile-sidebar-panel",
+      style: {
+        marginTop: '0.75rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => setMobileUnassignedOpen(!mobileUnassignedOpen),
+      style: {
+        padding: '0.6rem 0.75rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        cursor: 'pointer',
+        background: '#fafaf8',
+        borderBottom: mobileUnassignedOpen ? '1px solid var(--border)' : 'none'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.7rem',
+        fontWeight: 600,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        color: 'var(--text-muted)'
+      }
+    }, "\uD83D\uDC77 Neraspore\u0111eni (", unassigned.length, ") ", absentList.length > 0 && `· Odsutni (${absentList.length})`), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.7rem',
+        color: 'var(--text-light)'
+      }
+    }, mobileUnassignedOpen ? '▲' : '▼')), mobileUnassignedOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.5rem 0.75rem'
+      }
+    }, unassigned.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.8rem',
+        color: 'var(--green)',
+        fontWeight: 500,
+        padding: '0.25rem 0'
+      }
+    }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref7 => {
+      let {
+        cat,
+        workers: ws
+      } = _ref7;
+      return /*#__PURE__*/React.createElement("div", {
+        key: cat.id,
+        style: {
+          marginBottom: '0.5rem'
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '0.62rem',
+          fontWeight: 700,
+          color: cat.color,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          marginBottom: '0.2rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", null, cat.icon), cat.short), ws.map(w => /*#__PURE__*/React.createElement("div", {
+        key: w.id,
+        onClick: () => onWorkerClick(w),
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          padding: '0.35rem 0.5rem',
+          marginBottom: '0.15rem',
+          fontSize: '0.8rem',
+          fontWeight: 500,
+          background: cat.pale,
+          border: `1px solid ${cat.border}`,
+          borderLeft: `3px solid ${cat.color}`,
+          borderRadius: 4,
+          cursor: 'pointer',
+          color: cat.color
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.85rem'
+        }
+      }, cat.icon), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1
+        }
+      }, w.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.6rem',
+          opacity: 0.6
+        }
+      }, "\u2192"))));
+    }), absentList.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: 1,
+        background: 'var(--border)',
+        margin: '0.5rem 0'
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.62rem',
+        letterSpacing: '0.08em',
+        color: 'var(--text-light)',
+        textTransform: 'uppercase',
+        marginBottom: '0.4rem'
+      }
+    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref8 => {
+      let {
+        worker: w,
+        entry
+      } = _ref8;
+      const s = ODSUTNOST_SHORT[entry.type] || {
+        short: '?',
+        icon: '❓',
+        bg: '#f0f0f0',
+        color: '#555',
+        border: '#ccc'
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        key: w.id,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          padding: '0.35rem 0.5rem',
+          marginBottom: '0.15rem',
+          fontSize: '0.8rem',
+          fontWeight: 500,
+          background: s.bg,
+          border: `1px solid ${s.border}`,
+          borderLeft: `3px solid ${s.color}`,
+          borderRadius: 4,
+          color: s.color,
+          opacity: 0.85
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.85rem'
+        }
+      }, s.icon), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1
+        }
+      }, w.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.6rem',
+          fontWeight: 700,
+          fontFamily: 'var(--mono)'
+        }
+      }, s.short));
+    }))));
+  })());
+}
+
+// ─── RIGHT PANEL ──────────────────────────────────────────────────────────────
+function RightPanel(_ref9) {
+  let {
+    selectedDate,
+    daySchedules,
+    schedules,
+    workers,
+    departments,
+    wName,
+    dName,
+    statsByJob,
+    statsByDept,
+    godisnji,
+    onAdd,
+    onAddWithJob,
+    copyFromDate,
+    yesterday,
+    onWorkerClick
+  } = _ref9;
+  const [copyDate, setCopyDate] = useState('');
+  const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
+  const absentWorkers = new Set(Object.entries(godisnji || {}).filter(_ref0 => {
+    let [wId, entries] = _ref0;
+    return entries.some(e => e.date === selectedDate);
+  }).map(_ref1 => {
+    let [wId] = _ref1;
+    return wId;
+  }));
+  const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkers.has(w.id));
+
+  // Group unassigned by category
+  const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
+    cat,
+    workers: unassigned.filter(w => w.category === cat.id)
+  })).filter(g => g.workers.length > 0);
+  return /*#__PURE__*/React.createElement("aside", {
+    className: "right-panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.1em',
+      color: 'var(--text-light)',
+      textTransform: 'uppercase',
+      marginBottom: '0.5rem'
+    }
+  }, "Brzi unos"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      width: '100%',
+      marginBottom: '0.5rem'
+    },
+    onClick: onAdd
+  }, "+ Novi unos"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    style: {
+      width: '100%',
+      marginBottom: '0.5rem'
+    },
+    onClick: () => copyFromDate(yesterday)
+  }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "form-input",
+    value: copyDate,
+    onChange: e => setCopyDate(e.target.value),
+    style: {
+      flex: 1,
+      fontSize: '0.78rem'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    disabled: !copyDate,
+    onClick: () => {
+      copyFromDate(copyDate);
+      setCopyDate('');
+    }
+  }, "Kopiraj"))), /*#__PURE__*/React.createElement("div", {
+    className: "divider"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.1em',
+      color: 'var(--text-light)',
+      textTransform: 'uppercase',
+      marginBottom: '0.5rem'
+    }
+  }, "Vrsta posla \u2014 klikni"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.3rem'
+    }
+  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+    key: jt,
+    className: jobBadgeClass(jt),
+    onClick: () => onAddWithJob(jt),
+    style: {
+      cursor: 'pointer',
+      fontSize: '0.65rem',
+      padding: '0.25rem 0.5rem',
+      borderRadius: 4,
+      border: '1px solid var(--border)',
+      transition: 'all 0.1s'
+    }
+  }, "+ ", jt)))), /*#__PURE__*/React.createElement("div", {
+    className: "divider"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.1em',
+      color: 'var(--text-light)',
+      textTransform: 'uppercase',
+      marginBottom: '0.6rem'
+    }
+  }, "Po odjelu"), Object.keys(statsByDept).length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      color: 'var(--text-light)'
+    }
+  }, "Nema podataka"), Object.entries(statsByDept).map(_ref10 => {
+    let [dId, ws] = _ref10;
+    return /*#__PURE__*/React.createElement("div", {
+      key: dId,
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '0.35rem 0',
+        borderBottom: '1px solid var(--border)',
+        fontSize: '0.82rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, dName(dId)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontWeight: 600,
+        color: 'var(--green)'
+      }
+    }, ws.size));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "divider"
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.1em',
+      color: 'var(--text-light)',
+      textTransform: 'uppercase',
+      marginBottom: '0.6rem'
+    }
+  }, "Neraspore\u0111eni (", unassigned.length, ") ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      opacity: 0.6,
+      fontWeight: 400,
+      fontSize: '0.55rem'
+    }
+  }, "\u2199 klikni")), unassigned.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      color: 'var(--green)',
+      fontWeight: 500
+    }
+  }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref11 => {
+    let {
+      cat,
+      workers: ws
+    } = _ref11;
+    return /*#__PURE__*/React.createElement("div", {
+      key: cat.id,
+      style: {
+        marginBottom: '0.5rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.62rem',
+        fontWeight: 700,
+        color: cat.color,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        marginBottom: '0.2rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.25rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", null, cat.icon), cat.short), ws.map(w => /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      onClick: () => onWorkerClick(w),
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.3rem 0.5rem',
+        marginBottom: '0.15rem',
+        fontSize: '0.8rem',
+        fontWeight: 500,
+        background: cat.pale,
+        border: `1px solid ${cat.border}`,
+        borderLeft: `3px solid ${cat.color}`,
+        borderRadius: 4,
+        cursor: 'pointer',
+        transition: 'all 0.1s',
+        color: cat.color
+      },
+      onMouseEnter: e => e.currentTarget.style.background = cat.border,
+      onMouseLeave: e => e.currentTarget.style.background = cat.pale
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.85rem'
+      }
+    }, cat.icon), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }, w.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.6rem',
+        opacity: 0.6
+      }
+    }, "\u2192"))));
+  })), absentWorkers.size > 0 && (() => {
+    const ODSUTNOST_SHORT = {
+      'Godišnji odmor': {
+        short: 'GO',
+        icon: '🏖️',
+        bg: '#e4edf5',
+        color: '#1a3d5c',
+        border: '#9bbfd9'
+      },
+      'Bolovanje': {
+        short: 'B',
+        icon: '🏥',
+        bg: '#fde8e8',
+        color: '#8b2020',
+        border: '#e0a0a0'
+      },
+      'Slobodan dan': {
+        short: 'SD',
+        icon: '☀️',
+        bg: '#fdf0e0',
+        color: '#b5620a',
+        border: '#e8c17a'
+      },
+      'Neplaćeno': {
+        short: 'N',
+        icon: '📋',
+        bg: '#f0f0f0',
+        color: '#555',
+        border: '#ccc'
+      }
+    };
+    const absentList = [...absentWorkers].map(wId => {
+      const w = workers.find(x => x.id === wId);
+      const entry = (godisnji[wId] || []).find(e => e.date === selectedDate);
+      return w && entry ? {
+        worker: w,
+        entry
+      } : null;
+    }).filter(Boolean);
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "divider"
+    }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.65rem',
+        letterSpacing: '0.1em',
+        color: 'var(--text-light)',
+        textTransform: 'uppercase',
+        marginBottom: '0.6rem'
+      }
+    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref12 => {
+      let {
+        worker: w,
+        entry
+      } = _ref12;
+      const s = ODSUTNOST_SHORT[entry.type] || {
+        short: '?',
+        icon: '❓',
+        bg: '#f0f0f0',
+        color: '#555',
+        border: '#ccc'
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        key: w.id,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          padding: '0.3rem 0.5rem',
+          marginBottom: '0.15rem',
+          fontSize: '0.8rem',
+          fontWeight: 500,
+          background: s.bg,
+          border: `1px solid ${s.border}`,
+          borderLeft: `3px solid ${s.color}`,
+          borderRadius: 4,
+          color: s.color,
+          opacity: 0.85
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.85rem'
+        }
+      }, s.icon), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1
+        }
+      }, w.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.6rem',
+          fontWeight: 700,
+          fontFamily: 'var(--mono)'
+        }
+      }, s.short));
+    })));
+  })());
+}
+
+// ─── QUICK ASSIGN MODAL ───────────────────────────────────────────────────────
+function QuickModal(_ref13) {
+  let {
+    worker,
+    workers,
+    departments,
+    setDepartments,
+    selectedDate,
+    schedules,
+    checkConflict,
+    onSave,
+    onClose,
+    wName,
+    godisnji,
+    setGodisnji
+  } = _ref13;
+  const cat = getCatById(worker.category);
+  const isPrimac = worker.category === 'primac_panj';
+
+  // Two modes: 'rad' or 'odsutnost'
+  const [mode, setMode] = useState('rad');
+  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Slobodan dan', 'Neplaćeno'];
+  const ODSUTNOST_COLOR = {
+    'Godišnji odmor': {
+      bg: '#e4edf5',
+      color: '#1a3d5c',
+      border: '#9bbfd9',
+      short: 'GO',
+      icon: '🏖️'
+    },
+    'Bolovanje': {
+      bg: '#fde8e8',
+      color: '#8b2020',
+      border: '#e0a0a0',
+      short: 'B',
+      icon: '🏥'
+    },
+    'Slobodan dan': {
+      bg: '#fdf0e0',
+      color: '#b5620a',
+      border: '#e8c17a',
+      short: 'SD',
+      icon: '☀️'
+    },
+    'Neplaćeno': {
+      bg: '#f0f0f0',
+      color: '#555',
+      border: '#ccc',
+      short: 'N',
+      icon: '📋'
+    }
+  };
+  const QUICK_STATUSES = [{
+    id: 'kancelarija',
+    label: 'Kancelarija',
+    icon: '🏢',
+    bg: '#e8eaf6',
+    color: '#3949ab',
+    border: '#9fa8da'
+  }, {
+    id: 'teren',
+    label: 'Teren',
+    icon: '🌿',
+    bg: '#e8f5e9',
+    color: '#2e7d32',
+    border: '#81c784'
+  }];
+
+  // Determine jobType default based on category
+  const defaultJob = () => {
+    if (worker.category === 'primac_panj') return 'Primka';
+    if (worker.category === 'otpremac') return 'Otprema';
+    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Priprema proizvodnje';
+    if (worker.category === 'vlastita_rezija') return 'Ostalo';
+    return 'Ostalo';
+  };
+  const [deptId, setDeptId] = useState(departments[0]?.id || '');
+  const [newGJ, setNewGJ] = useState('');
+  const [newBroj, setNewBroj] = useState('');
+  const [jobType, setJobType] = useState(defaultJob());
+  const [quickStatus, setQuickStatus] = useState(null); // 'kancelarija' | 'teren' | null
+  const [odsutnostType, setOdsType] = useState('Godišnji odmor');
+  const [note, setNote] = useState('');
+  const [extraWorkers, setExtra] = useState([]);
+  const [forceOverride, setForce] = useState(false);
+  const [conflicts, setConflicts] = useState([]);
+  const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const companions = activeWorkers.filter(w => w.id !== worker.id && (w.category === 'radnik_primka' || w.category === 'pomocni' || w.category === 'primac_panj'));
+  const companionGroups = [{
+    label: 'Radnici u primci',
+    workers: companions.filter(w => w.category === 'radnik_primka')
+  }, {
+    label: 'Pomoćni radnici',
+    workers: companions.filter(w => w.category === 'pomocni')
+  }, {
+    label: 'Primači (opciono)',
+    workers: companions.filter(w => w.category === 'primac_panj')
+  }].filter(g => g.workers.length > 0);
+  const toggleExtra = wId => setExtra(prev => prev.includes(wId) ? prev.filter(x => x !== wId) : [...prev, wId]);
+  const allWorkers = isPrimac ? [worker.id, ...extraWorkers].filter(Boolean) : [worker.id];
+  const addDept = () => {
+    if (!newGJ) return alert('Odaberi gospodarsku jedinicu!');
+    if (!newBroj.trim()) return alert('Unesi broj odjela!');
+    const exists = departments.find(d => d.gospodarskaJedinica === newGJ && d.brojOdjela === newBroj.trim());
+    if (exists) {
+      setDeptId(exists.id);
+      return;
+    }
+    const nd = {
+      id: uid(),
+      gospodarskaJedinica: newGJ,
+      brojOdjela: newBroj.trim(),
+      note: ''
+    };
+    setDepartments(ds => [...ds, nd]);
+    setDeptId(nd.id);
+    setNewGJ('');
+    setNewBroj('');
+  };
+  const handleSaveOdsutnost = () => {
+    setGodisnji(g => {
+      const prev = g[worker.id] || [];
+      const filtered = prev.filter(e => e.date !== selectedDate);
+      return {
+        ...g,
+        [worker.id]: [...filtered, {
+          date: selectedDate,
+          type: odsutnostType,
+          note
+        }]
+      };
+    });
+    onClose();
+  };
+  const handleSaveKancelarijaOrTeren = () => {
+    const entry = {
+      id: uid(),
+      date: selectedDate,
+      deptId: deptId || 'kancelarija_teren',
+      jobType: quickStatus === 'kancelarija' ? 'Kancelarija' : 'Teren',
+      primatWorker: null,
+      helper1Worker: null,
+      helper2Worker: null,
+      extraWorkers: [],
+      allWorkers: [worker.id],
+      note,
+      overrides: []
+    };
+    onSave(entry);
+  };
+  const handleSaveRad = () => {
+    if (!deptId) return alert('Odaberi odjel!');
+    const entry = {
+      id: uid(),
+      date: selectedDate,
+      deptId,
+      jobType: quickStatus === 'kancelarija' ? 'Kancelarija' : quickStatus === 'teren' ? 'Teren' : jobType,
+      primatWorker: isPrimac ? worker.id : null,
+      helper1Worker: null,
+      helper2Worker: null,
+      extraWorkers: isPrimac ? extraWorkers : [],
+      allWorkers,
+      note,
+      overrides: []
+    };
+    const c = checkConflict(entry, null);
+    if (c.length > 0 && !forceOverride) {
+      setConflicts(c);
+      return;
+    }
+    onSave({
+      ...entry,
+      overrides: forceOverride ? c : []
+    });
+  };
+  const oc = ODSUTNOST_COLOR[odsutnostType];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: e => e.target === e.currentTarget && onClose()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal",
+    style: {
+      maxWidth: isPrimac && mode === 'rad' ? 520 : 400
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: {
+      background: cat?.pale,
+      borderBottom: `2px solid ${cat?.border}`
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.5rem'
+    }
+  }, cat?.icon), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-title",
+    style: {
+      color: cat?.color
+    }
+  }, worker.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.72rem',
+      color: cat?.color,
+      opacity: 0.8,
+      fontWeight: 600
+    }
+  }, cat?.label)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.75rem',
+      color: 'var(--text-muted)',
+      background: 'var(--bg)',
+      border: '1px solid var(--border)',
+      borderRadius: 4,
+      padding: '0.2rem 0.5rem'
+    }
+  }, selectedDate), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-icon",
+    onClick: onClose
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      borderBottom: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMode('rad'),
+    style: {
+      padding: '0.6rem',
+      border: 'none',
+      cursor: 'pointer',
+      fontWeight: 600,
+      fontSize: '0.82rem',
+      background: mode === 'rad' ? 'var(--green-pale)' : 'var(--bg)',
+      color: mode === 'rad' ? 'var(--green)' : 'var(--text-muted)',
+      borderBottom: mode === 'rad' ? '2px solid var(--green)' : '2px solid transparent'
+    }
+  }, "\uD83D\uDCBC Rasporedi na posao"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMode('odsutnost'),
+    style: {
+      padding: '0.6rem',
+      border: 'none',
+      cursor: 'pointer',
+      fontWeight: 600,
+      fontSize: '0.82rem',
+      background: mode === 'odsutnost' ? '#fde8e8' : 'var(--bg)',
+      color: mode === 'odsutnost' ? '#8b2020' : 'var(--text-muted)',
+      borderBottom: mode === 'odsutnost' ? '2px solid #8b2020' : '2px solid transparent'
+    }
+  }, "\uD83C\uDFD6\uFE0F Odsutnost")), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body",
+    style: {
+      maxHeight: '68vh',
+      overflowY: 'auto'
+    }
+  }, mode === 'odsutnost' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '0.5rem',
+      marginBottom: '0.75rem'
+    }
+  }, ODSUTNOST_TYPES.map(t => {
+    const o = ODSUTNOST_COLOR[t];
+    return /*#__PURE__*/React.createElement("button", {
+      key: t,
+      type: "button",
+      onClick: () => setOdsType(t),
+      style: {
+        padding: '0.65rem 0.5rem',
+        border: `2px solid ${odsutnostType === t ? o.color : o.border}`,
+        borderRadius: 8,
+        background: odsutnostType === t ? o.bg : 'var(--bg)',
+        color: odsutnostType === t ? o.color : 'var(--text-muted)',
+        fontWeight: odsutnostType === t ? 700 : 400,
+        fontSize: '0.82rem',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '0.2rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '1.3rem'
+      }
+    }, o.icon), /*#__PURE__*/React.createElement("span", null, t));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "form-group",
+    style: {
+      marginBottom: 0
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Napomena"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "Opcionalno...",
+    value: note,
+    onChange: e => setNote(e.target.value)
+  }))), mode === 'rad' && /*#__PURE__*/React.createElement("div", null, conflicts.length > 0 && !forceOverride && /*#__PURE__*/React.createElement("div", {
+    className: "alert alert-warning",
+    style: {
+      marginBottom: '0.75rem'
+    }
+  }, "\u26A0\uFE0F Konflikt: ", /*#__PURE__*/React.createElement("strong", null, conflicts.map(wName).join(', ')), " ve\u0107 raspore\u0111eni.", /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    onClick: () => setForce(true)
+  }, "Ipak sa\u010Duvaj"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '0.4rem',
+      marginBottom: '0.75rem'
+    }
+  }, QUICK_STATUSES.map(qs => /*#__PURE__*/React.createElement("button", {
+    key: qs.id,
+    type: "button",
+    onClick: () => setQuickStatus(quickStatus === qs.id ? null : qs.id),
+    style: {
+      padding: '0.5rem',
+      border: `2px solid ${quickStatus === qs.id ? qs.color : qs.border}`,
+      borderRadius: 8,
+      background: quickStatus === qs.id ? qs.bg : 'var(--bg)',
+      color: quickStatus === qs.id ? qs.color : 'var(--text-muted)',
+      fontWeight: quickStatus === qs.id ? 700 : 400,
+      fontSize: '0.82rem',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.1rem'
+    }
+  }, qs.icon), qs.label))), !quickStatus && /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Vrsta posla"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.3rem'
+    }
+  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+    key: jt,
+    type: "button",
+    onClick: () => setJobType(jt),
+    className: jobBadgeClass(jt),
+    style: {
+      cursor: 'pointer',
+      border: jobType === jt ? '2px solid #333' : '2px solid transparent',
+      opacity: jobType === jt ? 1 : 0.55,
+      fontSize: '0.75rem',
+      padding: '0.25rem 0.6rem'
+    }
+  }, jt)))), quickStatus !== 'kancelarija' && /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Odjel / Radili\u0161te"), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: deptId,
+    onChange: e => setDeptId(e.target.value),
+    style: {
+      marginBottom: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi postoje\u0107i \u2014"), departments.map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.gospodarskaJedinica, " \u2014 Odjel ", d.brojOdjela))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.4rem',
+      alignItems: 'flex-end'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 2
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      color: 'var(--text-light)',
+      marginBottom: '0.2rem'
+    }
+  }, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: newGJ,
+    onChange: e => setNewGJ(e.target.value),
+    style: {
+      fontSize: '0.82rem'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi \u2014"), GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
+    key: g,
+    value: g
+  }, g)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      color: 'var(--text-light)',
+      marginBottom: '0.2rem'
+    }
+  }, "Br. odjela"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "npr. 54",
+    value: newBroj,
+    onChange: e => setNewBroj(e.target.value),
+    style: {
+      fontSize: '0.82rem'
+    },
+    onKeyDown: e => e.key === 'Enter' && addDept()
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    style: {
+      whiteSpace: 'nowrap',
+      flexShrink: 0
+    },
+    onClick: addDept
+  }, "+ Dodaj")), deptId && departments.find(d => d.id === deptId) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.3rem',
+      fontSize: '0.75rem',
+      color: 'var(--green)',
+      fontWeight: 600
+    }
+  }, "\u2713 ", departments.find(d => d.id === deptId).gospodarskaJedinica, " \u2014 Odjel ", departments.find(d => d.id === deptId).brojOdjela)), isPrimac && !quickStatus && /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Pratioci (opciono)"), /*#__PURE__*/React.createElement("div", {
+    className: "worker-selector"
+  }, companionGroups.map(g => /*#__PURE__*/React.createElement("div", {
+    key: g.label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0.25rem 0.7rem',
+      fontSize: '0.62rem',
+      fontWeight: 700,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: 'var(--text-light)',
+      background: 'var(--bg)',
+      borderBottom: '1px solid var(--border)'
+    }
+  }, g.label), g.workers.filter(w => !extraWorkers.includes(w.id)).map(w => {
+    const wcat = getCatById(w.category);
+    return /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      className: "worker-option",
+      onClick: () => toggleExtra(w.id)
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.85rem'
+      }
+    }, wcat?.icon), w.name, /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: 'auto',
+        fontSize: '0.65rem',
+        color: wcat?.color,
+        background: wcat?.pale,
+        border: `1px solid ${wcat?.border}`,
+        padding: '0.1rem 0.3rem',
+        borderRadius: 3,
+        fontFamily: 'var(--mono)'
+      }
+    }, wcat?.short));
+  })))), extraWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.3rem',
+      marginTop: '0.4rem'
+    }
+  }, extraWorkers.map(wId => {
+    const w = workers.find(x => x.id === wId);
+    return /*#__PURE__*/React.createElement("span", {
+      key: wId,
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        background: 'white',
+        border: '1px solid var(--border)',
+        borderRadius: 20,
+        padding: '0.2rem 0.4rem 0.2rem 0.6rem',
+        fontSize: '0.78rem'
+      }
+    }, w?.name, /*#__PURE__*/React.createElement("button", {
+      onClick: () => toggleExtra(wId),
+      style: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--text-muted)',
+        fontSize: '0.75rem',
+        padding: '0 0.1rem'
+      }
+    }, "\u2715"));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group",
+    style: {
+      marginBottom: 0
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Napomena"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "Opcionalno...",
+    value: note,
+    onChange: e => setNote(e.target.value)
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: onClose
+  }, "Odustani"), mode === 'odsutnost' ? /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      background: oc?.color,
+      borderColor: oc?.color
+    },
+    onClick: handleSaveOdsutnost
+  }, oc?.icon, " Sa\u010Duvaj ", odsutnostType) : quickStatus === 'kancelarija' ? /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      background: '#3949ab',
+      borderColor: '#3949ab'
+    },
+    onClick: handleSaveKancelarijaOrTeren
+  }, "\uD83C\uDFE2 Kancelarija") : quickStatus === 'teren' ? /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      background: '#2e7d32',
+      borderColor: '#2e7d32'
+    },
+    onClick: handleSaveRad
+  }, "\uD83C\uDF3F Teren") : /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      background: cat?.color,
+      borderColor: cat?.color
+    },
+    onClick: handleSaveRad
+  }, "\u2713 Rasporedi ", worker.name.split(' ')[0]))));
+}
+
+// ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
+function EntryModal(_ref14) {
+  let {
+    data,
+    isEdit,
+    workers,
+    departments,
+    setDepartments,
+    schedules,
+    checkConflict,
+    onSave,
+    onClose,
+    wName
+  } = _ref14;
+  const [form, setForm] = useState({
+    id: data.id || uid(),
+    date: data.date || today(),
+    deptId: data.deptId || departments[0]?.id || '',
+    jobType: data.jobType || JOB_TYPES[0],
+    primatWorker: data.primatWorker || '',
+    helper1Worker: data.helper1Worker || '',
+    helper2Worker: data.helper2Worker || '',
+    extraWorkers: data.extraWorkers || [],
+    allWorkers: data.allWorkers || [],
+    note: data.note || '',
+    overrides: data.overrides || []
+  });
+  const [conflicts, setConflicts] = useState([]);
+  const [forceOverride, setForceOverride] = useState(false);
+  const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const isPrimka = form.jobType === 'Primka';
+  useEffect(() => {
+    if (isPrimka) {
+      const ws = [form.primatWorker, ...(form.extraWorkers || [])].filter(Boolean);
+      setForm(f => ({
+        ...f,
+        allWorkers: ws
+      }));
+    }
+  }, [form.primatWorker, form.extraWorkers, form.jobType]);
+  const toggleWorker = wId => {
+    setForm(f => {
+      const ws = f.allWorkers.includes(wId) ? f.allWorkers.filter(w => w !== wId) : [...f.allWorkers, wId];
+      return {
+        ...f,
+        allWorkers: ws
+      };
+    });
+  };
+  const toggleExtra = wId => {
+    setForm(f => {
+      const ws = f.extraWorkers.includes(wId) ? f.extraWorkers.filter(w => w !== wId) : [...f.extraWorkers, wId];
+      return {
+        ...f,
+        extraWorkers: ws
+      };
+    });
+  };
+  const handleSubmit = () => {
+    if (!form.deptId) return alert('Odaberite odjel!');
+    if (form.allWorkers.length === 0) return alert('Odaberite barem jednog radnika!');
+    const c = checkConflict(form, isEdit ? form.id : null);
+    if (c.length > 0 && !forceOverride) {
+      setConflicts(c);
+      return;
+    }
+    onSave({
+      ...form,
+      overrides: forceOverride ? c : []
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: e => e.target === e.currentTarget && onClose()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.2rem'
+    }
+  }, isEdit ? '✏️' : '+'), /*#__PURE__*/React.createElement("div", {
+    className: "modal-title"
+  }, isEdit ? 'Uredi unos' : 'Novi raspored'), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-icon",
+    onClick: onClose
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body",
+    style: {
+      maxHeight: '70vh',
+      overflowY: 'auto'
+    }
+  }, conflicts.length > 0 && !forceOverride && /*#__PURE__*/React.createElement("div", {
+    className: "alert alert-warning",
+    style: {
+      marginBottom: '1rem'
+    }
+  }, "\u26A0\uFE0F Konflikt! Radnici su ve\u0107 raspore\u0111eni za ovaj datum: ", /*#__PURE__*/React.createElement("strong", null, conflicts.map(wName).join(', ')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    onClick: () => setForceOverride(true)
+  }, "Ipak sa\u010Duvaj (override)"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Datum"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "form-input",
+    value: form.date,
+    onChange: e => setForm(f => ({
+      ...f,
+      date: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Odjel / Radili\u0161te"), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.deptId,
+    onChange: e => setForm(f => ({
+      ...f,
+      deptId: e.target.value
+    })),
+    style: {
+      marginBottom: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi postoje\u0107i \u2014"), departments.map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.gospodarskaJedinica, " \u2014 Odjel ", d.brojOdjela))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.4rem',
+      alignItems: 'flex-end'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 2
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      color: 'var(--text-light)',
+      marginBottom: '0.2rem'
+    }
+  }, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    id: "newDeptGJ",
+    style: {
+      fontSize: '0.82rem'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi \u2014"), GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
+    key: g,
+    value: g
+  }, g)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      color: 'var(--text-light)',
+      marginBottom: '0.2rem'
+    }
+  }, "Br. odjela"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    id: "newDeptBroj",
+    placeholder: "npr. 54",
+    style: {
+      fontSize: '0.82rem'
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    style: {
+      whiteSpace: 'nowrap',
+      flexShrink: 0
+    },
+    onClick: () => {
+      const gj = document.getElementById('newDeptGJ').value;
+      const br = document.getElementById('newDeptBroj').value.trim();
+      if (!gj) return alert('Odaberi gospodarsku jedinicu!');
+      if (!br) return alert('Unesi broj odjela!');
+      const exists = departments.find(d => d.gospodarskaJedinica === gj && d.brojOdjela === br);
+      if (exists) {
+        setForm(f => ({
+          ...f,
+          deptId: exists.id
+        }));
+        return;
+      }
+      const nd = {
+        id: uid(),
+        gospodarskaJedinica: gj,
+        brojOdjela: br,
+        note: ''
+      };
+      setDepartments(ds => [...ds, nd]);
+      setForm(f => ({
+        ...f,
+        deptId: nd.id
+      }));
+      document.getElementById('newDeptGJ').value = '';
+      document.getElementById('newDeptBroj').value = '';
+    }
+  }, "+ Dodaj odjel")), form.deptId && departments.find(d => d.id === form.deptId) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.3rem',
+      fontSize: '0.75rem',
+      color: 'var(--green)',
+      fontWeight: 600
+    }
+  }, "\u2713 ", departments.find(d => d.id === form.deptId).gospodarskaJedinica, " \u2014 Odjel ", departments.find(d => d.id === form.deptId).brojOdjela))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Vrsta posla"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.jobType,
+    onChange: e => setForm(f => ({
+      ...f,
+      jobType: e.target.value,
+      allWorkers: [],
+      primatWorker: '',
+      helper1Worker: '',
+      helper2Worker: '',
+      extraWorkers: []
+    }))
+  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("option", {
+    key: jt
+  }, jt)))), isPrimka ? /*#__PURE__*/React.createElement("div", {
+    className: "primka-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "primka-title"
+  }, "\u2696\uFE0F Primka \u2014 posebna raspodjela"), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Prima\u010D na \u0161uma panju"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.primatWorker,
+    onChange: e => setForm(f => ({
+      ...f,
+      primatWorker: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi prima\u010Da \u2014"), activeWorkers.filter(w => w.category === 'primac_panj').map(w => /*#__PURE__*/React.createElement("option", {
+    key: w.id,
+    value: w.id
+  }, w.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Pratioci prima\u010Da"), /*#__PURE__*/React.createElement("div", {
+    className: "worker-selector"
+  }, (() => {
+    const selectedPrimac = form.primatWorker;
+    const selected12 = [form.helper1Worker, form.helper2Worker].filter(Boolean);
+    const radniciPrimka = activeWorkers.filter(w => w.category === 'radnik_primka' && w.id !== selectedPrimac);
+    const pomocni = activeWorkers.filter(w => w.category === 'pomocni' && w.id !== selectedPrimac);
+    const ostaliPrimaci = activeWorkers.filter(w => w.category === 'primac_panj' && w.id !== selectedPrimac);
+    const allOptions = [...radniciPrimka.map(w => ({
+      ...w,
+      _group: 'Radnici u primci'
+    })), ...pomocni.map(w => ({
+      ...w,
+      _group: 'Pomoćni radnici'
+    })), ...ostaliPrimaci.map(w => ({
+      ...w,
+      _group: 'Primači (opciono)'
+    }))];
+    let lastGroup = null;
+    return allOptions.map(w => {
+      const cat = getCatById(w.category);
+      const isSelected = form.extraWorkers.includes(w.id);
+      const groupHeader = w._group !== lastGroup ? (lastGroup = w._group, /*#__PURE__*/React.createElement("div", {
+        key: 'grp-' + w._group,
+        style: {
+          padding: '0.3rem 0.7rem',
+          fontSize: '0.65rem',
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--text-light)',
+          background: 'var(--bg)',
+          borderBottom: '1px solid var(--border)'
+        }
+      }, w._group)) : null;
+      if (isSelected) return [null, null];
+      return [groupHeader, /*#__PURE__*/React.createElement("div", {
+        key: w.id,
+        className: "worker-option",
+        onClick: () => toggleExtra(w.id)
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.9rem'
+        }
+      }, cat?.icon || '👤'), w.name, /*#__PURE__*/React.createElement("span", {
+        style: {
+          marginLeft: 'auto',
+          fontSize: '0.65rem',
+          color: cat?.color,
+          background: cat?.pale,
+          border: `1px solid ${cat?.border}`,
+          padding: '0.1rem 0.3rem',
+          borderRadius: 3,
+          fontFamily: 'var(--mono)'
+        }
+      }, cat?.short))];
+    });
+  })()))) : /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Radnici"), /*#__PURE__*/React.createElement("div", {
+    className: "worker-selector"
+  }, activeWorkers.filter(w => !form.allWorkers.includes(w.id)).map(w => {
+    const cat = getCatById(w.category);
+    return /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      className: "worker-option",
+      onClick: () => toggleWorker(w.id)
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.9rem'
+      }
+    }, cat?.icon || '👤'), w.name, w.category && /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: 'auto',
+        fontSize: '0.65rem',
+        color: cat?.color,
+        background: cat?.pale,
+        border: `1px solid ${cat?.border}`,
+        padding: '0.1rem 0.3rem',
+        borderRadius: 3,
+        fontFamily: 'var(--mono)'
+      }
+    }, cat?.short));
+  }), activeWorkers.filter(w => !form.allWorkers.includes(w.id)).length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0.6rem 0.75rem',
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)',
+      fontStyle: 'italic'
+    }
+  }, "Svi radnici su odabrani."))), form.allWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'var(--green-pale)',
+      border: '1px solid #9bc492',
+      borderRadius: 'var(--radius)',
+      padding: '0.6rem 0.75rem',
+      marginBottom: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      fontWeight: 700,
+      color: 'var(--green)',
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
+      marginBottom: '0.4rem'
+    }
+  }, "Odabrani radnici (", form.allWorkers.length, ")"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.3rem'
+    }
+  }, form.allWorkers.map(wId => {
+    const w = workers.find(x => x.id === wId);
+    const isPrimac = isPrimka && wId === form.primatWorker;
+    const cat = getCatById(w?.category);
+    return /*#__PURE__*/React.createElement("span", {
+      key: wId,
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        background: isPrimac ? 'var(--amber-pale)' : 'white',
+        border: `1px solid ${isPrimac ? '#e8c17a' : 'var(--border)'}`,
+        borderRadius: 20,
+        padding: '0.2rem 0.4rem 0.2rem 0.6rem',
+        fontSize: '0.78rem',
+        fontWeight: isPrimac ? 700 : 400,
+        color: isPrimac ? 'var(--amber)' : 'var(--text)'
+      }
+    }, isPrimac && '👑 ', w?.name, !isPrimac && /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (isPrimka) {
+          setForm(f => ({
+            ...f,
+            extraWorkers: f.extraWorkers.filter(id => id !== wId)
+          }));
+        } else {
+          setForm(f => ({
+            ...f,
+            allWorkers: f.allWorkers.filter(id => id !== wId)
+          }));
+        }
+      },
+      style: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--text-muted)',
+        fontSize: '0.75rem',
+        lineHeight: 1,
+        padding: '0 0.1rem',
+        display: 'flex',
+        alignItems: 'center'
+      },
+      title: "Ukloni"
+    }, "\u2715"), isPrimac && /*#__PURE__*/React.createElement("button", {
+      onClick: () => setForm(f => ({
+        ...f,
+        primatWorker: '',
+        allWorkers: f.allWorkers.filter(id => id !== wId),
+        extraWorkers: f.extraWorkers.filter(id => id !== wId)
+      })),
+      style: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--amber)',
+        fontSize: '0.75rem',
+        lineHeight: 1,
+        padding: '0 0.1rem',
+        display: 'flex',
+        alignItems: 'center'
+      },
+      title: "Ukloni prima\u010Da"
+    }, "\u2715"));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Napomena"), /*#__PURE__*/React.createElement("textarea", {
+    className: "form-input",
+    rows: 2,
+    value: form.note,
+    onChange: e => setForm(f => ({
+      ...f,
+      note: e.target.value
+    })),
+    placeholder: "Opcionalna napomena...",
+    style: {
+      resize: 'vertical'
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: onClose
+  }, "Odustani"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: handleSubmit
+  }, isEdit ? '💾 Spremi izmjenu' : '+ Dodaj unos'))));
+}
+
+// ─── HISTORY DETAIL MODAL ─────────────────────────────────────────────────────
+function HistoryDetailModal(_ref15) {
+  let {
+    schedule,
+    history,
+    workers,
+    wName,
+    dName,
+    restoreVersion,
+    onClose
+  } = _ref15;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: e => e.target === e.currentTarget && onClose()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("div", {
+    className: "modal-title"
+  }, "Historija izmjena"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-icon",
+    onClick: onClose
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body",
+    style: {
+      maxHeight: '60vh',
+      overflowY: 'auto'
+    }
+  }, history.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '0.85rem',
+      textAlign: 'center',
+      padding: '2rem'
+    }
+  }, "Nema historije za ovaj zapis.") : history.map(h => /*#__PURE__*/React.createElement("div", {
+    className: "history-item",
+    key: h.id
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "history-header"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: `history-action ${h.action}`
+  }, h.action === 'create' ? '✅ Kreiran' : h.action === 'edit' ? '✏️ Izmjenjen' : h.action === 'delete' ? '🗑️ Obrisan' : '↩️ Vraćen'), /*#__PURE__*/React.createElement("span", {
+    className: "history-time"
+  }, fmtTime(h.timestamp)), h.oldData && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    style: {
+      marginLeft: 'auto'
+    },
+    onClick: () => restoreVersion(h)
+  }, "\u21A9 Vrati")), h.oldData && h.newData && /*#__PURE__*/React.createElement("div", {
+    className: "diff-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "diff-old"
+  }, h.oldData.allWorkers?.map(wName).join(', ')), /*#__PURE__*/React.createElement("div", null, "\u2192"), /*#__PURE__*/React.createElement("div", {
+    className: "diff-new"
+  }, h.newData.allWorkers?.map(wName).join(', ')))))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: onClose
+  }, "Zatvori"))));
+}
+
+// ─── EKIPA VIEW ───────────────────────────────────────────────────────────────
+// Data shape per day:
+//   primci:    [ { id, primatId, radnici:[wId,...], pomocni:[wId,...], note } ]
+//   otpremaci: [ { id, workerId, deptId, note } ]
+function EkipaView(_ref16) {
+  let {
+    workers,
+    ekipa,
+    setEkipa,
+    selectedDate,
+    setSelectedDate,
+    prevDay,
+    nextDay,
+    yesterday,
+    departments
+  } = _ref16;
+  const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const emptyDay = () => ({
+    primci: [],
+    otpremaci: []
+  });
+  const dayData = ekipa[selectedDate] || emptyDay();
+  const save = newData => setEkipa(e => ({
+    ...e,
+    [selectedDate]: newData
+  }));
+
+  // ── all assigned worker IDs today ──────────────────────────────────────────
+  const assignedIds = useMemo(() => {
+    const s = new Set();
+    (dayData.primci || []).forEach(p => {
+      if (p.primatId) s.add(p.primatId);
+      (p.radnici || []).forEach(id => s.add(id));
+      (p.pomocni || []).forEach(id => s.add(id));
+    });
+    (dayData.otpremaci || []).forEach(o => {
+      if (o.workerId) s.add(o.workerId);
+    });
+    return s;
+  }, [dayData]);
+  const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const unassigned = activeWorkers.filter(w => !assignedIds.has(w.id));
+  const totalAssigned = assignedIds.size;
+  const wName = id => workers.find(w => w.id === id)?.name || '—';
+  const dName = id => (departments || []).find(d => d.id === id)?.name || '—';
+
+  // Available workers for a picker (excluding already-taken ones, optionally allowing current)
+  const available = function () {
+    let excludeIds = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+    return activeWorkers.filter(w => !assignedIds.has(w.id) || excludeIds.includes(w.id));
+  };
+
+  // ── Primci operations ──────────────────────────────────────────────────────
+  const addPrimac = () => {
+    const row = {
+      id: uid(),
+      primatId: '',
+      radnici: [''],
+      pomocni: [''],
+      note: ''
+    };
+    save({
+      ...dayData,
+      primci: [...(dayData.primci || []), row]
+    });
+  };
+  const removePrimac = id => save({
+    ...dayData,
+    primci: dayData.primci.filter(p => p.id !== id)
+  });
+  const updatePrimac = (id, patch) => save({
+    ...dayData,
+    primci: dayData.primci.map(p => p.id === id ? {
+      ...p,
+      ...patch
+    } : p)
+  });
+
+  // Add/remove a slot in radnici or pomocni arrays
+  const addSlot = (primacId, field) => updatePrimac(primacId, {
+    [field]: [...(dayData.primci.find(p => p.id === primacId)[field] || []), '']
+  });
+  const removeSlot = (primacId, field, idx) => {
+    const arr = [...(dayData.primci.find(p => p.id === primacId)[field] || [])];
+    arr.splice(idx, 1);
+    updatePrimac(primacId, {
+      [field]: arr
+    });
+  };
+  const setSlotWorker = (primacId, field, idx, wId) => {
+    const arr = [...(dayData.primci.find(p => p.id === primacId)[field] || [])];
+    arr[idx] = wId;
+    updatePrimac(primacId, {
+      [field]: arr
+    });
+  };
+
+  // ── Otpremaci operations ──────────────────────────────────────────────────
+  const addOtpremac = () => {
+    const row = {
+      id: uid(),
+      workerId: '',
+      deptId: (departments || [])[0]?.id || '',
+      note: ''
+    };
+    save({
+      ...dayData,
+      otpremaci: [...(dayData.otpremaci || []), row]
+    });
+  };
+  const removeOtpremac = id => save({
+    ...dayData,
+    otpremaci: dayData.otpremaci.filter(o => o.id !== id)
+  });
+  const updateOtpremac = (id, patch) => save({
+    ...dayData,
+    otpremaci: dayData.otpremaci.map(o => o.id === id ? {
+      ...o,
+      ...patch
+    } : o)
+  });
+
+  // ── Copy from yesterday ───────────────────────────────────────────────────
+  const copyFromYesterday = () => {
+    const src = ekipa[yesterday];
+    if (!src || !src.primci?.length && !src.otpremaci?.length) return alert('Nema unesenih podataka za jučer.');
+    if (confirm('Kopirati ekipu od jučer? Trenutni unosi bit će zamijenjeni.')) save(JSON.parse(JSON.stringify(src)));
+  };
+
+  // ── Colours ───────────────────────────────────────────────────────────────
+  const C = {
+    panj: {
+      color: '#2d5a27',
+      pale: '#e8f0e6',
+      border: '#9bc492'
+    },
+    radnik: {
+      color: '#b5620a',
+      pale: '#fdf0e0',
+      border: '#e8c17a'
+    },
+    pomocni: {
+      color: '#1a3d5c',
+      pale: '#e4edf5',
+      border: '#9bbfd9'
+    },
+    otpr: {
+      color: '#6b3080',
+      pale: '#f0e8f5',
+      border: '#c4a0d8'
+    }
+  };
+
+  // ── Worker picker (inline select) ─────────────────────────────────────────
+  const WorkerSelect = _ref17 => {
+    let {
+      value,
+      onChange,
+      extraAllow = [],
+      placeholder = '— Odaberi —',
+      style = {}
+    } = _ref17;
+    const opts = activeWorkers.filter(w => !assignedIds.has(w.id) || w.id === value || extraAllow.includes(w.id));
+    return /*#__PURE__*/React.createElement("select", {
+      value: value || '',
+      onChange: e => onChange(e.target.value),
+      style: {
+        border: '1px solid var(--border)',
+        borderRadius: 5,
+        padding: '0.38rem 0.6rem',
+        fontSize: '0.82rem',
+        background: 'var(--bg)',
+        color: value ? 'var(--text)' : 'var(--text-light)',
+        fontFamily: 'var(--sans)',
+        width: '100%',
+        ...style
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, placeholder), opts.map(w => /*#__PURE__*/React.createElement("option", {
+      key: w.id,
+      value: w.id
+    }, w.name)), value && !opts.find(w => w.id === value) && /*#__PURE__*/React.createElement("option", {
+      value: value
+    }, "\u26A0 ", wName(value)));
+  };
+
+  // ── Summary stats ─────────────────────────────────────────────────────────
+  const numPrimaci = (dayData.primci || []).filter(p => p.primatId).length;
+  const numRadnici = (dayData.primci || []).reduce((s, p) => s + (p.radnici || []).filter(Boolean).length, 0);
+  const numPomocni = (dayData.primci || []).reduce((s, p) => s + (p.pomocni || []).filter(Boolean).length, 0);
+  const numOtpremaci = (dayData.otpremaci || []).filter(o => o.workerId).length;
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "date-bar"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "date-label"
+  }, "DATUM \u2014 DNEVNA EKIPA"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      marginTop: '0.25rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: prevDay
+  }, "\u2039"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "date-input",
+    value: selectedDate,
+    onChange: e => setSelectedDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: nextDay
+  }, "\u203A"), isToday && /*#__PURE__*/React.createElement("span", {
+    className: "today-chip"
+  }, "DANAS"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '1.2rem',
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, [{
+    label: 'Primači',
+    val: numPrimaci,
+    c: C.panj
+  }, {
+    label: 'Radnici/primka',
+    val: numRadnici,
+    c: C.radnik
+  }, {
+    label: 'Pomoćni',
+    val: numPomocni,
+    c: C.pomocni
+  }, {
+    label: 'Otpremači',
+    val: numOtpremaci,
+    c: C.otpr
+  }].map(_ref18 => {
+    let {
+      label,
+      val,
+      c
+    } = _ref18;
+    return /*#__PURE__*/React.createElement("div", {
+      key: label,
+      style: {
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '1.15rem',
+        fontWeight: 700,
+        color: c.color
+      }
+    }, val), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.6rem',
+        color: 'var(--text-muted)',
+        whiteSpace: 'nowrap'
+      }
+    }, label));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 1,
+      height: 32,
+      background: 'var(--border)'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '1.3rem',
+      fontWeight: 700,
+      color: 'var(--green)'
+    }
+  }, totalAssigned), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.6rem',
+      color: 'var(--text-muted)'
+    }
+  }, "UKUPNO"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginLeft: 'auto',
+      display: 'flex',
+      gap: '0.5rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm no-print",
+    onClick: copyFromYesterday
+  }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm no-print",
+    onClick: () => window.print()
+  }, "\uD83D\uDDA8\uFE0F Print"))), unassigned.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'var(--amber-pale)',
+      border: '1px solid #e8c17a',
+      borderRadius: 6,
+      padding: '0.55rem 1rem',
+      fontSize: '0.8rem',
+      color: 'var(--amber)',
+      marginBottom: '1rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700
+    }
+  }, "\u26A0 Neraspore\u0111eni:"), unassigned.map(w => /*#__PURE__*/React.createElement("span", {
+    key: w.id,
+    style: {
+      background: 'white',
+      border: '1px solid #e8c17a',
+      borderRadius: 12,
+      padding: '0.1rem 0.5rem',
+      fontSize: '0.75rem'
+    }
+  }, w.name))), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: `linear-gradient(135deg,${C.panj.color},${C.panj.color}bb)`,
+      color: 'white',
+      padding: '0.75rem 1rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.4rem'
+    }
+  }, "\uD83C\uDF33"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: '0.95rem'
+    }
+  }, "Primaci na \u0161uma panju"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      opacity: 0.8
+    }
+  }, "Svaki prima\u010D ima vlastiti tim: radnici u primci + pomo\u0107ni radnici")), /*#__PURE__*/React.createElement("button", {
+    onClick: addPrimac,
+    style: {
+      background: 'rgba(255,255,255,0.2)',
+      border: '1px solid rgba(255,255,255,0.4)',
+      color: 'white',
+      borderRadius: 6,
+      padding: '0.35rem 0.8rem',
+      fontSize: '0.8rem',
+      fontWeight: 600,
+      cursor: 'pointer'
+    }
+  }, "+ Dodaj prima\u010Da")), (dayData.primci || []).length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '2rem',
+      textAlign: 'center',
+      color: 'var(--text-light)',
+      fontSize: '0.85rem'
+    }
+  }, "Nema unesenih prima\u010Da za ovaj dan.", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("button", {
+    onClick: addPrimac,
+    style: {
+      marginTop: '0.75rem',
+      background: C.panj.color,
+      color: 'white',
+      border: 'none',
+      borderRadius: 6,
+      padding: '0.4rem 1rem',
+      fontSize: '0.82rem',
+      fontWeight: 600,
+      cursor: 'pointer'
+    }
+  }, "+ Dodaj prvog prima\u010Da")), (dayData.primci || []).map((primac, pi) => /*#__PURE__*/React.createElement("div", {
+    key: primac.id,
+    style: {
+      borderTop: pi === 0 ? 'none' : '2px solid var(--bg)',
+      padding: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.6rem',
+      marginBottom: '0.8rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 28,
+      height: 28,
+      borderRadius: '50%',
+      background: C.panj.color,
+      color: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '0.8rem',
+      fontWeight: 700,
+      fontFamily: 'var(--mono)',
+      flexShrink: 0
+    }
+  }, pi + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: '0.85rem',
+      color: C.panj.color
+    }
+  }, "Prima\u010D #", pi + 1), /*#__PURE__*/React.createElement("button", {
+    onClick: () => removePrimac(primac.id),
+    style: {
+      marginLeft: 'auto',
+      background: 'transparent',
+      border: '1px solid #e0a0a0',
+      color: 'var(--red)',
+      borderRadius: 5,
+      padding: '0.2rem 0.5rem',
+      fontSize: '0.75rem',
+      cursor: 'pointer'
+    }
+  }, "\uD83D\uDDD1 Ukloni")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1fr',
+      gap: '0.75rem',
+      alignItems: 'start'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.panj.pale,
+      border: `1px solid ${C.panj.border}`,
+      borderRadius: 8,
+      padding: '0.65rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.67rem',
+      fontWeight: 700,
+      color: C.panj.color,
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+      fontFamily: 'var(--mono)',
+      marginBottom: '0.45rem'
+    }
+  }, "\uD83C\uDF33 Prima\u010D na panju"), /*#__PURE__*/React.createElement(WorkerSelect, {
+    value: primac.primatId,
+    onChange: wId => updatePrimac(primac.id, {
+      primatId: wId
+    }),
+    extraAllow: primac.primatId ? [primac.primatId] : [],
+    placeholder: "\u2014 Odaberi prima\u010Da \u2014",
+    style: {
+      background: 'white'
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: primac.note || '',
+    onChange: e => updatePrimac(primac.id, {
+      note: e.target.value
+    }),
+    placeholder: "Napomena...",
+    style: {
+      marginTop: '0.4rem',
+      width: '100%',
+      fontSize: '0.72rem',
+      border: '1px solid var(--border)',
+      borderRadius: 4,
+      padding: '0.25rem 0.4rem',
+      fontFamily: 'var(--sans)',
+      background: 'white'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.radnik.pale,
+      border: `1px solid ${C.radnik.border}`,
+      borderRadius: 8,
+      padding: '0.65rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      marginBottom: '0.45rem',
+      gap: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.67rem',
+      fontWeight: 700,
+      color: C.radnik.color,
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+      fontFamily: 'var(--mono)',
+      flex: 1
+    }
+  }, "\uD83D\uDCCB Radnici u primci"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => addSlot(primac.id, 'radnici'),
+    style: {
+      background: C.radnik.color,
+      color: 'white',
+      border: 'none',
+      borderRadius: 4,
+      padding: '0.15rem 0.45rem',
+      fontSize: '0.7rem',
+      fontWeight: 700,
+      cursor: 'pointer'
+    }
+  }, "+")), (primac.radnici || ['']).map((wId, ri) => /*#__PURE__*/React.createElement("div", {
+    key: ri,
+    style: {
+      display: 'flex',
+      gap: '0.3rem',
+      marginBottom: '0.3rem',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(WorkerSelect, {
+    value: wId,
+    onChange: v => setSlotWorker(primac.id, 'radnici', ri, v),
+    extraAllow: wId ? [wId] : [],
+    placeholder: `— Radnik ${ri + 1} —`,
+    style: {
+      flex: 1,
+      background: 'white'
+    }
+  }), (primac.radnici || []).length > 1 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeSlot(primac.id, 'radnici', ri),
+    style: {
+      background: 'transparent',
+      border: 'none',
+      color: '#c0392b',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      padding: '0 0.2rem',
+      lineHeight: 1,
+      flexShrink: 0
+    }
+  }, "\u2715")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.pomocni.pale,
+      border: `1px solid ${C.pomocni.border}`,
+      borderRadius: 8,
+      padding: '0.65rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      marginBottom: '0.45rem',
+      gap: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.67rem',
+      fontWeight: 700,
+      color: C.pomocni.color,
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+      fontFamily: 'var(--mono)',
+      flex: 1
+    }
+  }, "\uD83D\uDD27 Pomo\u0107ni radnici"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => addSlot(primac.id, 'pomocni'),
+    style: {
+      background: C.pomocni.color,
+      color: 'white',
+      border: 'none',
+      borderRadius: 4,
+      padding: '0.15rem 0.45rem',
+      fontSize: '0.7rem',
+      fontWeight: 700,
+      cursor: 'pointer'
+    }
+  }, "+")), (primac.pomocni || ['']).map((wId, hi) => /*#__PURE__*/React.createElement("div", {
+    key: hi,
+    style: {
+      display: 'flex',
+      gap: '0.3rem',
+      marginBottom: '0.3rem',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(WorkerSelect, {
+    value: wId,
+    onChange: v => setSlotWorker(primac.id, 'pomocni', hi, v),
+    extraAllow: wId ? [wId] : [],
+    placeholder: `— Pomoćni ${hi + 1} —`,
+    style: {
+      flex: 1,
+      background: 'white'
+    }
+  }), (primac.pomocni || []).length > 1 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeSlot(primac.id, 'pomocni', hi),
+    style: {
+      background: 'transparent',
+      border: 'none',
+      color: '#c0392b',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      padding: '0 0.2rem',
+      lineHeight: 1,
+      flexShrink: 0
+    }
+  }, "\u2715")))))))), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      marginBottom: '1.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: `linear-gradient(135deg,${C.otpr.color},${C.otpr.color}bb)`,
+      color: 'white',
+      padding: '0.75rem 1rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.4rem'
+    }
+  }, "\uD83D\uDE9B"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: '0.95rem'
+    }
+  }, "Otprema\u010Di"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      opacity: 0.8
+    }
+  }, "Raspore\u0111uju se na odjel / radili\u0161te")), /*#__PURE__*/React.createElement("button", {
+    onClick: addOtpremac,
+    style: {
+      background: 'rgba(255,255,255,0.2)',
+      border: '1px solid rgba(255,255,255,0.4)',
+      color: 'white',
+      borderRadius: 6,
+      padding: '0.35rem 0.8rem',
+      fontSize: '0.8rem',
+      fontWeight: 600,
+      cursor: 'pointer'
+    }
+  }, "+ Dodaj otprema\u010Da")), (dayData.otpremaci || []).length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '1.5rem',
+      textAlign: 'center',
+      color: 'var(--text-light)',
+      fontSize: '0.85rem'
+    }
+  }, "Nema unesenih otprema\u010Da za ovaj dan.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0.75rem',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.5rem'
+    }
+  }, (dayData.otpremaci || []).map((otr, oi) => /*#__PURE__*/React.createElement("div", {
+    key: otr.id,
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'auto 1fr 1fr auto',
+      gap: '0.6rem',
+      alignItems: 'center',
+      background: C.otpr.pale,
+      border: `1px solid ${C.otpr.border}`,
+      borderRadius: 8,
+      padding: '0.6rem 0.8rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 26,
+      height: 26,
+      borderRadius: '50%',
+      background: C.otpr.color,
+      color: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '0.75rem',
+      fontWeight: 700,
+      fontFamily: 'var(--mono)',
+      flexShrink: 0
+    }
+  }, oi + 1), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.65rem',
+      fontWeight: 700,
+      color: C.otpr.color,
+      textTransform: 'uppercase',
+      letterSpacing: '0.06em',
+      fontFamily: 'var(--mono)',
+      marginBottom: '0.25rem'
+    }
+  }, "Otprema\u010D"), /*#__PURE__*/React.createElement(WorkerSelect, {
+    value: otr.workerId,
+    onChange: wId => updateOtpremac(otr.id, {
+      workerId: wId
+    }),
+    extraAllow: otr.workerId ? [otr.workerId] : [],
+    placeholder: "\u2014 Odaberi otprema\u010Da \u2014",
+    style: {
+      background: 'white'
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.65rem',
+      fontWeight: 700,
+      color: C.otpr.color,
+      textTransform: 'uppercase',
+      letterSpacing: '0.06em',
+      fontFamily: 'var(--mono)',
+      marginBottom: '0.25rem'
+    }
+  }, "Odjel / Radili\u0161te"), /*#__PURE__*/React.createElement("select", {
+    value: otr.deptId || '',
+    onChange: e => updateOtpremac(otr.id, {
+      deptId: e.target.value
+    }),
+    style: {
+      border: '1px solid var(--border)',
+      borderRadius: 5,
+      padding: '0.38rem 0.6rem',
+      fontSize: '0.82rem',
+      background: 'white',
+      fontFamily: 'var(--sans)',
+      width: '100%'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi odjel \u2014"), (departments || []).map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.name)))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeOtpremac(otr.id),
+    style: {
+      background: 'transparent',
+      border: '1px solid #e0a0a0',
+      color: 'var(--red)',
+      borderRadius: 5,
+      padding: '0.3rem 0.5rem',
+      fontSize: '0.75rem',
+      cursor: 'pointer',
+      alignSelf: 'flex-end'
+    }
+  }, "\uD83D\uDDD1"))))), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-header"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCCA"), /*#__PURE__*/React.createElement("div", {
+    className: "card-title"
+  }, "Pregled ekipe \u2014 ", fmtDate(selectedDate))), /*#__PURE__*/React.createElement("table", {
+    className: "schedule-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "#"), /*#__PURE__*/React.createElement("th", null, "Uloga"), /*#__PURE__*/React.createElement("th", null, "Radnik"), /*#__PURE__*/React.createElement("th", null, "Tim / Odjel"), /*#__PURE__*/React.createElement("th", null, "Napomena"))), /*#__PURE__*/React.createElement("tbody", null, (dayData.primci || []).flatMap((p, pi) => {
+    const rows = [];
+    // primač row
+    rows.push(/*#__PURE__*/React.createElement("tr", {
+      key: `p${pi}-prim`
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        fontFamily: 'var(--mono)',
+        color: 'var(--text-muted)',
+        fontSize: '0.72rem'
+      }
+    }, pi + 1), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.25rem',
+        background: C.panj.pale,
+        color: C.panj.color,
+        border: `1px solid ${C.panj.border}`,
+        borderRadius: 4,
+        padding: '0.15rem 0.5rem',
+        fontSize: '0.68rem',
+        fontWeight: 700,
+        fontFamily: 'var(--mono)'
+      }
+    }, "\uD83C\uDF33 Prima\u010D/panj")), /*#__PURE__*/React.createElement("td", {
+      style: {
+        fontWeight: 700
+      }
+    }, p.primatId ? wName(p.primatId) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-light)'
+      }
+    }, "\u2014")), /*#__PURE__*/React.createElement("td", {
+      style: {
+        fontSize: '0.78rem',
+        color: 'var(--text-muted)'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, "\uD83D\uDCCB ", (p.radnici || []).filter(Boolean).map(wName).join(', ') || '—'), /*#__PURE__*/React.createElement("div", null, "\uD83D\uDD27 ", (p.pomocni || []).filter(Boolean).map(wName).join(', ') || '—')), /*#__PURE__*/React.createElement("td", {
+      style: {
+        fontSize: '0.78rem',
+        color: 'var(--text-muted)'
+      }
+    }, p.note || '—')));
+    return rows;
+  }), (dayData.otpremaci || []).map((o, oi) => /*#__PURE__*/React.createElement("tr", {
+    key: `o${oi}`
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontFamily: 'var(--mono)',
+      color: 'var(--text-muted)',
+      fontSize: '0.72rem'
+    }
+  }, oi + 1), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.25rem',
+      background: C.otpr.pale,
+      color: C.otpr.color,
+      border: `1px solid ${C.otpr.border}`,
+      borderRadius: 4,
+      padding: '0.15rem 0.5rem',
+      fontSize: '0.68rem',
+      fontWeight: 700,
+      fontFamily: 'var(--mono)'
+    }
+  }, "\uD83D\uDE9B Otprema\u010D")), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontWeight: 700
+    }
+  }, o.workerId ? wName(o.workerId) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-light)'
+    }
+  }, "\u2014")), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)'
+    }
+  }, o.deptId ? dName(o.deptId) : '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)'
+    }
+  }, o.note || '—'))), totalAssigned === 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: 5,
+    style: {
+      textAlign: 'center',
+      padding: '2rem',
+      color: 'var(--text-light)'
+    }
+  }, "Nema unesenih radnika za ovaj dan."))))));
+}
+
+// ─── WORKER CATEGORY BADGE ────────────────────────────────────────────────────
+function CatBadge(_ref19) {
+  let {
+    catId,
+    size = 'normal'
+  } = _ref19;
+  const cat = getCatById(catId);
+  if (!cat) return null;
+  const small = size === 'small';
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: small ? '0.2rem' : '0.3rem',
+      background: cat.pale,
+      color: cat.color,
+      border: `1px solid ${cat.border}`,
+      borderRadius: 4,
+      padding: small ? '0.1rem 0.4rem' : '0.25rem 0.6rem',
+      fontSize: small ? '0.65rem' : '0.72rem',
+      fontWeight: 600,
+      fontFamily: 'var(--mono)',
+      whiteSpace: 'nowrap'
+    }
+  }, cat.icon, " ", small ? cat.short : cat.label);
+}
+
+// ─── WORKERS VIEW ─────────────────────────────────────────────────────────────
+function WorkersView(_ref20) {
+  let {
+    workers,
+    setWorkers,
+    schedules
+  } = _ref20;
+  const [modal, setModal] = useState(null);
+  const [search, setSearch] = useState('');
+  const [activeCat, setActiveCat] = useState('sve'); // 'sve' | catId
+  const [statusFilter, setStatus] = useState('sve'); // 'sve'|'aktivan'|'neaktivan'
+  const [viewMode, setViewMode] = useState('kartice'); // 'kartice' | 'tabela'
+  const [detailWorker, setDetail] = useState(null);
+
+  // ── filter ──
+  const filtered = useMemo(() => workers.filter(w => {
+    const matchSearch = w.name.toLowerCase().includes(search.toLowerCase()) || (w.phone || '').includes(search) || (w.note || '').toLowerCase().includes(search.toLowerCase());
+    const matchCat = activeCat === 'sve' || w.category === activeCat;
+    const matchStatus = statusFilter === 'sve' || w.status === statusFilter;
+    return matchSearch && matchCat && matchStatus;
+  }), [workers, search, activeCat, statusFilter]);
+
+  // ── stats per category ──
+  const catCounts = useMemo(() => {
+    const m = {
+      sve: workers.length
+    };
+    WORKER_CATEGORIES.forEach(c => {
+      m[c.id] = workers.filter(w => w.category === c.id).length;
+    });
+    return m;
+  }, [workers]);
+
+  // ── schedules count per worker ──
+  const workerSchedCount = useMemo(() => {
+    const m = {};
+    schedules.forEach(s => s.allWorkers.forEach(wId => {
+      m[wId] = (m[wId] || 0) + 1;
+    }));
+    return m;
+  }, [schedules]);
+
+  // ── last seen ──
+  const workerLastSeen = useMemo(() => {
+    const m = {};
+    schedules.forEach(s => s.allWorkers.forEach(wId => {
+      if (!m[wId] || s.date > m[wId]) m[wId] = s.date;
+    }));
+    return m;
+  }, [schedules]);
+  const handleDelete = w => {
+    if (confirm(`Obrisati radnika "${w.name}"?\n\nOvo ne briše historiju rasporeda.`)) setWorkers(ws => ws.filter(x => x.id !== w.id));
+  };
+
+  // ── WORKER MODAL ──
+  const WorkerModal = _ref21 => {
+    let {
+      worker,
+      onClose
+    } = _ref21;
+    const blank = {
+      id: uid(),
+      name: '',
+      status: 'aktivan',
+      category: WORKER_CATEGORIES[0].id,
+      phone: '',
+      note: ''
+    };
+    const [form, setForm] = useState(worker ? {
+      ...worker
+    } : blank);
+    const [errors, setErrors] = useState({});
+    const validate = () => {
+      const e = {};
+      if (!form.name.trim()) e.name = 'Ime je obavezno';
+      if (!form.category) e.category = 'Kategorija je obavezna';
+      setErrors(e);
+      return Object.keys(e).length === 0;
+    };
+    const save = () => {
+      if (!validate()) return;
+      if (worker) setWorkers(ws => ws.map(w => w.id === form.id ? form : w));else setWorkers(ws => [...ws, form]);
+      onClose();
+    };
+    const selCat = getCatById(form.category);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
+      onClick: e => e.target === e.currentTarget && onClose()
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal",
+      style: {
+        maxWidth: 560
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal-header",
+      style: {
+        background: selCat ? selCat.pale : undefined,
+        borderBottom: `2px solid ${selCat?.border || 'var(--border)'}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '1.4rem'
+      }
+    }, selCat?.icon || '👷'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "modal-title"
+    }, worker ? 'Uredi radnika' : 'Novi radnik'), selCat && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        color: selCat.color,
+        fontWeight: 600
+      }
+    }, selCat.label)), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon",
+      style: {
+        marginLeft: 'auto'
+      },
+      onClick: onClose
+    }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+      className: "modal-body",
+      style: {
+        maxHeight: '72vh',
+        overflowY: 'auto'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: '1.1rem'
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Kategorija radnika *"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '0.5rem'
+      }
+    }, WORKER_CATEGORIES.map(cat => /*#__PURE__*/React.createElement("button", {
+      key: cat.id,
+      type: "button",
+      onClick: () => setForm(f => ({
+        ...f,
+        category: cat.id
+      })),
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        padding: '0.6rem 0.8rem',
+        border: `2px solid ${form.category === cat.id ? cat.color : 'var(--border)'}`,
+        borderRadius: 6,
+        background: form.category === cat.id ? cat.pale : 'var(--bg)',
+        color: form.category === cat.id ? cat.color : 'var(--text-muted)',
+        fontWeight: form.category === cat.id ? 700 : 400,
+        fontSize: '0.82rem',
+        cursor: 'pointer',
+        transition: 'all 0.12s',
+        textAlign: 'left'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '1.1rem'
+      }
+    }, cat.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: '0.78rem'
+      }
+    }, cat.short), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.65rem',
+        opacity: 0.7,
+        marginTop: 1
+      }
+    }, cat.label)), form.category === cat.id && /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: 'auto',
+        fontSize: '0.9rem'
+      }
+    }, "\u2713")))), errors.category && /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: 'var(--red)',
+        fontSize: '0.75rem',
+        marginTop: '0.3rem'
+      }
+    }, "\u26A0 ", errors.category)), /*#__PURE__*/React.createElement("div", {
+      className: "divider"
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Ime i prezime *"), /*#__PURE__*/React.createElement("input", {
+      className: "form-input",
+      value: form.name,
+      onChange: e => setForm(f => ({
+        ...f,
+        name: e.target.value
+      })),
+      placeholder: "npr. Amer Hod\u017Ei\u0107",
+      style: errors.name ? {
+        borderColor: 'var(--red)'
+      } : {}
+    }), errors.name && /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: 'var(--red)',
+        fontSize: '0.75rem',
+        marginTop: '0.3rem'
+      }
+    }, "\u26A0 ", errors.name)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '0.75rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Status"), /*#__PURE__*/React.createElement("select", {
+      className: "form-select",
+      value: form.status,
+      onChange: e => setForm(f => ({
+        ...f,
+        status: e.target.value
+      }))
+    }, /*#__PURE__*/React.createElement("option", {
+      value: "aktivan"
+    }, "\u2705 Aktivan"), /*#__PURE__*/React.createElement("option", {
+      value: "neaktivan"
+    }, "\u26D4 Neaktivan"))), /*#__PURE__*/React.createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Telefon"), /*#__PURE__*/React.createElement("input", {
+      className: "form-input",
+      value: form.phone || '',
+      onChange: e => setForm(f => ({
+        ...f,
+        phone: e.target.value
+      })),
+      placeholder: "061-xxx-xxx"
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Napomena"), /*#__PURE__*/React.createElement("textarea", {
+      className: "form-input",
+      rows: 2,
+      value: form.note || '',
+      onChange: e => setForm(f => ({
+        ...f,
+        note: e.target.value
+      })),
+      placeholder: "Bolovanje, posebne napomene, kvalifikacije...",
+      style: {
+        resize: 'vertical'
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "modal-footer"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-secondary",
+      onClick: onClose
+    }, "Odustani"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-primary",
+      onClick: save
+    }, worker ? '💾 Spremi izmjenu' : '+ Dodaj radnika'))));
+  };
+
+  // ── DETAIL MODAL ──
+  const DetailModal = _ref22 => {
+    let {
+      worker,
+      onClose
+    } = _ref22;
+    const cat = getCatById(worker.category);
+    const sc = workerSchedCount[worker.id] || 0;
+    const ls = workerLastSeen[worker.id];
+    const recentSched = schedules.filter(s => s.allWorkers.includes(worker.id)).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
+      onClick: e => e.target === e.currentTarget && onClose()
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal",
+      style: {
+        maxWidth: 480
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal-header",
+      style: {
+        background: cat?.pale,
+        borderBottom: `2px solid ${cat?.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '2rem'
+      }
+    }, cat?.icon), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: '1rem'
+      }
+    }, worker.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.75rem',
+        color: cat?.color,
+        fontWeight: 600
+      }
+    }, cat?.label)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        padding: '0.2rem 0.6rem',
+        borderRadius: 12,
+        fontSize: '0.72rem',
+        fontWeight: 700,
+        background: worker.status === 'aktivan' ? '#d4edda' : '#f8d7da',
+        color: worker.status === 'aktivan' ? '#155724' : '#721c24'
+      }
+    }, worker.status === 'aktivan' ? '✅ Aktivan' : '⛔ Neaktivan'), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon",
+      onClick: onClose
+    }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+      className: "modal-body"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '0.75rem',
+        marginBottom: '1rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        padding: '0.75rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '1.4rem',
+        fontWeight: 700,
+        color: 'var(--green)'
+      }
+    }, sc), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)'
+      }
+    }, "Ukupno rasporeda")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        padding: '0.75rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.9rem',
+        fontWeight: 700,
+        color: 'var(--green)'
+      }
+    }, ls ? fmtDate(ls) : '—'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)'
+      }
+    }, "Posljednji raspored"))), worker.phone && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: '0.75rem',
+        fontSize: '0.85rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, "\uD83D\uDCDE "), worker.phone), worker.note && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: 'var(--amber-pale)',
+        border: '1px solid #e8c17a',
+        borderRadius: 6,
+        padding: '0.6rem 0.75rem',
+        fontSize: '0.82rem',
+        marginBottom: '1rem'
+      }
+    }, "\uD83D\uDCDD ", worker.note), recentSched.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.65rem',
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        color: 'var(--text-light)',
+        marginBottom: '0.4rem'
+      }
+    }, "NEDAVNI RASPOREDI"), recentSched.map(s => /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      style: {
+        display: 'flex',
+        gap: '0.5rem',
+        alignItems: 'center',
+        padding: '0.3rem 0',
+        borderBottom: '1px solid var(--border)',
+        fontSize: '0.8rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        color: 'var(--text-muted)',
+        fontSize: '0.75rem'
+      }
+    }, fmtDate(s.date)), /*#__PURE__*/React.createElement("span", {
+      className: jobBadgeClass(s.jobType),
+      style: {
+        fontSize: '0.65rem'
+      }
+    }, s.jobType), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)',
+        fontSize: '0.75rem',
+        marginLeft: 'auto'
+      }
+    }))))), /*#__PURE__*/React.createElement("div", {
+      className: "modal-footer"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-secondary",
+      onClick: onClose
+    }, "Zatvori"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-primary",
+      onClick: () => {
+        onClose();
+        setTimeout(() => setModal(worker), 50);
+      }
+    }, "\u270F\uFE0F Uredi"))));
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: '100%',
+      overflowX: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      marginBottom: '1rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "Evidencija radnika"), /*#__PURE__*/React.createElement("span", {
+    className: "tag",
+    style: {
+      marginRight: 'auto'
+    }
+  }, workers.filter(w => w.status === 'aktivan').length, " aktivnih / ", workers.length, " ukupno"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: `btn btn-sm ${viewMode === 'kartice' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => setViewMode('kartice')
+  }, "\u229E Kartice"), /*#__PURE__*/React.createElement("button", {
+    className: `btn btn-sm ${viewMode === 'tabela' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => setViewMode('tabela')
+  }, "\u2261 Tabela")), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: () => setModal({})
+  }, "+ Novi radnik")), /*#__PURE__*/React.createElement("div", {
+    className: "category-grid"
+  }, WORKER_CATEGORIES.map(cat => {
+    const cnt = catCounts[cat.id] || 0;
+    const active = activeCat === cat.id;
+    return /*#__PURE__*/React.createElement("button", {
+      key: cat.id,
+      onClick: () => setActiveCat(active ? 'sve' : cat.id),
+      className: "category-card",
+      style: {
+        border: `2px solid ${active ? cat.color : 'var(--border)'}`,
+        background: active ? cat.pale : 'var(--surface)',
+        boxShadow: active ? `0 0 0 1px ${cat.border}` : 'var(--shadow)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "category-card-icon"
+    }, cat.icon), /*#__PURE__*/React.createElement("span", {
+      className: "category-card-count",
+      style: {
+        color: cat.color
+      }
+    }, cnt)), /*#__PURE__*/React.createElement("div", {
+      className: "category-card-label",
+      style: {
+        color: active ? cat.color : 'var(--text-muted)'
+      }
+    }, cat.label));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.5rem',
+      marginBottom: '1rem',
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "\uD83D\uDD0D Pretra\u017Ei ime, telefon...",
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    style: {
+      flex: '1 1 150px',
+      minWidth: 0,
+      maxWidth: 300
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.3rem'
+    }
+  }, ['sve', 'aktivan', 'neaktivan'].map(s => /*#__PURE__*/React.createElement("button", {
+    key: s,
+    className: `filter-chip ${statusFilter === s ? 'active' : ''}`,
+    onClick: () => setStatus(s)
+  }, s === 'sve' ? 'Svi' : s === 'aktivan' ? '✅ Aktivni' : '⛔ Neaktivni'))), (activeCat !== 'sve' || statusFilter !== 'sve' || search) && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => {
+      setActiveCat('sve');
+      setStatus('sve');
+      setSearch('');
+    }
+  }, "\u2715 Resetuj"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)'
+    }
+  }, filtered.length, " radnika")), viewMode === 'kartice' && /*#__PURE__*/React.createElement("div", {
+    className: "worker-cards-grid"
+  }, filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty-state",
+    style: {
+      gridColumn: '1/-1'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDC77"), /*#__PURE__*/React.createElement("p", null, "Nema radnika za odabrane filtere.")), filtered.map(w => {
+    const cat = getCatById(w.category);
+    const sc = workerSchedCount[w.id] || 0;
+    const ls = workerLastSeen[w.id];
+    return /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      className: "worker-card",
+      style: {
+        background: 'var(--surface)',
+        border: `1px solid ${w.status === 'aktivan' ? 'var(--border)' : '#f0c0c0'}`,
+        borderRadius: 8,
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow)',
+        opacity: w.status === 'aktivan' ? 1 : 0.72,
+        transition: 'box-shadow 0.12s'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-stripe",
+      style: {
+        height: 4,
+        background: `linear-gradient(90deg,${cat?.color || '#999'},${cat?.border || '#ccc'})`
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-body",
+      style: {
+        padding: '0.9rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-top",
+      style: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '0.5rem',
+        marginBottom: '0.6rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-avatar",
+      style: {
+        width: 38,
+        height: 38,
+        borderRadius: 8,
+        background: cat?.pale || '#f0f0f0',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '1.3rem',
+        flexShrink: 0,
+        border: `1px solid ${cat?.border || '#ccc'}`
+      }
+    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-name",
+      style: {
+        fontWeight: 700,
+        fontSize: '0.88rem',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, w.name), /*#__PURE__*/React.createElement(CatBadge, {
+      catId: w.category,
+      size: "small"
+    })), /*#__PURE__*/React.createElement("span", {
+      className: "worker-card-status",
+      style: {
+        fontSize: '0.65rem',
+        fontWeight: 700,
+        padding: '0.15rem 0.4rem',
+        borderRadius: 10,
+        background: w.status === 'aktivan' ? '#d4edda' : '#f8d7da',
+        color: w.status === 'aktivan' ? '#155724' : '#721c24',
+        flexShrink: 0
+      }
+    }, w.status === 'aktivan' ? 'AKT' : 'NEA')), /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-stats",
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '0.4rem',
+        marginBottom: '0.6rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: 'var(--bg)',
+        borderRadius: 4,
+        padding: '0.3rem 0.5rem',
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '1rem',
+        fontWeight: 700,
+        color: 'var(--green)'
+      }
+    }, sc), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.62rem',
+        color: 'var(--text-light)'
+      }
+    }, "rasporeda")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: 'var(--bg)',
+        borderRadius: 4,
+        padding: '0.3rem 0.5rem',
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        color: 'var(--green)'
+      }
+    }, ls ? fmtDate(ls) : '—'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.62rem',
+        color: 'var(--text-light)'
+      }
+    }, "posljednji"))), w.phone && /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-phone",
+      style: {
+        fontSize: '0.75rem',
+        color: 'var(--text-muted)',
+        marginBottom: '0.3rem'
+      }
+    }, "\uD83D\uDCDE ", w.phone), w.note && /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-note",
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)',
+        fontStyle: 'italic',
+        marginBottom: '0.4rem',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, w.note), /*#__PURE__*/React.createElement("div", {
+      className: "worker-card-actions",
+      style: {
+        display: 'flex',
+        gap: '0.3rem',
+        marginTop: '0.5rem',
+        borderTop: '1px solid var(--border)',
+        paddingTop: '0.5rem',
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-sm",
+      style: {
+        flex: 1
+      },
+      onClick: () => setDetail(w)
+    }, "\uD83D\uDC41 Detalji"), w.category === 'primac_panj' && /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-sm worker-card-transfer",
+      title: "Prebaci u pomo\u0107nog radnika",
+      style: {
+        flex: '1 0 100%',
+        background: '#e4edf5',
+        color: '#1a3d5c',
+        border: '1px solid #9bbfd9',
+        fontSize: '0.72rem'
+      },
+      onClick: () => {
+        if (confirm(`Prebaciti "${w.name}" u Pomoćnog radnika?`)) setWorkers(ws => ws.map(x => x.id === w.id ? {
+          ...x,
+          category: 'pomocni'
+        } : x));
+      }
+    }, "\uD83D\uDD04 Prebaci u pomo\u0107nog"), w.category === 'pomocni' && /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-sm worker-card-transfer",
+      title: "Vrati u prima\u010Da",
+      style: {
+        flex: '1 0 100%',
+        background: '#e8f0e6',
+        color: '#2d5a27',
+        border: '1px solid #9bc492',
+        fontSize: '0.72rem'
+      },
+      onClick: () => {
+        if (confirm(`Vratiti "${w.name}" u Primača na šuma panju?`)) setWorkers(ws => ws.map(x => x.id === w.id ? {
+          ...x,
+          category: 'primac_panj'
+        } : x));
+      }
+    }, "\uD83D\uDD04 Vrati u prima\u010Da"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon btn-sm",
+      title: "Uredi",
+      onClick: () => setModal(w)
+    }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-danger btn-icon btn-sm",
+      title: "Bri\u0161i",
+      onClick: () => handleDelete(w)
+    }, "\uD83D\uDDD1\uFE0F"))));
+  })), viewMode === 'tabela' && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDC77"), /*#__PURE__*/React.createElement("p", null, "Nema radnika za odabrane filtere.")) : /*#__PURE__*/React.createElement("table", {
+    className: "schedule-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Ime i prezime"), /*#__PURE__*/React.createElement("th", null, "Kategorija"), /*#__PURE__*/React.createElement("th", null, "Status"), /*#__PURE__*/React.createElement("th", null, "Telefon"), /*#__PURE__*/React.createElement("th", null, "Rasporeda"), /*#__PURE__*/React.createElement("th", null, "Posljednji"), /*#__PURE__*/React.createElement("th", null, "Napomena"), /*#__PURE__*/React.createElement("th", null, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, filtered.map(w => /*#__PURE__*/React.createElement("tr", {
+    key: w.id,
+    style: {
+      opacity: w.status === 'aktivan' ? 1 : 0.65
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontWeight: 600
+    }
+  }, w.name), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement(CatBadge, {
+    catId: w.category,
+    size: "small"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      padding: '0.15rem 0.5rem',
+      borderRadius: 10,
+      fontSize: '0.72rem',
+      fontWeight: 700,
+      background: w.status === 'aktivan' ? '#d4edda' : '#f8d7da',
+      color: w.status === 'aktivan' ? '#155724' : '#721c24'
+    }
+  }, w.status === 'aktivan' ? '✅ Aktivan' : '⛔ Neaktivan')), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)'
+    }
+  }, w.phone || '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, workerSchedCount[w.id] || 0)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.75rem',
+      color: 'var(--text-muted)'
+    }
+  }, workerLastSeen[w.id] ? fmtDate(workerLastSeen[w.id]) : '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)',
+      maxWidth: 140,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
+    }
+  }, w.note || '—'), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.2rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-icon btn-sm",
+    onClick: () => setDetail(w)
+  }, "\uD83D\uDC41"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-icon btn-sm",
+    onClick: () => setModal(w)
+  }, "\u270F\uFE0F"), w.category === 'primac_panj' && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-sm",
+    title: "Prebaci u pomo\u0107nog",
+    style: {
+      background: '#e4edf5',
+      color: '#1a3d5c',
+      border: '1px solid #9bbfd9',
+      fontSize: '0.7rem',
+      padding: '0.2rem 0.4rem'
+    },
+    onClick: () => {
+      if (confirm(`Prebaciti "${w.name}" u Pomoćnog?`)) setWorkers(ws => ws.map(x => x.id === w.id ? {
+        ...x,
+        category: 'pomocni'
+      } : x));
+    }
+  }, "\uD83D\uDD04"), w.category === 'pomocni' && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-sm",
+    title: "Vrati u prima\u010Da",
+    style: {
+      background: '#e8f0e6',
+      color: '#2d5a27',
+      border: '1px solid #9bc492',
+      fontSize: '0.7rem',
+      padding: '0.2rem 0.4rem'
+    },
+    onClick: () => {
+      if (confirm(`Vratiti "${w.name}" u Primača?`)) setWorkers(ws => ws.map(x => x.id === w.id ? {
+        ...x,
+        category: 'primac_panj'
+      } : x));
+    }
+  }, "\uD83D\uDD04"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-danger btn-icon btn-sm",
+    onClick: () => handleDelete(w)
+  }, "\uD83D\uDDD1\uFE0F")))))))), modal !== null && /*#__PURE__*/React.createElement(WorkerModal, {
+    worker: Object.keys(modal).length ? modal : null,
+    onClose: () => setModal(null)
+  }), detailWorker && /*#__PURE__*/React.createElement(DetailModal, {
+    worker: detailWorker,
+    onClose: () => setDetail(null)
+  }));
+}
+
+// ─── DEPARTMENTS VIEW ─────────────────────────────────────────────────────────
+function DepartmentsView(_ref23) {
+  let {
+    departments,
+    setDepartments,
+    schedules,
+    dName
+  } = _ref23;
+  const [modal, setModal] = useState(null);
+  const DeptModal = _ref24 => {
+    let {
+      dept,
+      onClose
+    } = _ref24;
+    const [form, setForm] = useState(dept || {
+      id: uid(),
+      gospodarskaJedinica: '',
+      brojOdjela: '',
+      note: ''
+    });
+    const save = () => {
+      if (!form.gospodarskaJedinica) return alert('Odaberite gospodarsku jedinicu!');
+      if (!form.brojOdjela.trim()) return alert('Unesite broj odjela!');
+      if (dept) setDepartments(ds => ds.map(d => d.id === form.id ? form : d));else setDepartments(ds => [...ds, form]);
+      onClose();
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
+      onClick: e => e.target === e.currentTarget && onClose()
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal-header"
+    }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDFD5\uFE0F"), /*#__PURE__*/React.createElement("div", {
+      className: "modal-title"
+    }, dept ? 'Uredi odjel' : 'Novi odjel'), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon",
+      onClick: onClose
+    }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+      className: "modal-body"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Gospodarska jedinica *"), /*#__PURE__*/React.createElement("select", {
+      className: "form-select",
+      value: form.gospodarskaJedinica,
+      onChange: e => setForm(f => ({
+        ...f,
+        gospodarskaJedinica: e.target.value
+      }))
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "\u2014 Odaberi \u2014"), GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
+      key: g,
+      value: g
+    }, g)))), /*#__PURE__*/React.createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Broj odjela *"), /*#__PURE__*/React.createElement("input", {
+      className: "form-input",
+      placeholder: "npr. 54 ili 5/2",
+      value: form.brojOdjela,
+      onChange: e => setForm(f => ({
+        ...f,
+        brojOdjela: e.target.value
+      }))
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "form-label"
+    }, "Napomena"), /*#__PURE__*/React.createElement("textarea", {
+      className: "form-input",
+      rows: 2,
+      value: form.note,
+      onChange: e => setForm(f => ({
+        ...f,
+        note: e.target.value
+      })),
+      style: {
+        resize: 'vertical'
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "modal-footer"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-secondary",
+      onClick: onClose
+    }, "Odustani"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-primary",
+      onClick: save
+    }, "Spremi"))));
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "Odjeli i radili\u0161ta"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: () => setModal({})
+  }, "+ Novi odjel")), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "schedule-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("th", null, "Broj odjela"), /*#__PURE__*/React.createElement("th", null, "Napomena"), /*#__PURE__*/React.createElement("th", null, "Rasporeda"), /*#__PURE__*/React.createElement("th", null, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, departments.map(d => {
+    const cnt = schedules.filter(s => s.deptId === d.id).length;
+    return /*#__PURE__*/React.createElement("tr", {
+      key: d.id
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        fontWeight: 600
+      }
+    }, d.gospodarskaJedinica), /*#__PURE__*/React.createElement("td", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontWeight: 600
+      }
+    }, d.brojOdjela), /*#__PURE__*/React.createElement("td", {
+      style: {
+        color: 'var(--text-muted)',
+        fontSize: '0.8rem'
+      }
+    }, d.note || '—'), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+      className: "tag"
+    }, cnt)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '0.25rem'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon btn-sm",
+      onClick: () => setModal(d)
+    }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-danger btn-icon btn-sm",
+      onClick: () => {
+        if (cnt > 0) return alert('Ne možete obrisati odjel koji ima unose u rasporedu!');
+        if (confirm(`Obrisati ${d.name}?`)) setDepartments(ds => ds.filter(x => x.id !== d.id));
+      }
+    }, "\uD83D\uDDD1\uFE0F"))));
+  })))), modal !== null && /*#__PURE__*/React.createElement(DeptModal, {
+    dept: Object.keys(modal).length ? modal : null,
+    onClose: () => setModal(null)
+  }));
+}
+
+// ─── PREGLED VIEW ─────────────────────────────────────────────────────────────
+function PregledView(_ref25) {
+  let {
+    schedules,
+    workers,
+    departments,
+    wName,
+    dName,
+    filterWorker,
+    setFilterWorker,
+    filterDept,
+    setFilterDept,
+    filterJob,
+    setFilterJob
+  } = _ref25;
+  const [tab, setTab] = useState('radnik');
+  const filtered = useMemo(() => schedules.filter(s => (!filterWorker || s.allWorkers.includes(filterWorker)) && (!filterDept || s.deptId === filterDept) && (!filterJob || s.jobType === filterJob)).sort((a, b) => b.date.localeCompare(a.date)), [schedules, filterWorker, filterDept, filterJob]);
+
+  // Worker stats
+  const workerStats = useMemo(() => {
+    if (!filterWorker) return null;
+    const byJob = {};
+    filtered.forEach(s => {
+      byJob[s.jobType] = (byJob[s.jobType] || 0) + 1;
+    });
+    return byJob;
+  }, [filtered, filterWorker]);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "Pregled i filtriranje")), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-body"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(min(200px,100%),1fr))',
+      gap: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-group",
+    style: {
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Radnik"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: filterWorker,
+    onChange: e => setFilterWorker(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Svi radnici"), workers.map(w => /*#__PURE__*/React.createElement("option", {
+    key: w.id,
+    value: w.id
+  }, w.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group",
+    style: {
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Odjel"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: filterDept,
+    onChange: e => setFilterDept(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Svi odjeli"), departments.map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group",
+    style: {
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Vrsta posla"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: filterJob,
+    onChange: e => setFilterJob(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Sve vrste"), JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("option", {
+    key: jt
+  }, jt)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'flex-end'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    onClick: () => {
+      setFilterWorker('');
+      setFilterDept('');
+      setFilterJob('');
+    }
+  }, "\u2715 Resetuj"))))), filterWorker && workerStats && /*#__PURE__*/React.createElement("div", {
+    className: "stats-row",
+    style: {
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value"
+  }, filtered.length), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, "Ukupno smjena")), Object.entries(workerStats).map(_ref26 => {
+    let [jt, cnt] = _ref26;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "stat-card",
+      key: jt
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "stat-value",
+      style: {
+        fontSize: '1.2rem'
+      }
+    }, cnt), /*#__PURE__*/React.createElement("div", {
+      className: "stat-label"
+    }, jt));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      color: 'var(--text-muted)',
+      marginBottom: '0.5rem'
+    }
+  }, filtered.length, " zapisa"), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDD0D"), /*#__PURE__*/React.createElement("p", null, "Nema rezultata za odabrane filtere.")) : /*#__PURE__*/React.createElement("table", {
+    className: "schedule-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Datum"), /*#__PURE__*/React.createElement("th", null, "Odjel"), /*#__PURE__*/React.createElement("th", null, "Vrsta posla"), /*#__PURE__*/React.createElement("th", null, "Radnici"), /*#__PURE__*/React.createElement("th", null, "Napomena"))), /*#__PURE__*/React.createElement("tbody", null, filtered.map(s => /*#__PURE__*/React.createElement("tr", {
+    key: s.id
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.8rem',
+      whiteSpace: 'nowrap'
+    }
+  }, fmtDate(s.date)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontSize: '0.83rem',
+      fontWeight: 500
+    }
+  }, dName(s.deptId)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    className: jobBadgeClass(s.jobType)
+  }, s.jobType)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '2px'
+    }
+  }, s.allWorkers.map(wId => /*#__PURE__*/React.createElement("span", {
+    key: wId,
+    className: `worker-pill ${s.jobType === 'Primka' && wId === s.primatWorker ? 'primac' : ''}`
+  }, wName(wId))))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '0.8rem'
+    }
+  }, s.note || '—')))))));
+}
+
+// ─── HISTORIJA VIEW ───────────────────────────────────────────────────────────
+function HistorijaView(_ref27) {
+  let {
+    history,
+    wName,
+    dName,
+    restoreVersion,
+    schedules
+  } = _ref27;
+  const grouped = useMemo(() => {
+    const m = {};
+    history.forEach(h => {
+      const d = new Date(h.timestamp).toISOString().split('T')[0];
+      if (!m[d]) m[d] = [];
+      m[d].push(h);
+    });
+    return Object.entries(m).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [history]);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "Historija izmjena"), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, history.length, " zapisa")), history.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("p", null, "Historija je prazna.")) : grouped.map(_ref28 => {
+    let [date, items] = _ref28;
+    return /*#__PURE__*/React.createElement("div", {
+      key: date,
+      style: {
+        marginBottom: '1.25rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        color: 'var(--text-muted)',
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        marginBottom: '0.5rem',
+        paddingLeft: '0.25rem'
+      }
+    }, fmtDate(date)), items.map(h => /*#__PURE__*/React.createElement("div", {
+      className: "history-item",
+      key: h.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "history-header"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: `history-action ${h.action}`
+    }, h.action === 'create' ? '✅ Kreiran' : h.action === 'edit' ? '✏️ Izmjenjen' : h.action === 'delete' ? '🗑️ Obrisan' : '↩️ Vraćen'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.78rem',
+        color: 'var(--text-muted)'
+      }
+    }, "Raspored: ", fmtDate(h.date), " \u2014 ", h.newData?.deptId || h.oldData?.deptId ? dName(h.newData?.deptId || h.oldData?.deptId) : '', ' ', /*#__PURE__*/React.createElement("span", {
+      className: jobBadgeClass(h.newData?.jobType || h.oldData?.jobType),
+      style: {
+        fontSize: '0.65rem'
+      }
+    }, h.newData?.jobType || h.oldData?.jobType)), /*#__PURE__*/React.createElement("span", {
+      className: "history-time"
+    }, fmtTime(h.timestamp)), h.oldData && /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-secondary btn-sm",
+      style: {
+        marginLeft: 'auto'
+      },
+      onClick: () => {
+        if (confirm('Vratiti ovo stanje?')) restoreVersion(h);
+      }
+    }, "\u21A9 Vrati")), h.oldData && h.newData && /*#__PURE__*/React.createElement("div", {
+      className: "diff-row"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "diff-old"
+    }, h.oldData.allWorkers?.map(wName).join(', ')), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, "\u2192"), /*#__PURE__*/React.createElement("div", {
+      className: "diff-new"
+    }, h.newData.allWorkers?.map(wName).join(', '))))));
+  }));
+}
+
+// ─── SPISAK VIEW ──────────────────────────────────────────────────────────────
+function SpisakView(_ref29) {
+  let {
+    workers,
+    setWorkers
+  } = _ref29;
+  // editing: { workerId, field } | null
+  const [editing, setEditing] = useState(null);
+  const [editVal, setEditVal] = useState('');
+  // adding: catId | null
+  const [adding, setAdding] = useState(null);
+  const [addName, setAddName] = useState('');
+  const workersByCat = catId => workers.filter(w => w.category === catId);
+  const startEdit = (w, field) => {
+    setEditing({
+      workerId: w.id,
+      field
+    });
+    setEditVal(w[field] || '');
+  };
+  const commitEdit = () => {
+    if (!editing) return;
+    setWorkers(ws => ws.map(w => w.id === editing.workerId ? {
+      ...w,
+      [editing.field]: editVal
+    } : w));
+    setEditing(null);
+    setEditVal('');
+  };
+  const handleKeyDown = e => {
+    if (e.key === 'Enter') commitEdit();
+    if (e.key === 'Escape') {
+      setEditing(null);
+      setEditVal('');
+    }
+  };
+  const deleteWorker = w => {
+    if (confirm(`Obrisati radnika "${w.name}"?`)) setWorkers(ws => ws.filter(x => x.id !== w.id));
+  };
+  const toggleStatus = w => {
+    setWorkers(ws => ws.map(x => x.id === w.id ? {
+      ...x,
+      status: x.status === 'aktivan' ? 'neaktivan' : 'aktivan'
+    } : x));
+  };
+  const addWorker = catId => {
+    const name = addName.trim();
+    if (!name) return;
+    const newW = {
+      id: uid(),
+      name,
+      category: catId,
+      status: 'aktivan',
+      phone: '',
+      note: ''
+    };
+    setWorkers(ws => [...ws, newW]);
+    setAddName('');
+    setAdding(null);
+  };
+  const moveWorker = (wId, newCat) => {
+    setWorkers(ws => ws.map(w => w.id === wId ? {
+      ...w,
+      category: newCat
+    } : w));
+  };
+  const CAT_COLS = SPISAK_COLUMNS.map(cid => WORKER_CATEGORIES.find(c => c.id === cid)).filter(Boolean);
+  // max rows needed
+  const maxRows = Math.max(0, ...CAT_COLS.map(c => workersByCat(c.id).length));
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      marginBottom: '1rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "\uD83D\uDCCA Spisak radnika po kategorijama"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)'
+    }
+  }, workers.filter(w => w.status === 'aktivan').length, " aktivnih / ", workers.length, " ukupno")), /*#__PURE__*/React.createElement("div", {
+    className: "spisak-desktop",
+    style: {
+      overflowX: 'auto',
+      maxWidth: '100%'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      borderCollapse: 'collapse',
+      width: '100%',
+      minWidth: 'max-content'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, CAT_COLS.map(cat => /*#__PURE__*/React.createElement("th", {
+    key: cat.id,
+    style: {
+      background: cat.pale,
+      border: `2px solid ${cat.border}`,
+      padding: '0.6rem 0.75rem',
+      minWidth: 190,
+      verticalAlign: 'bottom'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.1rem'
+    }
+  }, cat.icon), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: '0.8rem',
+      color: cat.color,
+      marginTop: '0.2rem',
+      lineHeight: 1.2
+    }
+  }, cat.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      color: cat.color,
+      opacity: 0.7,
+      marginTop: '0.15rem'
+    }
+  }, workersByCat(cat.id).filter(w => w.status === 'aktivan').length, " aktivnih")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setAdding(cat.id);
+      setAddName('');
+    },
+    style: {
+      background: cat.color,
+      color: 'white',
+      border: 'none',
+      borderRadius: 4,
+      width: 24,
+      height: 24,
+      fontSize: '1rem',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      fontWeight: 700
+    },
+    title: "Dodaj radnika"
+  }, "+")), adding === cat.id && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.4rem',
+      display: 'flex',
+      gap: '0.3rem'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    className: "form-input",
+    placeholder: "Ime i prezime...",
+    value: addName,
+    onChange: e => setAddName(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') addWorker(cat.id);
+      if (e.key === 'Escape') {
+        setAdding(null);
+        setAddName('');
+      }
+    },
+    style: {
+      fontSize: '0.78rem',
+      padding: '0.3rem 0.5rem',
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => addWorker(cat.id),
+    style: {
+      background: cat.color,
+      color: 'white',
+      border: 'none',
+      borderRadius: 4,
+      padding: '0.3rem 0.5rem',
+      cursor: 'pointer',
+      fontSize: '0.75rem',
+      fontWeight: 700
+    }
+  }, "\u2713"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setAdding(null);
+      setAddName('');
+    },
+    style: {
+      background: 'var(--bg)',
+      border: '1px solid var(--border)',
+      borderRadius: 4,
+      padding: '0.3rem 0.5rem',
+      cursor: 'pointer',
+      fontSize: '0.75rem',
+      color: 'var(--text-muted)'
+    }
+  }, "\u2715")))))), /*#__PURE__*/React.createElement("tbody", null, Array.from({
+    length: maxRows + 0
+  }, (_, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i
+  }, CAT_COLS.map(cat => {
+    const ws = workersByCat(cat.id);
+    const w = ws[i];
+    if (!w) return /*#__PURE__*/React.createElement("td", {
+      key: cat.id,
+      style: {
+        border: `1px solid ${cat.border}`,
+        background: cat.pale,
+        opacity: 0.3,
+        minHeight: 36
+      }
+    });
+    const isInactive = w.status !== 'aktivan';
+    const isEditingName = editing?.workerId === w.id && editing?.field === 'name';
+    const isEditingPhone = editing?.workerId === w.id && editing?.field === 'phone';
+    return /*#__PURE__*/React.createElement("td", {
+      key: cat.id,
+      style: {
+        border: `1px solid ${cat.border}`,
+        padding: '0.3rem 0.5rem',
+        verticalAlign: 'top',
+        background: isInactive ? '#fafafa' : 'white',
+        opacity: isInactive ? 0.55 : 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.25rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.6rem',
+        color: 'var(--text-light)',
+        minWidth: 14,
+        textAlign: 'right',
+        flexShrink: 0
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, isEditingName ? /*#__PURE__*/React.createElement("input", {
+      autoFocus: true,
+      className: "form-input",
+      value: editVal,
+      onChange: e => setEditVal(e.target.value),
+      onBlur: commitEdit,
+      onKeyDown: handleKeyDown,
+      style: {
+        fontSize: '0.82rem',
+        padding: '0.2rem 0.4rem',
+        width: '100%'
+      }
+    }) : /*#__PURE__*/React.createElement("span", {
+      onClick: () => startEdit(w, 'name'),
+      title: "Klikni za editovanje",
+      style: {
+        fontSize: '0.85rem',
+        fontWeight: 600,
+        cursor: 'text',
+        display: 'block',
+        textDecoration: isInactive ? 'line-through' : 'none',
+        color: isInactive ? 'var(--text-light)' : 'var(--text)'
+      }
+    }, w.name), isEditingPhone ? /*#__PURE__*/React.createElement("input", {
+      autoFocus: true,
+      className: "form-input",
+      value: editVal,
+      onChange: e => setEditVal(e.target.value),
+      onBlur: commitEdit,
+      onKeyDown: handleKeyDown,
+      placeholder: "Telefon...",
+      style: {
+        fontSize: '0.7rem',
+        padding: '0.15rem 0.3rem',
+        width: '100%',
+        marginTop: '0.15rem'
+      }
+    }) : /*#__PURE__*/React.createElement("span", {
+      onClick: () => startEdit(w, 'phone'),
+      title: "Klikni za editovanje telefona",
+      style: {
+        fontSize: '0.7rem',
+        color: 'var(--text-muted)',
+        cursor: 'text',
+        display: 'block',
+        marginTop: '0.1rem'
+      }
+    }, w.phone || /*#__PURE__*/React.createElement("span", {
+      style: {
+        opacity: 0.35,
+        fontStyle: 'italic'
+      }
+    }, "+ telefon"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.15rem',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => toggleStatus(w),
+      title: isInactive ? 'Aktiviraj' : 'Deaktiviraj',
+      style: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: '0.75rem',
+        padding: '0.1rem',
+        lineHeight: 1
+      }
+    }, isInactive ? '⛔' : '✅'), /*#__PURE__*/React.createElement("select", {
+      value: w.category,
+      onChange: e => moveWorker(w.id, e.target.value),
+      title: "Premjesti u drugu kategoriju",
+      style: {
+        fontSize: '0.6rem',
+        border: '1px solid var(--border)',
+        borderRadius: 3,
+        padding: '0.1rem',
+        background: 'var(--bg)',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+        maxWidth: 70
+      }
+    }, WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(c => /*#__PURE__*/React.createElement("option", {
+      key: c.id,
+      value: c.id
+    }, c.short))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => deleteWorker(w),
+      title: "Obri\u0161i",
+      style: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: '0.7rem',
+        padding: '0.1rem',
+        color: 'var(--red)',
+        lineHeight: 1
+      }
+    }, "\uD83D\uDDD1"))));
+  }))), /*#__PURE__*/React.createElement("tr", null, CAT_COLS.map(cat => /*#__PURE__*/React.createElement("td", {
+    key: cat.id,
+    style: {
+      border: `1px solid ${cat.border}`,
+      background: cat.pale,
+      padding: '0.3rem 0.5rem',
+      opacity: 0.6
+    }
+  }, adding !== cat.id && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setAdding(cat.id);
+      setAddName('');
+    },
+    style: {
+      background: 'none',
+      border: `1px dashed ${cat.border}`,
+      borderRadius: 4,
+      color: cat.color,
+      width: '100%',
+      padding: '0.3rem',
+      fontSize: '0.75rem',
+      cursor: 'pointer',
+      textAlign: 'left'
+    }
+  }, "+ dodaj radnika"))))))), /*#__PURE__*/React.createElement("div", {
+    className: "spisak-mobile"
+  }, CAT_COLS.map(cat => {
+    const ws = workersByCat(cat.id);
+    const active = ws.filter(w => w.status === 'aktivan').length;
+    return /*#__PURE__*/React.createElement("div", {
+      key: cat.id,
+      style: {
+        background: 'var(--surface)',
+        border: `1px solid ${cat.border}`,
+        borderLeft: `4px solid ${cat.color}`,
+        borderRadius: 6,
+        marginBottom: '0.5rem',
+        overflow: 'hidden'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.4rem 0.5rem',
+        background: cat.pale
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.9rem'
+      }
+    }, cat.icon), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: '0.8rem',
+        color: cat.color,
+        flex: 1
+      }
+    }, cat.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.65rem',
+        fontWeight: 700,
+        color: 'white',
+        background: cat.color,
+        borderRadius: 3,
+        padding: '0.1rem 0.3rem'
+      }
+    }, active), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setAdding(cat.id);
+        setAddName('');
+      },
+      style: {
+        background: cat.color,
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        width: 22,
+        height: 22,
+        fontSize: '0.85rem',
+        cursor: 'pointer',
+        fontWeight: 700
+      }
+    }, "+")), adding === cat.id && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.3rem 0.5rem',
+        display: 'flex',
+        gap: '0.3rem',
+        background: '#fafaf8',
+        borderBottom: `1px solid ${cat.border}`
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      autoFocus: true,
+      className: "form-input",
+      placeholder: "Ime i prezime...",
+      value: addName,
+      onChange: e => setAddName(e.target.value),
+      onKeyDown: e => {
+        if (e.key === 'Enter') addWorker(cat.id);
+        if (e.key === 'Escape') {
+          setAdding(null);
+          setAddName('');
+        }
+      },
+      style: {
+        fontSize: '0.78rem',
+        padding: '0.25rem 0.4rem',
+        flex: 1
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: () => addWorker(cat.id),
+      style: {
+        background: cat.color,
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        padding: '0.2rem 0.5rem',
+        fontSize: '0.75rem',
+        fontWeight: 700
+      }
+    }, "+")), /*#__PURE__*/React.createElement("div", null, ws.map((w, i) => {
+      const isInactive = w.status !== 'aktivan';
+      const isEditName = editing?.workerId === w.id && editing?.field === 'name';
+      const isEditPhone = editing?.workerId === w.id && editing?.field === 'phone';
+      return /*#__PURE__*/React.createElement("div", {
+        key: w.id,
+        style: {
+          padding: '0.3rem 0.5rem',
+          borderBottom: `1px solid ${cat.border}`,
+          opacity: isInactive ? 0.5 : 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.3rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          fontSize: '0.6rem',
+          color: 'var(--text-light)',
+          minWidth: 16,
+          textAlign: 'right'
+        }
+      }, i + 1), /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1,
+          minWidth: 0
+        }
+      }, isEditName ? /*#__PURE__*/React.createElement("input", {
+        autoFocus: true,
+        className: "form-input",
+        value: editVal,
+        onChange: e => setEditVal(e.target.value),
+        onBlur: commitEdit,
+        onKeyDown: handleKeyDown,
+        style: {
+          fontSize: '0.8rem',
+          padding: '0.15rem 0.3rem',
+          width: '100%'
+        }
+      }) : /*#__PURE__*/React.createElement("span", {
+        onClick: () => startEdit(w, 'name'),
+        style: {
+          fontSize: '0.82rem',
+          fontWeight: 600,
+          cursor: 'text',
+          display: 'block',
+          textDecoration: isInactive ? 'line-through' : 'none'
+        }
+      }, w.name), isEditPhone ? /*#__PURE__*/React.createElement("input", {
+        autoFocus: true,
+        className: "form-input",
+        value: editVal,
+        onChange: e => setEditVal(e.target.value),
+        onBlur: commitEdit,
+        onKeyDown: handleKeyDown,
+        placeholder: "Telefon...",
+        style: {
+          fontSize: '0.68rem',
+          padding: '0.1rem 0.3rem',
+          width: '100%',
+          marginTop: '0.1rem'
+        }
+      }) : /*#__PURE__*/React.createElement("span", {
+        onClick: () => startEdit(w, 'phone'),
+        style: {
+          fontSize: '0.68rem',
+          color: 'var(--text-muted)',
+          cursor: 'text',
+          display: 'block'
+        }
+      }, w.phone || /*#__PURE__*/React.createElement("span", {
+        style: {
+          opacity: 0.35,
+          fontStyle: 'italic'
+        }
+      }, "+ telefon"))), /*#__PURE__*/React.createElement("button", {
+        onClick: () => toggleStatus(w),
+        style: {
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '0.7rem',
+          padding: '0.1rem'
+        }
+      }, isInactive ? '⛔' : '✅'), /*#__PURE__*/React.createElement("select", {
+        value: w.category,
+        onChange: e => moveWorker(w.id, e.target.value),
+        style: {
+          fontSize: '0.55rem',
+          border: '1px solid var(--border)',
+          borderRadius: 3,
+          padding: '0.1rem',
+          background: 'var(--bg)',
+          color: 'var(--text-muted)',
+          maxWidth: 65
+        }
+      }, WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(c => /*#__PURE__*/React.createElement("option", {
+        key: c.id,
+        value: c.id
+      }, c.short))), /*#__PURE__*/React.createElement("button", {
+        onClick: () => deleteWorker(w),
+        style: {
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '0.65rem',
+          color: 'var(--red)',
+          padding: '0.1rem'
+        }
+      }, "\uD83D\uDDD1"));
+    }), ws.length === 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.5rem',
+        fontSize: '0.75rem',
+        color: 'var(--text-light)',
+        fontStyle: 'italic',
+        textAlign: 'center'
+      }
+    }, "Nema radnika")));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.75rem',
+      fontSize: '0.72rem',
+      color: 'var(--text-muted)'
+    }
+  }, "\uD83D\uDCA1 Klikni na ime ili telefon za direktno editovanje \xB7 Klikni \u2705/\u26D4 za aktivaciju \xB7 Koristite dropdown za premje\u0161tanje u drugu kategoriju"));
+}
+
+// ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
+function SihtaricaView(_ref30) {
+  let {
+    schedules,
+    workers,
+    departments,
+    godisnji,
+    setGodisnji,
+    wName,
+    dName
+  } = _ref30;
+  const now = new Date();
+  const [selYear, setSelYear] = useState(now.getFullYear());
+  const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
+  const [selWorker, setSelWorker] = useState('');
+  const [goModal, setGoModal] = useState(null); // { workerId } or null
+  const [goForm, setGoForm] = useState({
+    date: '',
+    dateDo: '',
+    type: 'Godišnji odmor',
+    note: ''
+  });
+  const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji'
+
+  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Slobodan dan', 'Neplaćeno'];
+  const ODSUTNOST_COLOR = {
+    'Godišnji odmor': {
+      bg: '#e4edf5',
+      color: '#1a3d5c',
+      border: '#9bbfd9',
+      short: 'GO'
+    },
+    'Bolovanje': {
+      bg: '#fde8e8',
+      color: '#8b2020',
+      border: '#e0a0a0',
+      short: 'B'
+    },
+    'Slobodan dan': {
+      bg: '#fdf0e0',
+      color: '#b5620a',
+      border: '#e8c17a',
+      short: 'SD'
+    },
+    'Neplaćeno': {
+      bg: '#f0f0f0',
+      color: '#555',
+      border: '#ccc',
+      short: 'N'
+    }
+  };
+  const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+  const days = Array.from({
+    length: daysInMonth
+  }, (_, i) => i + 1);
+  const isoDate = d => `${selYear}-${String(selMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const dayOfWeek = d => new Date(selYear, selMonth, d).getDay(); // 0=Sun,6=Sat
+  const isWeekend = d => {
+    const dw = dayOfWeek(d);
+    return dw === 0 || dw === 6;
+  };
+  const MONTH_NAMES = ['Januar', 'Februar', 'Mart', 'April', 'Maj', 'Juni', 'Juli', 'August', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
+
+  // Build map: workerId -> date -> { type: 'rad'|odsutnost }
+  const workerDayMap = useMemo(() => {
+    const m = {};
+    workers.forEach(w => {
+      m[w.id] = {};
+    });
+    // Radni dani iz rasporeda
+    schedules.forEach(s => {
+      s.allWorkers.forEach(wId => {
+        if (m[wId]) m[wId][s.date] = {
+          type: 'rad',
+          jobType: s.jobType
+        };
+      });
+    });
+    // Odsutnost
+    Object.entries(godisnji).forEach(_ref31 => {
+      let [wId, entries] = _ref31;
+      if (!m[wId]) return;
+      entries.forEach(e => {
+        m[wId][e.date] = {
+          type: 'odsutnost',
+          oType: e.type,
+          note: e.note
+        };
+      });
+    });
+    return m;
+  }, [schedules, godisnji, workers]);
+
+  // Stats per worker for selected month
+  const workerStats = useMemo(() => {
+    return workers.map(w => {
+      let radnih = 0,
+        odsutnih = 0,
+        vikenda = 0,
+        praznih = 0;
+      const odsutTypes = {};
+      days.forEach(d => {
+        const date = isoDate(d);
+        const entry = workerDayMap[w.id]?.[date];
+        if (isWeekend(d)) {
+          vikenda++;
+          return;
+        }
+        if (!entry) {
+          praznih++;
+          return;
+        }
+        if (entry.type === 'rad') radnih++;else {
+          odsutnih++;
+          odsutTypes[entry.oType] = (odsutTypes[entry.oType] || 0) + 1;
+        }
+      });
+      return {
+        ...w,
+        radnih,
+        odsutnih,
+        vikenda,
+        praznih,
+        odsutTypes
+      };
+    });
+  }, [workerDayMap, days, selYear, selMonth]);
+
+  // Add odsutnost (supports date range)
+  const saveGodisnji = () => {
+    if (!goForm.date) return alert('Odaberi datum!');
+    const wId = goModal.workerId;
+    const startDate = new Date(goForm.date);
+    const endDate = goForm.dateDo ? new Date(goForm.dateDo) : startDate;
+    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    // Collect all dates in range
+    const dates = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dw = d.getDay();
+      if (dw !== 0 && dw !== 6) {
+        // skip weekends
+        dates.push(d.toISOString().slice(0, 10));
+      }
+    }
+    if (dates.length === 0) return alert('Nema radnih dana u odabranom periodu!');
+    setGodisnji(g => {
+      const prev = (g[wId] || []).filter(e => !dates.includes(e.date));
+      const newEntries = dates.map(dt => ({
+        date: dt,
+        type: goForm.type,
+        note: goForm.note
+      }));
+      return {
+        ...g,
+        [wId]: [...prev, ...newEntries]
+      };
+    });
+    setGoModal(null);
+    setGoForm({
+      date: '',
+      dateDo: '',
+      type: 'Godišnji odmor',
+      note: ''
+    });
+  };
+  const deleteGodisnji = (wId, date) => {
+    setGodisnji(g => ({
+      ...g,
+      [wId]: (g[wId] || []).filter(e => e.date !== date)
+    }));
+  };
+  const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
+
+  // ── Yearly overview data ──
+  const yearlyStats = useMemo(() => {
+    if (sihtView !== 'godisnji') return [];
+    return workers.filter(w => w.status === 'aktivan').map(w => {
+      const months = Array.from({
+        length: 12
+      }, (_, mi) => {
+        const dim = new Date(selYear, mi + 1, 0).getDate();
+        let radnih = 0,
+          odsutnih = 0,
+          vikenda = 0,
+          praznih = 0;
+        const odsutTypes = {};
+        for (let d = 1; d <= dim; d++) {
+          const iso = `${selYear}-${String(mi + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const dw = new Date(selYear, mi, d).getDay();
+          if (dw === 0 || dw === 6) {
+            vikenda++;
+            continue;
+          }
+          const entry = workerDayMap[w.id]?.[iso];
+          if (!entry) {
+            praznih++;
+            continue;
+          }
+          if (entry.type === 'rad') radnih++;else {
+            odsutnih++;
+            odsutTypes[entry.oType] = (odsutTypes[entry.oType] || 0) + 1;
+          }
+        }
+        return {
+          radnih,
+          odsutnih,
+          vikenda,
+          praznih,
+          odsutTypes
+        };
+      });
+      const total = months.reduce((a, m) => ({
+        radnih: a.radnih + m.radnih,
+        odsutnih: a.odsutnih + m.odsutnih,
+        vikenda: a.vikenda + m.vikenda,
+        praznih: a.praznih + m.praznih
+      }), {
+        radnih: 0,
+        odsutnih: 0,
+        vikenda: 0,
+        praznih: 0
+      });
+      return {
+        ...w,
+        months,
+        total
+      };
+    });
+  }, [sihtView, selYear, workerDayMap, workers]);
+
+  // ── Per-worker monthly detail ──
+  const singleWorkerData = useMemo(() => {
+    if (sihtView !== 'radnik' || !selWorker) return null;
+    const w = workers.find(x => x.id === selWorker);
+    if (!w) return null;
+    const months = Array.from({
+      length: 12
+    }, (_, mi) => {
+      const dim = new Date(selYear, mi + 1, 0).getDate();
+      const daysList = [];
+      let radnih = 0,
+        odsutnih = 0,
+        vikenda = 0,
+        praznih = 0;
+      const odsutTypes = {};
+      for (let d = 1; d <= dim; d++) {
+        const iso = `${selYear}-${String(mi + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dw = new Date(selYear, mi, d).getDay();
+        const entry = workerDayMap[w.id]?.[iso];
+        const wknd = dw === 0 || dw === 6;
+        if (wknd) vikenda++;else if (!entry) praznih++;else if (entry.type === 'rad') radnih++;else {
+          odsutnih++;
+          odsutTypes[entry.oType] = (odsutTypes[entry.oType] || 0) + 1;
+        }
+        daysList.push({
+          d,
+          iso,
+          dw,
+          wknd,
+          entry
+        });
+      }
+      return {
+        mi,
+        days: daysList,
+        radnih,
+        odsutnih,
+        vikenda,
+        praznih,
+        odsutTypes
+      };
+    });
+    const total = months.reduce((a, m) => ({
+      radnih: a.radnih + m.radnih,
+      odsutnih: a.odsutnih + m.odsutnih,
+      vikenda: a.vikenda + m.vikenda,
+      praznih: a.praznih + m.praznih
+    }), {
+      radnih: 0,
+      odsutnih: 0,
+      vikenda: 0,
+      praznih: 0
+    });
+    return {
+      worker: w,
+      months,
+      total
+    };
+  }, [sihtView, selYear, selWorker, workerDayMap, workers]);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      marginBottom: '0.75rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "\uD83D\uDCC4 \u0160ihtarica"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 0,
+      borderRadius: 6,
+      overflow: 'hidden',
+      border: '1px solid var(--border)'
+    }
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref32 => {
+    let [k, l] = _ref32;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      onClick: () => setSihtView(k),
+      style: {
+        padding: '0.35rem 0.7rem',
+        fontSize: '0.75rem',
+        fontWeight: sihtView === k ? 700 : 400,
+        border: 'none',
+        cursor: 'pointer',
+        background: sihtView === k ? 'var(--green)' : 'var(--bg)',
+        color: sihtView === k ? 'white' : 'var(--text-muted)'
+      }
+    }, l);
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      marginBottom: '1rem',
+      flexWrap: 'wrap'
+    }
+  }, sihtView !== 'godisnji' ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: () => {
+      if (selMonth === 0) {
+        setSelMonth(11);
+        setSelYear(y => y - 1);
+      } else setSelMonth(m => m - 1);
+    }
+  }, "\u25C0"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontWeight: 700,
+      fontSize: '0.9rem',
+      minWidth: 140,
+      textAlign: 'center'
+    }
+  }, MONTH_NAMES[selMonth], " ", selYear), /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: () => {
+      if (selMonth === 11) {
+        setSelMonth(0);
+        setSelYear(y => y + 1);
+      } else setSelMonth(m => m + 1);
+    }
+  }, "\u25B6")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: () => setSelYear(y => y - 1)
+  }, "\u25C0"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontWeight: 700,
+      fontSize: '0.9rem',
+      minWidth: 60,
+      textAlign: 'center'
+    }
+  }, selYear), /*#__PURE__*/React.createElement("button", {
+    className: "date-nav-btn",
+    onClick: () => setSelYear(y => y + 1)
+  }, "\u25B6")), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: selWorker,
+    onChange: e => setSelWorker(e.target.value),
+    style: {
+      maxWidth: 220
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, sihtView === 'radnik' ? '— Odaberi radnika —' : 'Svi radnici'), workers.filter(w => w.status === 'aktivan').map(w => /*#__PURE__*/React.createElement("option", {
+    key: w.id,
+    value: w.id
+  }, w.name))), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    onClick: () => window.print()
+  }, "\uD83D\uDDA8\uFE0F \u0160tampaj")), sihtView === 'mjesecni' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.5rem',
+      flexWrap: 'wrap',
+      marginBottom: '1rem',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.72rem',
+      color: 'var(--text-muted)',
+      fontWeight: 700
+    }
+  }, "Kategorije:"), WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(c => /*#__PURE__*/React.createElement("span", {
+    key: c.id,
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.2rem',
+      fontSize: '0.72rem',
+      background: c.pale,
+      color: c.color,
+      border: `1px solid ${c.border}`,
+      borderRadius: 3,
+      padding: '0.15rem 0.5rem',
+      fontWeight: 600
+    }
+  }, c.icon, " ", c.short)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      margin: '0 0.3rem',
+      color: 'var(--border)'
+    }
+  }, "|"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.72rem',
+      color: 'var(--text-muted)',
+      fontWeight: 700
+    }
+  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref33 => {
+    let [k, v] = _ref33;
+    return /*#__PURE__*/React.createElement("span", {
+      key: k,
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.2rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.72rem',
+        background: v.bg,
+        color: v.color,
+        border: `1px solid ${v.border}`,
+        borderRadius: 3,
+        padding: '0.1rem 0.4rem',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700
+      }
+    }, v.short), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)'
+      }
+    }, k));
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.72rem',
+      background: '#f0ede6',
+      color: '#9e9589',
+      border: '1px solid #d4cfc4',
+      borderRadius: 3,
+      padding: '0.1rem 0.4rem',
+      fontFamily: 'var(--mono)'
+    }
+  }, "\u2014"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.72rem',
+      color: 'var(--text-muted)'
+    }
+  }, "Vikend")), /*#__PURE__*/React.createElement("div", {
+    className: "siht-desktop-table",
+    style: {
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      borderCollapse: 'collapse',
+      fontSize: '0.75rem',
+      minWidth: 'max-content',
+      width: '100%'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#f0ede6',
+      padding: '0.5rem 0.75rem',
+      textAlign: 'left',
+      border: '1px solid var(--border)',
+      minWidth: 160,
+      position: 'sticky',
+      left: 0,
+      zIndex: 2,
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.08em'
+    }
+  }, "RADNIK"), days.map(d => /*#__PURE__*/React.createElement("th", {
+    key: d,
+    style: {
+      background: isWeekend(d) ? '#ece9e2' : '#f0ede6',
+      padding: '0.3rem 0.2rem',
+      textAlign: 'center',
+      border: '1px solid var(--border)',
+      minWidth: 28,
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      color: isWeekend(d) ? 'var(--text-light)' : 'var(--text-muted)'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, d), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.55rem',
+      opacity: 0.7
+    }
+  }, 'NPUSČPS'[dayOfWeek(d)]))), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#f0ede6',
+      padding: '0.3rem 0.5rem',
+      border: '1px solid var(--border)',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.6rem',
+      minWidth: 36,
+      textAlign: 'center'
+    }
+  }, "R"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#fdf0e0',
+      padding: '0.3rem 0.5rem',
+      border: '1px solid var(--border)',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.6rem',
+      minWidth: 36,
+      textAlign: 'center'
+    }
+  }, "GO"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#fde8e8',
+      padding: '0.3rem 0.5rem',
+      border: '1px solid var(--border)',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.6rem',
+      minWidth: 36,
+      textAlign: 'center'
+    }
+  }, "B"))), /*#__PURE__*/React.createElement("tbody", null, displayWorkers.map(w => {
+    const stats = workerStats.find(s => s.id === w.id) || w;
+    const cat = getCatById(w.category);
+    const catColor = cat?.color || '#2d5a27';
+    const catPale = cat?.pale || '#e8f0e6';
+    const catBorder = cat?.border || '#9bc492';
+    return /*#__PURE__*/React.createElement("tr", {
+      key: w.id,
+      style: {
+        opacity: w.status === 'aktivan' ? 1 : 0.5
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: '0.35rem 0.6rem',
+        border: `2px solid ${catBorder}`,
+        borderLeft: `4px solid ${catColor}`,
+        fontWeight: 600,
+        background: catPale,
+        position: 'sticky',
+        left: 0,
+        zIndex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        minWidth: 0,
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.8rem',
+        flexShrink: 0
+      }
+    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        color: catColor
+      }
+    }, w.name)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setGoModal({
+          workerId: w.id
+        });
+        setGoForm({
+          date: isoDate(new Date().getDate()),
+          dateDo: '',
+          type: 'Godišnji odmor',
+          note: ''
+        });
+      },
+      style: {
+        background: catColor,
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        padding: '0.15rem 0.35rem',
+        fontSize: '0.65rem',
+        cursor: 'pointer',
+        flexShrink: 0,
+        fontWeight: 700
+      },
+      title: "Dodaj odsutnost"
+    }, "+GO")), days.map(d => {
+      const date = isoDate(d);
+      const entry = workerDayMap[w.id]?.[date];
+      const wknd = isWeekend(d);
+      let cellBg = wknd ? '#f0ede6' : 'white';
+      let cellBorderColor = wknd ? '#ddd9d0' : '#ece9e2';
+      let cellText = wknd ? /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: '#ccc8c0',
+          fontSize: '0.55rem'
+        }
+      }, "\u2014") : null;
+      let title = '';
+      if (entry?.type === 'rad') {
+        cellBg = catPale;
+        cellBorderColor = catBorder;
+        cellText = /*#__PURE__*/React.createElement("span", {
+          style: {
+            color: catColor,
+            fontWeight: 700,
+            fontSize: '0.65rem',
+            fontFamily: 'var(--mono)'
+          }
+        }, cat?.icon || 'R');
+        title = (cat?.short || 'Rad') + ' · ' + entry.jobType;
+      } else if (entry?.type === 'odsutnost') {
+        const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
+        cellBg = oc.bg;
+        cellBorderColor = oc.border;
+        cellText = /*#__PURE__*/React.createElement("span", {
+          style: {
+            color: oc.color,
+            fontWeight: 700,
+            fontSize: '0.6rem',
+            fontFamily: 'var(--mono)',
+            cursor: 'pointer'
+          },
+          onClick: () => deleteGodisnji(w.id, date),
+          title: 'Klikni za brisanje: ' + entry.oType
+        }, oc.short);
+        title = entry.oType + (entry.note ? ' — ' + entry.note : '');
+      }
+      return /*#__PURE__*/React.createElement("td", {
+        key: d,
+        title: title,
+        style: {
+          padding: '0.25rem 0.15rem',
+          border: `1px solid ${cellBorderColor}`,
+          textAlign: 'center',
+          background: cellBg
+        }
+      }, cellText);
+    }), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: `1px solid ${catBorder}`,
+        background: catPale,
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        color: catColor,
+        padding: '0.25rem 0.4rem'
+      }
+    }, stats.radnih || 0), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: '1px solid var(--border)',
+        background: '#fdf0e0',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        color: '#b5620a',
+        padding: '0.25rem 0.4rem'
+      }
+    }, (stats.odsutTypes || {})['Godišnji odmor'] || 0), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: '1px solid var(--border)',
+        background: '#fde8e8',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        color: '#8b2020',
+        padding: '0.25rem 0.4rem'
+      }
+    }, (stats.odsutTypes || {})['Bolovanje'] || 0));
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "siht-mobile-cards"
+  }, displayWorkers.filter(w => w.status === 'aktivan').map(w => {
+    const stats = workerStats.find(s => s.id === w.id) || w;
+    const cat = getCatById(w.category);
+    const catColor = cat?.color || '#2d5a27';
+    const catPale = cat?.pale || '#e8f0e6';
+    const catBorder = cat?.border || '#9bc492';
+    return /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      style: {
+        background: 'var(--surface)',
+        border: `1px solid ${catBorder}`,
+        borderLeft: `4px solid ${catColor}`,
+        borderRadius: 6,
+        marginBottom: '0.4rem',
+        overflow: 'hidden'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        padding: '0.35rem 0.5rem',
+        background: catPale
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.8rem'
+      }
+    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: '0.8rem',
+        color: catColor,
+        flex: 1,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, w.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.65rem',
+        fontWeight: 700,
+        color: 'white',
+        background: catColor,
+        borderRadius: 3,
+        padding: '0.1rem 0.3rem'
+      }
+    }, stats.radnih || 0, "R"), (stats.odsutTypes?.['Godišnji odmor'] || 0) > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.6rem',
+        fontWeight: 700,
+        color: 'white',
+        background: '#1a3d5c',
+        borderRadius: 3,
+        padding: '0.1rem 0.25rem'
+      }
+    }, stats.odsutTypes['Godišnji odmor'], "GO"), (stats.odsutTypes?.['Bolovanje'] || 0) > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.6rem',
+        fontWeight: 700,
+        color: 'white',
+        background: '#8b2020',
+        borderRadius: 3,
+        padding: '0.1rem 0.25rem'
+      }
+    }, stats.odsutTypes['Bolovanje'], "B"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setGoModal({
+          workerId: w.id
+        });
+        setGoForm({
+          date: isoDate(new Date().getDate()),
+          dateDo: '',
+          type: 'Godišnji odmor',
+          note: ''
+        });
+      },
+      style: {
+        background: catColor,
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        padding: '0.15rem 0.35rem',
+        fontSize: '0.6rem',
+        cursor: 'pointer',
+        fontWeight: 700
+      }
+    }, "+GO")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.25rem 0.35rem 0.3rem',
+        display: 'grid',
+        gridTemplateColumns: `repeat(${daysInMonth}, 1fr)`,
+        gap: '1.5px'
+      }
+    }, days.map(d => {
+      const date = isoDate(d);
+      const entry = workerDayMap[w.id]?.[date];
+      const wknd = isWeekend(d);
+      let bg,
+        color,
+        fontW = 400,
+        label = String(d);
+      if (entry?.type === 'rad') {
+        bg = catColor;
+        color = 'white';
+        fontW = 700;
+      } else if (entry?.type === 'odsutnost') {
+        const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
+        bg = oc.color;
+        color = 'white';
+        fontW = 700;
+        label = oc.short;
+      } else if (wknd) {
+        bg = '#d5d0c8';
+        color = '#fff';
+      } else {
+        bg = '#e8e4dc';
+        color = '#a09888';
+      }
+      return /*#__PURE__*/React.createElement("div", {
+        key: d,
+        title: `${d}. ${entry?.type === 'rad' ? (cat?.short || 'Rad') + ' · ' + entry.jobType : entry?.oType || (wknd ? 'vikend' : '')}`,
+        style: {
+          height: 22,
+          background: bg,
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '0.42rem',
+          fontWeight: fontW,
+          fontFamily: 'var(--mono)',
+          color,
+          cursor: entry?.type === 'odsutnost' ? 'pointer' : 'default'
+        },
+        onClick: () => {
+          if (entry?.type === 'odsutnost') deleteGodisnji(w.id, date);
+        }
+      }, label);
+    })));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '1.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.1em',
+      textTransform: 'uppercase',
+      color: 'var(--text-light)',
+      marginBottom: '0.75rem'
+    }
+  }, "Pregled po radniku \u2014 ", MONTH_NAMES[selMonth], " ", selYear), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(min(200px,100%),1fr))',
+      gap: '0.5rem'
+    }
+  }, displayWorkers.filter(w => w.status === 'aktivan').map(w => {
+    const stats = workerStats.find(s => s.id === w.id) || {
+      radnih: 0,
+      odsutnih: 0,
+      praznih: 0
+    };
+    const goUpcoming = (godisnji[w.id] || []).filter(e => e.date >= today()).sort((a, b) => a.date.localeCompare(b.date));
+    return /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      style: {
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        padding: '0.75rem',
+        boxShadow: 'var(--shadow)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: '0.82rem',
+        marginBottom: '0.4rem',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, w.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '0.4rem',
+        flexWrap: 'wrap',
+        marginBottom: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.75rem',
+        background: '#e8f0e6',
+        color: '#2d5a27',
+        border: '1px solid #9bc492',
+        borderRadius: 3,
+        padding: '0.1rem 0.4rem'
+      }
+    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref34 => {
+      let [k, v] = _ref34;
+      const oc = ODSUTNOST_COLOR[k] || {
+        bg: '#f0f0f0',
+        color: '#555',
+        border: '#ccc'
+      };
+      return /*#__PURE__*/React.createElement("span", {
+        key: k,
+        style: {
+          fontFamily: 'var(--mono)',
+          fontSize: '0.75rem',
+          background: oc.bg,
+          color: oc.color,
+          border: `1px solid ${oc.border}`,
+          borderRadius: 3,
+          padding: '0.1rem 0.4rem'
+        }
+      }, v, " ", k.split(' ')[0].toLowerCase());
+    })), goUpcoming.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '0.3rem'
+      }
+    }, goUpcoming.slice(0, 3).map(e => {
+      const oc = ODSUTNOST_COLOR[e.type] || {
+        bg: '#f0f0f0',
+        color: '#555',
+        border: '#ccc'
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        key: e.date,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.3rem',
+          fontSize: '0.72rem',
+          marginBottom: '0.15rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          color: oc.color,
+          background: oc.bg,
+          border: `1px solid ${oc.border}`,
+          borderRadius: 3,
+          padding: '0.05rem 0.3rem',
+          fontSize: '0.65rem',
+          fontWeight: 700
+        }
+      }, ODSUTNOST_COLOR[e.type]?.short), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          color: 'var(--text-muted)'
+        }
+      }, fmtDate(e.date)), e.note && /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: 'var(--text-light)',
+          fontStyle: 'italic',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }
+      }, e.note), /*#__PURE__*/React.createElement("button", {
+        onClick: () => deleteGodisnji(w.id, e.date),
+        style: {
+          marginLeft: 'auto',
+          background: 'none',
+          border: 'none',
+          color: 'var(--text-light)',
+          cursor: 'pointer',
+          fontSize: '0.7rem',
+          padding: 0
+        }
+      }, "\u2715"));
+    })));
+  })))), sihtView === 'radnik' && (!selWorker ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDC77"), /*#__PURE__*/React.createElement("p", null, "Odaberi radnika iz padaju\u0107eg menija iznad.")) : !singleWorkerData ? /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("p", null, "Radnik nije prona\u0111en.")) : (() => {
+    const {
+      worker: w,
+      months: wMonths,
+      total: wTotal
+    } = singleWorkerData;
+    const cat = getCatById(w.category);
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.6rem',
+        marginBottom: '1rem',
+        padding: '0.75rem 1rem',
+        background: cat?.pale || '#f0f0f0',
+        border: `2px solid ${cat?.border || '#ccc'}`,
+        borderLeft: `5px solid ${cat?.color || '#999'}`,
+        borderRadius: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '1.4rem'
+      }
+    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: '1rem',
+        color: cat?.color || 'var(--text)'
+      }
+    }, w.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.75rem',
+        color: 'var(--text-muted)'
+      }
+    }, cat?.label, " \xB7 ", selYear)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginLeft: 'auto',
+        display: 'flex',
+        gap: '0.5rem',
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.82rem',
+        background: '#e8f0e6',
+        color: '#2d5a27',
+        border: '1px solid #9bc492',
+        borderRadius: 4,
+        padding: '0.2rem 0.6rem',
+        fontWeight: 700
+      }
+    }, wTotal.radnih, " radnih"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.82rem',
+        background: '#fde8e8',
+        color: '#8b2020',
+        border: '1px solid #e0a0a0',
+        borderRadius: 4,
+        padding: '0.2rem 0.6rem',
+        fontWeight: 700
+      }
+    }, wTotal.odsutnih, " ods."), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.82rem',
+        background: 'var(--bg)',
+        color: 'var(--text-muted)',
+        border: '1px solid var(--border)',
+        borderRadius: 4,
+        padding: '0.2rem 0.6rem'
+      }
+    }, wTotal.praznih, " praznih"))), wMonths.map(mo => {
+      if (mo.radnih === 0 && mo.odsutnih === 0 && mo.praznih === 0) return null;
+      return /*#__PURE__*/React.createElement("div", {
+        key: mo.mi,
+        className: "card",
+        style: {
+          marginBottom: '0.75rem'
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: 'linear-gradient(135deg,var(--green),var(--green-light))',
+          color: 'white',
+          padding: '0.5rem 0.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 700,
+          fontSize: '0.85rem'
+        }
+      }, MONTH_NAMES[mo.mi], " ", selYear), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex',
+          gap: '0.4rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          fontSize: '0.72rem',
+          background: 'rgba(255,255,255,0.2)',
+          padding: '0.15rem 0.4rem',
+          borderRadius: 10
+        }
+      }, mo.radnih, " R"), mo.odsutnih > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          fontSize: '0.72rem',
+          background: 'rgba(255,255,255,0.2)',
+          padding: '0.15rem 0.4rem',
+          borderRadius: 10
+        }
+      }, mo.odsutnih, " ods"))), /*#__PURE__*/React.createElement("div", {
+        className: "siht-radnik-desktop",
+        style: {
+          overflowX: 'auto'
+        }
+      }, /*#__PURE__*/React.createElement("table", {
+        style: {
+          borderCollapse: 'collapse',
+          fontSize: '0.75rem',
+          width: '100%'
+        }
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref35 => {
+        let {
+          d,
+          dw,
+          wknd
+        } = _ref35;
+        return /*#__PURE__*/React.createElement("th", {
+          key: d,
+          style: {
+            background: wknd ? '#ece9e2' : '#f0ede6',
+            padding: '0.25rem 0.15rem',
+            textAlign: 'center',
+            border: '1px solid var(--border)',
+            minWidth: 26,
+            fontFamily: 'var(--mono)',
+            fontSize: '0.62rem',
+            color: wknd ? 'var(--text-light)' : 'var(--text-muted)'
+          }
+        }, /*#__PURE__*/React.createElement("div", null, d), /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: '0.5rem',
+            opacity: 0.7
+          }
+        }, 'NPUSČPS'[dw]));
+      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref36 => {
+        let {
+          d,
+          iso,
+          wknd,
+          entry
+        } = _ref36;
+        let bg = wknd ? '#f0ede6' : 'white';
+        let content = wknd ? /*#__PURE__*/React.createElement("span", {
+          style: {
+            color: '#ccc8c0',
+            fontSize: '0.5rem'
+          }
+        }, "\u2014") : null;
+        let border = wknd ? '#ddd9d0' : '#ece9e2';
+        if (entry?.type === 'rad') {
+          bg = cat?.pale || '#e8f0e6';
+          border = cat?.border || '#9bc492';
+          content = /*#__PURE__*/React.createElement("span", {
+            style: {
+              color: cat?.color || '#2d5a27',
+              fontWeight: 700,
+              fontSize: '0.6rem',
+              fontFamily: 'var(--mono)'
+            }
+          }, cat?.icon || 'R');
+        } else if (entry?.type === 'odsutnost') {
+          const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
+          bg = oc.bg;
+          border = oc.border;
+          content = /*#__PURE__*/React.createElement("span", {
+            style: {
+              color: oc.color,
+              fontWeight: 700,
+              fontSize: '0.58rem',
+              fontFamily: 'var(--mono)'
+            }
+          }, oc.short);
+        }
+        return /*#__PURE__*/React.createElement("td", {
+          key: d,
+          title: entry?.type === 'rad' ? entry.jobType : entry?.oType || '',
+          style: {
+            padding: '0.2rem 0.1rem',
+            border: `1px solid ${border}`,
+            textAlign: 'center',
+            background: bg
+          }
+        }, content);
+      }))))), /*#__PURE__*/React.createElement("div", {
+        className: "siht-radnik-mobile",
+        style: {
+          padding: '0.25rem 0.4rem 0.3rem',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${mo.days.length}, 1fr)`,
+          gap: '1.5px'
+        }
+      }, mo.days.map(_ref37 => {
+        let {
+          d,
+          iso,
+          wknd,
+          entry
+        } = _ref37;
+        let bg,
+          color,
+          label = String(d),
+          fontW = 400;
+        if (entry?.type === 'rad') {
+          bg = cat?.color || '#2d5a27';
+          color = 'white';
+          fontW = 700;
+        } else if (entry?.type === 'odsutnost') {
+          const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
+          bg = oc.color;
+          color = 'white';
+          fontW = 700;
+          label = oc.short;
+        } else if (wknd) {
+          bg = '#d5d0c8';
+          color = '#fff';
+        } else {
+          bg = '#e8e4dc';
+          color = '#a09888';
+        }
+        return /*#__PURE__*/React.createElement("div", {
+          key: d,
+          style: {
+            height: 22,
+            background: bg,
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.42rem',
+            fontWeight: fontW,
+            fontFamily: 'var(--mono)',
+            color
+          }
+        }, label);
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          padding: '0.4rem 0.75rem',
+          display: 'flex',
+          gap: '0.4rem',
+          flexWrap: 'wrap',
+          borderTop: '1px solid var(--border)',
+          fontSize: '0.72rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          background: '#e8f0e6',
+          color: '#2d5a27',
+          border: '1px solid #9bc492',
+          borderRadius: 3,
+          padding: '0.1rem 0.4rem',
+          fontWeight: 700
+        }
+      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref38 => {
+        let [k, v] = _ref38;
+        const oc = ODSUTNOST_COLOR[k] || {
+          bg: '#f0f0f0',
+          color: '#555',
+          border: '#ccc',
+          short: '?'
+        };
+        return /*#__PURE__*/React.createElement("span", {
+          key: k,
+          style: {
+            fontFamily: 'var(--mono)',
+            background: oc.bg,
+            color: oc.color,
+            border: `1px solid ${oc.border}`,
+            borderRadius: 3,
+            padding: '0.1rem 0.4rem',
+            fontWeight: 700
+          }
+        }, v, " ", oc.short);
+      }), mo.praznih > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          color: 'var(--text-light)',
+          padding: '0.1rem 0.4rem'
+        }
+      }, mo.praznih, " praznih"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          color: 'var(--text-light)',
+          padding: '0.1rem 0.4rem'
+        }
+      }, mo.vikenda, " vik")));
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "card",
+      style: {
+        background: '#fafaf8'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.75rem 1rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.65rem',
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        color: 'var(--text-light)',
+        marginBottom: '0.4rem'
+      }
+    }, "UKUPNO ZA ", selYear), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '0.5rem',
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.85rem',
+        background: '#e8f0e6',
+        color: '#2d5a27',
+        border: '1px solid #9bc492',
+        borderRadius: 4,
+        padding: '0.2rem 0.6rem',
+        fontWeight: 700
+      }
+    }, wTotal.radnih, " radnih dana"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.85rem',
+        background: '#fde8e8',
+        color: '#8b2020',
+        border: '1px solid #e0a0a0',
+        borderRadius: 4,
+        padding: '0.2rem 0.6rem',
+        fontWeight: 700
+      }
+    }, wTotal.odsutnih, " odsutnih"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.85rem',
+        background: 'var(--bg)',
+        color: 'var(--text-muted)',
+        border: '1px solid var(--border)',
+        borderRadius: 4,
+        padding: '0.2rem 0.6rem'
+      }
+    }, wTotal.praznih, " praznih"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.85rem',
+        background: 'var(--bg)',
+        color: 'var(--text-muted)',
+        border: '1px solid var(--border)',
+        borderRadius: 4,
+        padding: '0.2rem 0.6rem'
+      }
+    }, wTotal.vikenda, " vikend")))));
+  })()), sihtView === 'godisnji' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "siht-godisnji-desktop",
+    style: {
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      borderCollapse: 'collapse',
+      fontSize: '0.75rem',
+      width: '100%',
+      minWidth: 'max-content'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#f0ede6',
+      padding: '0.5rem 0.75rem',
+      textAlign: 'left',
+      border: '1px solid var(--border)',
+      minWidth: 160,
+      position: 'sticky',
+      left: 0,
+      zIndex: 2,
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.08em'
+    }
+  }, "RADNIK"), MONTH_NAMES.map((mn, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: {
+      background: '#f0ede6',
+      padding: '0.35rem 0.3rem',
+      textAlign: 'center',
+      border: '1px solid var(--border)',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.62rem',
+      minWidth: 44,
+      cursor: 'pointer'
+    },
+    onClick: () => {
+      setSelMonth(i);
+      setSihtView('mjesecni');
+    },
+    title: `Otvori ${mn}`
+  }, mn.substring(0, 3).toUpperCase())), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: 'var(--green)',
+      color: 'white',
+      padding: '0.35rem 0.5rem',
+      border: '1px solid var(--green)',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      textAlign: 'center',
+      minWidth: 48
+    }
+  }, "UKUP"))), /*#__PURE__*/React.createElement("tbody", null, yearlyStats.map(w => {
+    const cat = getCatById(w.category);
+    return /*#__PURE__*/React.createElement("tr", {
+      key: w.id
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: '0.35rem 0.6rem',
+        border: `2px solid ${cat?.border || '#ccc'}`,
+        borderLeft: `4px solid ${cat?.color || '#999'}`,
+        fontWeight: 600,
+        background: cat?.pale || '#f0f0f0',
+        position: 'sticky',
+        left: 0,
+        zIndex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.8rem'
+      }
+    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        color: cat?.color || 'var(--text)',
+        cursor: 'pointer'
+      },
+      onClick: () => {
+        setSelWorker(w.id);
+        setSihtView('radnik');
+      },
+      title: "Otvori detalj"
+    }, w.name))), w.months.map((m, mi) => {
+      const hasData = m.radnih > 0 || m.odsutnih > 0;
+      const go = m.odsutTypes?.['Godišnji odmor'] || 0;
+      const bol = m.odsutTypes?.['Bolovanje'] || 0;
+      return /*#__PURE__*/React.createElement("td", {
+        key: mi,
+        style: {
+          padding: '0.2rem 0.15rem',
+          border: '1px solid var(--border)',
+          textAlign: 'center',
+          background: hasData ? 'white' : '#fafaf8',
+          cursor: 'pointer'
+        },
+        onClick: () => {
+          setSelMonth(mi);
+          setSihtView('mjesecni');
+        },
+        title: `${MONTH_NAMES[mi]}: ${m.radnih}R ${m.odsutnih}O`
+      }, hasData ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: 'var(--mono)',
+          fontWeight: 700,
+          fontSize: '0.72rem',
+          color: 'var(--green)'
+        }
+      }, m.radnih), (go > 0 || bol > 0) && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '0.1rem',
+          marginTop: '0.05rem'
+        }
+      }, go > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.5rem',
+          fontFamily: 'var(--mono)',
+          color: '#1a3d5c',
+          fontWeight: 700
+        }
+      }, go, "GO"), bol > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.5rem',
+          fontFamily: 'var(--mono)',
+          color: '#8b2020',
+          fontWeight: 700
+        }
+      }, bol, "B"))) : /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: '#ddd',
+          fontSize: '0.6rem'
+        }
+      }, "\u2014"));
+    }), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: '1px solid var(--green)',
+        background: '#e8f0e6',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        color: 'var(--green)',
+        padding: '0.3rem 0.4rem',
+        fontSize: '0.82rem'
+      }
+    }, w.total.radnih, w.total.odsutnih > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.55rem',
+        color: '#8b2020',
+        fontWeight: 600
+      }
+    }, w.total.odsutnih, " ods")));
+  })), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    style: {
+      background: 'var(--green)',
+      color: 'white',
+      padding: '0.4rem 0.75rem',
+      fontWeight: 700,
+      fontSize: '0.75rem',
+      position: 'sticky',
+      left: 0,
+      zIndex: 2,
+      border: '1px solid var(--green)'
+    }
+  }, "UKUPNO"), Array.from({
+    length: 12
+  }, (_, mi) => {
+    const sum = yearlyStats.reduce((a, w) => a + w.months[mi].radnih, 0);
+    return /*#__PURE__*/React.createElement("td", {
+      key: mi,
+      style: {
+        textAlign: 'center',
+        border: '1px solid var(--border)',
+        background: '#f0ede6',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        fontSize: '0.72rem',
+        color: 'var(--green)',
+        padding: '0.3rem 0.2rem'
+      }
+    }, sum || '—');
+  }), /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'center',
+      border: '1px solid var(--green)',
+      background: 'var(--green)',
+      color: 'white',
+      fontFamily: 'var(--mono)',
+      fontWeight: 700,
+      fontSize: '0.85rem',
+      padding: '0.3rem 0.4rem'
+    }
+  }, yearlyStats.reduce((a, w) => a + w.total.radnih, 0)))))), /*#__PURE__*/React.createElement("div", {
+    className: "siht-godisnji-mobile"
+  }, yearlyStats.map(w => {
+    const cat = getCatById(w.category);
+    return /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      style: {
+        background: 'var(--surface)',
+        border: `1px solid ${cat?.border || '#ccc'}`,
+        borderLeft: `4px solid ${cat?.color || '#999'}`,
+        borderRadius: 6,
+        marginBottom: '0.4rem',
+        overflow: 'hidden'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        padding: '0.35rem 0.5rem',
+        background: cat?.pale || '#f0f0f0'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.75rem'
+      }
+    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+      onClick: () => {
+        setSelWorker(w.id);
+        setSihtView('radnik');
+      },
+      style: {
+        fontWeight: 700,
+        fontSize: '0.78rem',
+        color: cat?.color || 'var(--text)',
+        flex: 1,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        cursor: 'pointer'
+      }
+    }, w.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.62rem',
+        fontWeight: 700,
+        color: 'white',
+        background: 'var(--green)',
+        borderRadius: 3,
+        padding: '0.1rem 0.25rem'
+      }
+    }, w.total.radnih, "R"), w.total.odsutnih > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.58rem',
+        fontWeight: 700,
+        color: 'white',
+        background: '#8b2020',
+        borderRadius: 3,
+        padding: '0.1rem 0.2rem'
+      }
+    }, w.total.odsutnih, "O")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.2rem 0.35rem 0.25rem',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(12, 1fr)',
+        gap: '2px'
+      }
+    }, w.months.map((m, mi) => {
+      const hasData = m.radnih > 0 || m.odsutnih > 0;
+      return /*#__PURE__*/React.createElement("div", {
+        key: mi,
+        onClick: () => {
+          setSelMonth(mi);
+          setSihtView('mjesecni');
+        },
+        style: {
+          textAlign: 'center',
+          padding: '0.15rem 0',
+          borderRadius: 2,
+          cursor: 'pointer',
+          background: hasData ? m.odsutnih > 0 ? '#fde8e8' : '#e8f0e6' : '#f0ede6',
+          border: `1px solid ${hasData ? m.odsutnih > 0 ? '#e0a0a0' : '#9bc492' : 'transparent'}`
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: 'var(--mono)',
+          fontSize: '0.4rem',
+          color: 'var(--text-light)',
+          lineHeight: 1
+        }
+      }, MONTH_NAMES[mi].substring(0, 3)), hasData ? /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: 'var(--mono)',
+          fontSize: '0.55rem',
+          fontWeight: 700,
+          color: 'var(--green)',
+          lineHeight: 1.2
+        }
+      }, m.radnih) : /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '0.45rem',
+          color: '#ccc',
+          lineHeight: 1.2
+        }
+      }, "\u2014"));
+    })));
+  }))), goModal && /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: e => e.target === e.currentTarget && setGoModal(null)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal",
+    style: {
+      maxWidth: 400
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCC5"), /*#__PURE__*/React.createElement("div", {
+    className: "modal-title"
+  }, "Dodaj odsutnost \u2014 ", workers.find(w => w.id === goModal.workerId)?.name), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-icon",
+    onClick: () => setGoModal(null)
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '0.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Od *"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "form-input",
+    value: goForm.date,
+    onChange: e => setGoForm(f => ({
+      ...f,
+      date: e.target.value,
+      dateDo: f.dateDo && f.dateDo < e.target.value ? e.target.value : f.dateDo
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Do ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-light)',
+      fontWeight: 400
+    }
+  }, "(opciono)")), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "form-input",
+    value: goForm.dateDo,
+    min: goForm.date || undefined,
+    onChange: e => setGoForm(f => ({
+      ...f,
+      dateDo: e.target.value
+    }))
+  }))), goForm.date && goForm.dateDo && goForm.dateDo >= goForm.date && (() => {
+    const s = new Date(goForm.date),
+      e = new Date(goForm.dateDo);
+    let count = 0;
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const dw = d.getDay();
+      if (dw !== 0 && dw !== 6) count++;
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.75rem',
+        color: 'var(--text-muted)',
+        marginTop: '-0.3rem',
+        marginBottom: '0.3rem'
+      }
+    }, "\uD83D\uDCC5 ", count, " radni", count === 1 ? '' : count < 5 ? 'a' : 'h', " dan", count === 1 ? '' : count < 5 ? 'a' : 'a', " u periodu");
+  })(), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Vrsta odsutnosti"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '0.4rem'
+    }
+  }, ODSUTNOST_TYPES.map(t => {
+    const oc = ODSUTNOST_COLOR[t];
+    return /*#__PURE__*/React.createElement("button", {
+      key: t,
+      type: "button",
+      onClick: () => setGoForm(f => ({
+        ...f,
+        type: t
+      })),
+      style: {
+        padding: '0.5rem 0.6rem',
+        border: `2px solid ${goForm.type === t ? oc.color : oc.border}`,
+        borderRadius: 6,
+        background: goForm.type === t ? oc.bg : 'var(--bg)',
+        color: goForm.type === t ? oc.color : 'var(--text-muted)',
+        fontWeight: goForm.type === t ? 700 : 400,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        fontSize: '0.7rem',
+        background: oc.bg,
+        color: oc.color,
+        border: `1px solid ${oc.border}`,
+        borderRadius: 3,
+        padding: '0.05rem 0.3rem'
+      }
+    }, oc.short), t);
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "Napomena"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "npr. najava za prekosutra...",
+    value: goForm.note,
+    onChange: e => setGoForm(f => ({
+      ...f,
+      note: e.target.value
+    }))
+  })), (godisnji[goModal.workerId] || []).filter(e => e.date >= today()).length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'var(--bg)',
+      border: '1px solid var(--border)',
+      borderRadius: 6,
+      padding: '0.6rem 0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.62rem',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: 'var(--text-light)',
+      marginBottom: '0.4rem'
+    }
+  }, "Planirane odsutnosti"), (godisnji[goModal.workerId] || []).filter(e => e.date >= today()).sort((a, b) => a.date.localeCompare(b.date)).map(e => {
+    const oc = ODSUTNOST_COLOR[e.type] || {
+      bg: '#f0f0f0',
+      color: '#555',
+      border: '#ccc',
+      short: '?'
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      key: e.date,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        fontSize: '0.78rem',
+        marginBottom: '0.2rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        color: oc.color,
+        background: oc.bg,
+        border: `1px solid ${oc.border}`,
+        borderRadius: 3,
+        padding: '0.05rem 0.3rem',
+        fontSize: '0.65rem',
+        fontWeight: 700
+      }
+    }, oc.short), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontWeight: 600
+      }
+    }, fmtDate(e.date)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, e.type), e.note && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-light)',
+        fontStyle: 'italic'
+      }
+    }, e.note), /*#__PURE__*/React.createElement("button", {
+      onClick: () => deleteGodisnji(goModal.workerId, e.date),
+      style: {
+        marginLeft: 'auto',
+        background: 'none',
+        border: 'none',
+        color: 'var(--red)',
+        cursor: 'pointer',
+        fontSize: '0.8rem'
+      }
+    }, "\u2715"));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: () => setGoModal(null)
+  }, "Odustani"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: saveGodisnji
+  }, "\uD83D\uDCBE Sa\u010Duvaj")))));
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
