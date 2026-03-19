@@ -1,4 +1,4 @@
-const { useState, useEffect, useCallback, useMemo } = React;
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 // ─── DEMO DATA ───────────────────────────────────────────────────────────────
 // Kategorije radnika u šumariji
@@ -512,13 +512,42 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   useEffect(() => { setSaturdayWorkMode(false); }, [selectedDate]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
-  const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleId }
+  const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleId, rect }
+  const vehiclePopupRef = useRef(null);
+
+  // Close popup on outside click
+  useEffect(() => {
+    if (!vehiclePopup) return;
+    const handler = (e) => {
+      if (vehiclePopupRef.current && !vehiclePopupRef.current.contains(e.target)) setVehiclePopup(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [vehiclePopup]);
 
   // Available vehicles: only 'vozno' status
   const availableVehicles = useMemo(() => (vehicles || []).filter(v => v.status === 'vozno'), [vehicles]);
 
   // Vozači (drivers) from workers
   const drivers = useMemo(() => workers.filter(w => w.category === 'vozac' && w.status === 'aktivan'), [workers]);
+
+  // Vehicle usage across today's schedules: vehicleId -> total workers assigned
+  const vehicleUsageMap = useMemo(() => {
+    const m = {};
+    daySchedules.forEach(s => {
+      if (s.vehicleId) {
+        if (!m[s.vehicleId]) m[s.vehicleId] = { total: 0, rows: [] };
+        m[s.vehicleId].total += (s.allWorkers || []).length;
+        m[s.vehicleId].rows.push(s.id);
+      }
+    });
+    return m;
+  }, [daySchedules]);
+
+  const openVehiclePopup = (row, e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setVehiclePopup(vehiclePopup?.rowId === row.id ? null : { rowId: row.id, vehicleId: row.vehicleId || '', rect });
+  };
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
@@ -668,92 +697,29 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                         )}
                       </div>
                     </td>
-                    <td data-label="Vozilo" style={{fontSize:'0.8rem',position:'relative'}}>
-                      {(row.jobType === 'Primka' || row.jobType === 'Otprema') ? (
-                        <div style={{cursor:'pointer'}} onClick={() => setVehiclePopup(vehiclePopup?.rowId === row.id ? null : { rowId: row.id, vehicleId: row.vehicleId || '' })} className="no-print">
-                          {(() => {
-                            const v = vehicles?.find(v => v.id === row.vehicleId);
-                            if (!v) return <span style={{color:'var(--green)',fontWeight:600,fontSize:'0.75rem'}}>+ Dodijeli vozilo</span>;
-                            const driver = workers.find(w => w.id === v.driverId);
-                            const wCount = (row.allWorkers || []).length;
-                            const cap = v.brojMjesta || 0;
-                            const over = wCount > cap;
-                            return (
-                              <div style={{display:'flex',flexDirection:'column',gap:'1px'}}>
-                                <span style={{fontWeight:600}}>🚗 {v.registracija}</span>
-                                <span style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>{v.tipVozila} · {v.brojMjesta} mj.</span>
-                                {driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>}
-                                <span style={{fontSize:'0.65rem',fontWeight:700,marginTop:'2px',color: over ? '#c53030' : '#2d5a27',background: over ? '#fde8e8' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem',display:'inline-block'}}>
-                                  {over ? '⚠️' : '👥'} {wCount}/{cap}{over && ` (+${wCount - cap})`}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      ) : (
-                        (() => {
+                    <td data-label="Vozilo" style={{fontSize:'0.8rem'}}>
+                      <div style={{cursor:'pointer'}} onClick={(e) => openVehiclePopup(row, e)} className="no-print">
+                        {(() => {
                           const v = vehicles?.find(v => v.id === row.vehicleId);
-                          if (!v) return '—';
+                          if (!v) return <span style={{color:'var(--green)',fontWeight:600,fontSize:'0.75rem'}}>+ Dodijeli vozilo</span>;
                           const driver = workers.find(w => w.id === v.driverId);
+                          const usage = vehicleUsageMap[v.id];
+                          const totalInVehicle = usage?.total || 0;
+                          const cap = v.brojMjesta || 0;
+                          const over = totalInVehicle > cap;
                           return (
                             <div style={{display:'flex',flexDirection:'column',gap:'1px'}}>
                               <span style={{fontWeight:600}}>🚗 {v.registracija}</span>
+                              <span style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>{v.tipVozila} · {v.brojMjesta} mj.</span>
                               {driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>}
+                              <span style={{fontSize:'0.65rem',fontWeight:700,marginTop:'2px',color: over ? '#c53030' : totalInVehicle === cap ? '#b5620a' : '#2d5a27',background: over ? '#fde8e8' : totalInVehicle === cap ? '#fdf0e0' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : totalInVehicle === cap ? '#e8c17a' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem',display:'inline-block'}}>
+                                {over ? '⚠️' : '👥'} {totalInVehicle}/{cap}{over && ` (+${totalInVehicle - cap})`}
+                              </span>
+                              {over && <span style={{fontSize:'0.6rem',color:'#c53030',fontWeight:600}}>Prekoračen kapacitet!</span>}
                             </div>
                           );
-                        })()
-                      )}
-                      {/* Vehicle assignment popup */}
-                      {vehiclePopup?.rowId === row.id && (
-                        <div style={{position:'absolute',top:'100%',left:0,zIndex:100,background:'white',border:'1px solid var(--border)',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,0.15)',padding:'0.75rem',minWidth:280,maxWidth:340}} onClick={e=>e.stopPropagation()}>
-                          <div style={{fontWeight:700,fontSize:'0.82rem',marginBottom:'0.5rem',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                            🚗 Dodijeli vozilo
-                            <button onClick={()=>setVehiclePopup(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1rem',color:'var(--text-muted)'}}>✕</button>
-                          </div>
-                          {/* Driver select */}
-                          <div style={{marginBottom:'0.5rem'}}>
-                            <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.2rem'}}>Šofer</label>
-                            <select className="form-select" style={{width:'100%',fontSize:'0.82rem'}}
-                              value={(() => { const v = availableVehicles.find(v => v.id === vehiclePopup.vehicleId); return v?.driverId || ''; })()}
-                              onChange={e => {
-                                const dId = e.target.value;
-                                if (!dId) { setVehiclePopup(p => ({...p, vehicleId:''})); return; }
-                                const defV = availableVehicles.find(v => v.driverId === dId);
-                                setVehiclePopup(p => ({...p, vehicleId: defV?.id || ''}));
-                              }}>
-                              <option value="">— Odaberi šofera —</option>
-                              {drivers.map(d => {
-                                const dv = availableVehicles.find(v => v.driverId === d.id);
-                                return <option key={d.id} value={d.id}>{d.name}{dv ? ` (${dv.registracija})` : ' (bez vozila)'}</option>;
-                              })}
-                            </select>
-                          </div>
-                          {/* Vehicle select */}
-                          <div style={{marginBottom:'0.75rem'}}>
-                            <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.2rem'}}>Vozilo</label>
-                            <select className="form-select" style={{width:'100%',fontSize:'0.82rem'}}
-                              value={vehiclePopup.vehicleId}
-                              onChange={e => setVehiclePopup(p => ({...p, vehicleId: e.target.value}))}>
-                              <option value="">— Bez vozila —</option>
-                              {availableVehicles.map(v => {
-                                const dr = workers.find(w => w.id === v.driverId);
-                                return <option key={v.id} value={v.id}>{v.registracija} — {v.tipVozila} · {v.brojMjesta} mj.{dr ? ` (${dr.name})` : ''}</option>;
-                              })}
-                            </select>
-                          </div>
-                          <div style={{display:'flex',gap:'0.4rem'}}>
-                            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={() => {
-                              onAssignVehicle(row.id, vehiclePopup.vehicleId);
-                              setVehiclePopup(null);
-                            }}>Spremi</button>
-                            {row.vehicleId && <button className="btn btn-sm" style={{background:'#c53030',color:'white',border:'none'}} onClick={() => {
-                              onAssignVehicle(row.id, '');
-                              setVehiclePopup(null);
-                            }}>Ukloni</button>}
-                            <button className="btn btn-secondary btn-sm" onClick={()=>setVehiclePopup(null)}>Odustani</button>
-                          </div>
-                        </div>
-                      )}
+                        })()}
+                      </div>
                     </td>
                     <td data-label="Napomena" style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{row.note || '—'}</td>
                     <td data-label="" className="no-print">
@@ -805,74 +771,27 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                   {rows.map(row => {
                     const v = vehicles?.find(x => x.id === row.vehicleId);
                     const driver = v ? workers.find(w => w.id === v.driverId) : null;
-                    const wCount = (row.allWorkers || []).length;
+                    const usage = v ? vehicleUsageMap[v.id] : null;
+                    const totalInVehicle = usage?.total || 0;
                     const cap = v?.brojMjesta || 0;
-                    const over = v && wCount > cap;
+                    const over = v && totalInVehicle > cap;
                     return (
-                      <div key={row.id} style={{position:'relative',marginTop:'0.3rem'}}>
+                      <div key={row.id} style={{marginTop:'0.3rem'}}>
                         <div className="no-print" style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.75rem',color:'var(--text-muted)',cursor:'pointer'}}
-                          onClick={() => setVehiclePopup(vehiclePopup?.rowId === row.id ? null : { rowId: row.id, vehicleId: row.vehicleId || '' })}>
+                          onClick={(e) => openVehiclePopup(row, e)}>
                           {v ? (<>
                             <span>🚗</span>
                             <span style={{fontWeight:600}}>{v.registracija}</span>
                             <span>{v.tipVozila} · {v.brojMjesta} mj.</span>
                             {driver && <span style={{color:'#2a6478'}}>({driver.name})</span>}
                             <span style={{fontWeight:700,fontSize:'0.65rem',color: over ? '#c53030' : '#2d5a27',background: over ? '#fde8e8' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem'}}>
-                              {over ? '⚠️' : '👥'} {wCount}/{cap}
+                              {over ? '⚠️' : '👥'} {totalInVehicle}/{cap}
                             </span>
+                            {over && <span style={{fontSize:'0.6rem',color:'#c53030',fontWeight:600}}>Prekoračen!</span>}
                           </>) : (
                             <span style={{color:'var(--green)',fontWeight:600,fontSize:'0.75rem'}}>+ Dodijeli vozilo</span>
                           )}
                         </div>
-                        {/* Vehicle popup */}
-                        {vehiclePopup?.rowId === row.id && (
-                          <div style={{position:'absolute',top:'100%',left:0,zIndex:100,background:'white',border:'1px solid var(--border)',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,0.15)',padding:'0.75rem',minWidth:280,maxWidth:340}} onClick={e=>e.stopPropagation()}>
-                            <div style={{fontWeight:700,fontSize:'0.82rem',marginBottom:'0.5rem',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                              🚗 Dodijeli vozilo
-                              <button onClick={()=>setVehiclePopup(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1rem',color:'var(--text-muted)'}}>✕</button>
-                            </div>
-                            <div style={{marginBottom:'0.5rem'}}>
-                              <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.2rem'}}>Šofer</label>
-                              <select className="form-select" style={{width:'100%',fontSize:'0.82rem'}}
-                                value={(() => { const vv = availableVehicles.find(vv => vv.id === vehiclePopup.vehicleId); return vv?.driverId || ''; })()}
-                                onChange={e => {
-                                  const dId = e.target.value;
-                                  if (!dId) { setVehiclePopup(p => ({...p, vehicleId:''})); return; }
-                                  const defV = availableVehicles.find(vv => vv.driverId === dId);
-                                  setVehiclePopup(p => ({...p, vehicleId: defV?.id || ''}));
-                                }}>
-                                <option value="">— Odaberi šofera —</option>
-                                {drivers.map(d => {
-                                  const dv = availableVehicles.find(vv => vv.driverId === d.id);
-                                  return <option key={d.id} value={d.id}>{d.name}{dv ? ` (${dv.registracija})` : ' (bez vozila)'}</option>;
-                                })}
-                              </select>
-                            </div>
-                            <div style={{marginBottom:'0.75rem'}}>
-                              <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.2rem'}}>Vozilo</label>
-                              <select className="form-select" style={{width:'100%',fontSize:'0.82rem'}}
-                                value={vehiclePopup.vehicleId}
-                                onChange={e => setVehiclePopup(p => ({...p, vehicleId: e.target.value}))}>
-                                <option value="">— Bez vozila —</option>
-                                {availableVehicles.map(vv => {
-                                  const dr = workers.find(w => w.id === vv.driverId);
-                                  return <option key={vv.id} value={vv.id}>{vv.registracija} — {vv.tipVozila} · {vv.brojMjesta} mj.{dr ? ` (${dr.name})` : ''}</option>;
-                                })}
-                              </select>
-                            </div>
-                            <div style={{display:'flex',gap:'0.4rem'}}>
-                              <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={() => {
-                                onAssignVehicle(row.id, vehiclePopup.vehicleId);
-                                setVehiclePopup(null);
-                              }}>Spremi</button>
-                              {row.vehicleId && <button className="btn btn-sm" style={{background:'#c53030',color:'white',border:'none'}} onClick={() => {
-                                onAssignVehicle(row.id, '');
-                                setVehiclePopup(null);
-                              }}>Ukloni</button>}
-                              <button className="btn btn-secondary btn-sm" onClick={()=>setVehiclePopup(null)}>Odustani</button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -1035,6 +954,94 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
         );
       })()}
       </>}
+
+      {/* ─── VEHICLE ASSIGNMENT PORTAL POPUP ─── */}
+      {vehiclePopup && ReactDOM.createPortal(
+        <div style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',zIndex:9998}} onClick={()=>setVehiclePopup(null)}>
+          <div ref={vehiclePopupRef} onClick={e=>e.stopPropagation()} style={{
+            position:'fixed',
+            top: Math.min(vehiclePopup.rect?.bottom || 200, window.innerHeight - 380),
+            left: Math.min(Math.max(vehiclePopup.rect?.left || 100, 8), window.innerWidth - 340),
+            zIndex:9999,background:'white',border:'1px solid var(--border)',borderRadius:10,
+            boxShadow:'0 8px 32px rgba(0,0,0,0.18)',padding:'0.85rem',width:320,maxHeight:'70vh',overflowY:'auto',
+          }}>
+            <div style={{fontWeight:700,fontSize:'0.85rem',marginBottom:'0.6rem',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              🚗 Dodijeli vozilo
+              <button onClick={()=>setVehiclePopup(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',color:'var(--text-muted)',lineHeight:1}}>✕</button>
+            </div>
+            {/* Driver select */}
+            <div style={{marginBottom:'0.5rem'}}>
+              <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.25rem'}}>Šofer</label>
+              <select className="form-select" style={{width:'100%',fontSize:'0.82rem',padding:'0.4rem'}}
+                value={(() => { const v = availableVehicles.find(v => v.id === vehiclePopup.vehicleId); return v?.driverId || ''; })()}
+                onChange={e => {
+                  const dId = e.target.value;
+                  if (!dId) { setVehiclePopup(p => ({...p, vehicleId:''})); return; }
+                  const defV = availableVehicles.find(v => v.driverId === dId);
+                  setVehiclePopup(p => ({...p, vehicleId: defV?.id || ''}));
+                }}>
+                <option value="">— Odaberi šofera —</option>
+                {drivers.map(d => {
+                  const dv = availableVehicles.find(v => v.driverId === d.id);
+                  return <option key={d.id} value={d.id}>{d.name}{dv ? ` (${dv.registracija})` : ' (bez vozila)'}</option>;
+                })}
+              </select>
+            </div>
+            {/* Vehicle select */}
+            <div style={{marginBottom:'0.5rem'}}>
+              <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.25rem'}}>Vozilo</label>
+              <select className="form-select" style={{width:'100%',fontSize:'0.82rem',padding:'0.4rem'}}
+                value={vehiclePopup.vehicleId}
+                onChange={e => setVehiclePopup(p => ({...p, vehicleId: e.target.value}))}>
+                <option value="">— Bez vozila —</option>
+                {availableVehicles.map(v => {
+                  const dr = workers.find(w => w.id === v.driverId);
+                  const usage = vehicleUsageMap[v.id];
+                  const totalUsed = usage?.total || 0;
+                  const cap = v.brojMjesta || 0;
+                  const isFull = totalUsed >= cap;
+                  return <option key={v.id} value={v.id}>{v.registracija} — {v.tipVozila} · {v.brojMjesta} mj.{dr ? ` (${dr.name})` : ''}{isFull ? ' ⚠️ PUNO' : ` (${totalUsed}/${cap})`}</option>;
+                })}
+              </select>
+            </div>
+            {/* Capacity warning */}
+            {vehiclePopup.vehicleId && (() => {
+              const v = availableVehicles.find(v => v.id === vehiclePopup.vehicleId);
+              if (!v) return null;
+              const currentRow = daySchedules.find(s => s.id === vehiclePopup.rowId);
+              const currentRowWorkers = (currentRow?.allWorkers || []).length;
+              // Calculate what usage would be if we assign this vehicle
+              const otherUsage = daySchedules.filter(s => s.vehicleId === v.id && s.id !== vehiclePopup.rowId).reduce((sum, s) => sum + (s.allWorkers || []).length, 0);
+              const newTotal = otherUsage + currentRowWorkers;
+              const cap = v.brojMjesta || 0;
+              const over = newTotal > cap;
+              return (
+                <div style={{marginBottom:'0.6rem',padding:'0.4rem 0.5rem',borderRadius:6,fontSize:'0.75rem',fontWeight:600,
+                  background: over ? '#fde8e8' : newTotal === cap ? '#fdf0e0' : '#e8f5e9',
+                  color: over ? '#c53030' : newTotal === cap ? '#b5620a' : '#2d5a27',
+                  border: `1px solid ${over ? '#f5b5b5' : newTotal === cap ? '#e8c17a' : '#a5d6a7'}`,
+                }}>
+                  {over ? '⚠️ Prekoračen kapacitet!' : '👥 Kapacitet:'} {newTotal}/{cap}
+                  {over && ` (+${newTotal - cap} višak)`}
+                  {otherUsage > 0 && <div style={{fontSize:'0.68rem',fontWeight:400,marginTop:'0.2rem'}}>Vozilo koriste još {otherUsage} radnika u drugim ekipama</div>}
+                </div>
+              );
+            })()}
+            <div style={{display:'flex',gap:'0.4rem'}}>
+              <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={() => {
+                onAssignVehicle(vehiclePopup.rowId, vehiclePopup.vehicleId);
+                setVehiclePopup(null);
+              }}>Spremi</button>
+              {(() => { const r = daySchedules.find(s=>s.id===vehiclePopup.rowId); return r?.vehicleId; })() && <button className="btn btn-sm" style={{background:'#c53030',color:'white',border:'none'}} onClick={() => {
+                onAssignVehicle(vehiclePopup.rowId, '');
+                setVehiclePopup(null);
+              }}>Ukloni</button>}
+              <button className="btn btn-secondary btn-sm" onClick={()=>setVehiclePopup(null)}>Odustani</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
