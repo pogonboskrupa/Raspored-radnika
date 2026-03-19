@@ -417,428 +417,361 @@ const fmtTime = ts => {
   });
 };
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-function App() {
-  const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
-  const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
-  const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
-  const [history, setHistory] = useStorage('sumarija_history', []);
-  const [activeTab, setActiveTab] = useState('raspored');
-  const [selectedDate, setSelectedDate] = useState(today());
-  const [sidebarFilter, setSidebarFilter] = useState(null);
-  const [modal, setModal] = useState(null);
-  const [historyModal, setHistoryModal] = useState(null);
-  const [quickModal, setQuickModal] = useState(null); // { worker }
-  const [filterTab, setFilterTab] = useState('dan');
-  const [filterWorker, setFilterWorker] = useState('');
-  const [filterDept, setFilterDept] = useState('');
-  const [filterJob, setFilterJob] = useState('');
-  // godisnji: { workerId: [ { date, type, note } ] }
-  const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
-  // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
-  const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
-  // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
-  const [holidays, setHolidays] = useStorage('sumarija_holidays', {});
-  const addHistory = (action, scheduleId, oldData, newData) => {
-    setHistory(h => [{
-      id: uid(),
-      timestamp: Date.now(),
-      action,
-      scheduleId,
-      date: newData?.date || oldData?.date,
-      oldData,
-      newData
-    }, ...h].slice(0, 200));
-  };
+// ─── LOGIN / AUTH ────────────────────────────────────────────────────────────
+const AUTH_KEY = 'sumarija_auth';
+const AUTH_SESSION_KEY = 'sumarija_session';
+function hashPin(pin) {
+  // Simple hash for PIN (not crypto-grade, but sufficient for basic access control)
+  let hash = 0;
+  for (let i = 0; i < pin.length; i++) {
+    const char = pin.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return 'h_' + Math.abs(hash).toString(36);
+}
+function LoginScreen(_ref) {
+  let {
+    onLogin
+  } = _ref;
+  const [mode, setMode] = useState('login'); // 'login' | 'setup' | 'change'
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [error, setError] = useState('');
+  const [showPin, setShowPin] = useState(false);
 
-  // Day schedules
-  const daySchedules = useMemo(() => schedules.filter(s => s.date === selectedDate && (!sidebarFilter || s.deptId === sidebarFilter)), [schedules, selectedDate, sidebarFilter]);
-
-  // Dept summary for sidebar
-  const deptCounts = useMemo(() => {
-    const counts = {};
-    schedules.filter(s => s.date === selectedDate).forEach(s => {
-      counts[s.deptId] = (counts[s.deptId] || 0) + s.allWorkers.length;
-    });
-    return counts;
-  }, [schedules, selectedDate]);
-
-  // Stats
-  const totalToday = useMemo(() => new Set(daySchedules.flatMap(s => s.allWorkers)).size, [daySchedules]);
-  const statsByJob = useMemo(() => {
-    const m = {};
-    daySchedules.forEach(s => {
-      if (!m[s.jobType]) m[s.jobType] = new Set();
-      s.allWorkers.forEach(w => m[s.jobType].add(w));
-    });
-    return m;
-  }, [daySchedules]);
-  const statsByDept = useMemo(() => {
-    const m = {};
-    daySchedules.forEach(s => {
-      if (!m[s.deptId]) m[s.deptId] = new Set();
-      s.allWorkers.forEach(w => m[s.deptId].add(w));
-    });
-    return m;
-  }, [daySchedules]);
-
-  // Conflict check
-  const checkConflict = function (newSched) {
-    let excludeId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
-    const conflicts = [];
-    newSched.allWorkers.forEach(wId => {
-      const existing = schedules.find(s => s.date === newSched.date && s.id !== excludeId && s.allWorkers.includes(wId));
-      if (existing) conflicts.push(wId);
-    });
-    return conflicts;
-  };
-  const wName = id => workers.find(w => w.id === id)?.name || id;
-  const dName = id => {
-    const d = departments.find(d => d.id === id);
-    return d ? `${d.gospodarskaJedinica} — Odjel ${d.brojOdjela}` : id;
-  };
-
-  // Save schedule
-  const saveSchedule = (data, isEdit) => {
-    if (!isEdit && holidays[data.date]) {
-      return alert(`Nije moguće rasporediti radnika na ${data.date} — praznik: "${holidays[data.date]}"`);
-    }
-    if (isEdit) {
-      const old = schedules.find(s => s.id === data.id);
-      setSchedules(prev => prev.map(s => s.id === data.id ? data : s));
-      addHistory('edit', data.id, old, data);
+  // Check if PIN exists
+  const [existingHash, setExistingHash] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    // Try Firebase first, then localStorage
+    if (FIREBASE_ENABLED) {
+      const ref = firebase.database().ref('sumarija/' + AUTH_KEY);
+      ref.once('value').then(snap => {
+        const val = snap.val();
+        if (val) {
+          setExistingHash(typeof val === 'string' ? val : null);
+          setMode('login');
+        } else {
+          setMode('setup');
+        }
+        setLoaded(true);
+      }).catch(() => {
+        // Fallback to localStorage
+        const local = localStorage.getItem(AUTH_KEY);
+        if (local) {
+          setExistingHash(local);
+          setMode('login');
+        } else setMode('setup');
+        setLoaded(true);
+      });
     } else {
-      const newId = uid();
-      const nd = {
-        ...data,
-        id: newId
-      };
-      setSchedules(prev => [...prev, nd]);
-      addHistory('create', newId, null, nd);
+      const local = localStorage.getItem(AUTH_KEY);
+      if (local) {
+        setExistingHash(local);
+        setMode('login');
+      } else setMode('setup');
+      setLoaded(true);
+    }
+  }, []);
+  const saveHash = hash => {
+    localStorage.setItem(AUTH_KEY, hash);
+    if (FIREBASE_ENABLED) {
+      firebase.database().ref('sumarija/' + AUTH_KEY).set(hash).catch(() => {});
     }
   };
-  const deleteSchedule = id => {
-    const old = schedules.find(s => s.id === id);
-    setSchedules(prev => prev.filter(s => s.id !== id));
-    addHistory('delete', id, old, null);
+  const handleSetup = () => {
+    setError('');
+    if (pin.length < 4) {
+      setError('PIN mora imati barem 4 znaka');
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError('PIN-ovi se ne poklapaju');
+      return;
+    }
+    const hash = hashPin(pin);
+    saveHash(hash);
+    sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+    onLogin();
   };
-  const restoreVersion = histItem => {
-    if (!histItem.oldData) return;
-    const exists = schedules.find(s => s.id === histItem.scheduleId);
-    if (exists) {
-      setSchedules(prev => prev.map(s => s.id === histItem.scheduleId ? histItem.oldData : s));
+  const handleLogin = () => {
+    setError('');
+    if (!pin) {
+      setError('Unesite PIN');
+      return;
+    }
+    const hash = hashPin(pin);
+    if (hash === existingHash) {
+      sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+      onLogin();
     } else {
-      setSchedules(prev => [...prev, histItem.oldData]);
+      setError('Pogrešan PIN!');
+      setPin('');
     }
-    addHistory('restore', histItem.scheduleId, exists, histItem.oldData);
-    setHistoryModal(null);
   };
-  const copyFromDate = fromDate => {
-    if (holidays[selectedDate]) {
-      return alert(`Nije moguće kopirati raspored na ${selectedDate} — praznik: "${holidays[selectedDate]}"`);
+  const handleKeyDown = e => {
+    if (e.key === 'Enter') {
+      if (mode === 'setup') handleSetup();else handleLogin();
     }
-    const source = schedules.filter(s => s.date === fromDate);
-    const newOnes = source.map(s => ({
-      ...s,
-      id: uid(),
-      date: selectedDate
-    }));
-    setSchedules(prev => {
-      const cleaned = prev.filter(s => s.date !== selectedDate);
-      return [...cleaned, ...newOnes];
-    });
-    newOnes.forEach(s => addHistory('create', s.id, null, s));
   };
-  const prevDay = () => {
-    const d = new Date(selectedDate);
-    do {
-      d.setDate(d.getDate() - 1);
-    } while (d.getDay() === 0); // skip Sunday
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-  const nextDay = () => {
-    const d = new Date(selectedDate);
-    do {
-      d.setDate(d.getDate() + 1);
-    } while (d.getDay() === 0); // skip Sunday
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-
-  // Print
-  const handlePrint = () => window.print();
-
-  // Quick assign from panel click
-  const onWorkerClick = worker => setQuickModal({
-    worker
-  });
+  if (!loaded) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: 'var(--bg)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '1.2rem',
+        color: 'var(--text-muted)'
+      }
+    }, "U\u010Ditavanje..."));
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e8f0e6 100%)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'white',
+      borderRadius: 16,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+      padding: '2rem',
       width: '100%',
-      maxWidth: '100vw',
-      overflowX: 'hidden'
+      maxWidth: 380,
+      margin: '1rem'
     }
-  }, /*#__PURE__*/React.createElement("header", {
-    className: "app-header"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "app-title"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "icon"
-  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Raspored"), FIREBASE_ENABLED ? /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: '0.65rem',
-      background: 'rgba(255,255,255,0.15)',
-      padding: '0.15rem 0.5rem',
-      borderRadius: 10,
-      marginLeft: '0.25rem',
-      fontFamily: 'var(--mono)'
+      textAlign: 'center',
+      marginBottom: '1.5rem'
     }
-  }, "\uD83D\uDD34 live sync") : /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: '0.65rem',
-      background: 'rgba(255,255,255,0.1)',
-      padding: '0.15rem 0.5rem',
-      borderRadius: 10,
-      marginLeft: '0.25rem',
+      fontSize: '2.5rem',
+      marginBottom: '0.3rem'
+    }
+  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("div", {
+    style: {
       fontFamily: 'var(--mono)',
-      opacity: 0.6
+      fontWeight: 800,
+      fontSize: '1.1rem',
+      color: 'var(--green)',
+      letterSpacing: '-0.03em'
     }
-  }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
-    className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref => {
-    let [k, l] = _ref;
-    return /*#__PURE__*/React.createElement("button", {
-      key: k,
-      className: `nav-tab ${activeTab === k ? 'active' : ''}`,
-      onClick: () => setActiveTab(k)
-    }, l);
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "app-layout"
-  }, activeTab === 'raspored' && /*#__PURE__*/React.createElement("aside", {
-    className: "sidebar"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-label"
-  }, "Odjeli"), /*#__PURE__*/React.createElement("button", {
-    className: `sidebar-item ${!sidebarFilter ? 'active' : ''}`,
-    onClick: () => setSidebarFilter(null)
-  }, /*#__PURE__*/React.createElement("span", null, "Svi odjeli"), /*#__PURE__*/React.createElement("span", {
-    className: "count"
-  }, Object.values(statsByDept).reduce((a, s) => a + s.size, 0))), departments.map(d => /*#__PURE__*/React.createElement("button", {
-    key: d.id,
-    className: `sidebar-item ${sidebarFilter === d.id ? 'active' : ''}`,
-    onClick: () => setSidebarFilter(d.id)
-  }, /*#__PURE__*/React.createElement("span", {
+  }, "Raspored Radnika"), /*#__PURE__*/React.createElement("div", {
     style: {
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap'
+      fontFamily: 'var(--mono)',
+      fontSize: '0.7rem',
+      color: 'var(--text-muted)',
+      marginTop: '0.25rem'
     }
-  }, d.name), /*#__PURE__*/React.createElement("span", {
-    className: "count"
-  }, statsByDept[d.id]?.size || 0)))), /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
+  }, "\u0160umsko gospodarstvo")), mode === 'setup' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      marginBottom: '1rem'
+    }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-label"
-  }, "Vrste posla ", /*#__PURE__*/React.createElement("span", {
     style: {
-      opacity: 0.5,
-      fontSize: '0.5rem',
-      fontWeight: 400
+      fontSize: '0.85rem',
+      fontWeight: 600,
+      color: 'var(--text)'
     }
-  }, "klikni za brzi unos")), JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
-    key: jt,
-    className: "sidebar-item",
-    onClick: () => setModal({
-      type: 'entry',
-      data: {
-        date: selectedDate,
-        jobType: jt
-      }
-    })
-  }, /*#__PURE__*/React.createElement("span", {
-    className: jobBadgeClass(jt),
+  }, "Postavi pristupni PIN"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: '0.65rem'
+      fontSize: '0.72rem',
+      color: 'var(--text-muted)',
+      marginTop: '0.2rem'
     }
-  }, jt), /*#__PURE__*/React.createElement("span", {
-    className: "count"
-  }, statsByJob[jt]?.size || 0))))), /*#__PURE__*/React.createElement("main", {
-    className: "main-content"
-  }, activeTab === 'raspored' && /*#__PURE__*/React.createElement(ScheduleView, {
-    selectedDate: selectedDate,
-    setSelectedDate: setSelectedDate,
-    daySchedules: daySchedules,
-    schedules: schedules,
-    workers: workers,
-    departments: departments,
-    vehicles: vehicles,
-    wName: wName,
-    dName: dName,
-    totalToday: totalToday,
-    statsByJob: statsByJob,
-    statsByDept: statsByDept,
-    sidebarFilter: sidebarFilter,
-    setSidebarFilter: setSidebarFilter,
-    prevDay: prevDay,
-    nextDay: nextDay,
-    onAdd: () => setModal({
-      type: 'entry',
-      data: {
-        date: selectedDate
-      }
-    }),
-    onAddWithJob: jobType => setModal({
-      type: 'entry',
-      data: {
-        date: selectedDate,
-        jobType
-      }
-    }),
-    onEdit: s => setModal({
-      type: 'entry',
-      data: s,
-      isEdit: true
-    }),
-    onDelete: id => {
-      if (confirm('Obrisati ovaj zapis?')) deleteSchedule(id);
-    },
-    onHistory: s => setHistoryModal(s),
-    onAssignVehicle: (rowId, vehicleIds) => {
-      setSchedules(prev => prev.map(s => s.id === rowId ? {
-        ...s,
-        vehicleIds,
-        vehicleId: vehicleIds[0] || ''
-      } : s));
-    },
-    copyFromDate: copyFromDate,
-    handlePrint: handlePrint,
-    yesterday: yesterday(),
-    godisnji: godisnji,
-    holidays: holidays,
-    onWorkerClick: onWorkerClick
-  }), activeTab === 'radnici' && /*#__PURE__*/React.createElement(WorkersView, {
-    workers: workers,
-    setWorkers: setWorkers,
-    schedules: schedules
-  }), activeTab === 'odjeli' && /*#__PURE__*/React.createElement(DepartmentsView, {
-    departments: departments,
-    setDepartments: setDepartments,
-    schedules: schedules,
-    dName: dName
-  }), activeTab === 'spisak' && /*#__PURE__*/React.createElement(SpisakView, {
-    workers: workers,
-    setWorkers: setWorkers,
-    vehicles: vehicles
-  }), activeTab === 'vozila' && /*#__PURE__*/React.createElement(VozaciView, {
-    vehicles: vehicles,
-    setVehicles: setVehicles,
-    workers: workers
-  }), activeTab === 'sihtarica' && /*#__PURE__*/React.createElement(SihtaricaView, {
-    schedules: schedules,
-    workers: workers,
-    departments: departments,
-    godisnji: godisnji,
-    setGodisnji: setGodisnji,
-    holidays: holidays,
-    setHolidays: setHolidays,
-    wName: wName,
-    dName: dName
-  }), activeTab === 'pregled' && /*#__PURE__*/React.createElement(PregledView, {
-    schedules: schedules,
-    workers: workers,
-    departments: departments,
-    wName: wName,
-    dName: dName,
-    filterWorker: filterWorker,
-    setFilterWorker: setFilterWorker,
-    filterDept: filterDept,
-    setFilterDept: setFilterDept,
-    filterJob: filterJob,
-    setFilterJob: setFilterJob
-  }), activeTab === 'historija' && /*#__PURE__*/React.createElement(HistorijaView, {
-    history: history,
-    wName: wName,
-    dName: dName,
-    restoreVersion: restoreVersion,
-    schedules: schedules
-  })), activeTab === 'raspored' && /*#__PURE__*/React.createElement(RightPanel, {
-    selectedDate: selectedDate,
-    daySchedules: daySchedules,
-    schedules: schedules,
-    workers: workers,
-    departments: departments,
-    wName: wName,
-    dName: dName,
-    statsByJob: statsByJob,
-    statsByDept: statsByDept,
-    godisnji: godisnji,
-    onAdd: () => setModal({
-      type: 'entry',
-      data: {
-        date: selectedDate
-      }
-    }),
-    onAddWithJob: jobType => setModal({
-      type: 'entry',
-      data: {
-        date: selectedDate,
-        jobType
-      }
-    }),
-    copyFromDate: copyFromDate,
-    yesterday: yesterday(),
-    onWorkerClick: onWorkerClick
-  })), activeTab === 'raspored' && /*#__PURE__*/React.createElement("button", {
-    className: "mobile-fab",
-    onClick: () => setModal({
-      type: 'entry',
-      data: {
-        date: selectedDate
-      }
-    })
-  }, "+"), quickModal && /*#__PURE__*/React.createElement(QuickModal, {
-    worker: quickModal.worker,
-    workers: workers,
-    departments: departments,
-    setDepartments: setDepartments,
-    selectedDate: selectedDate,
-    schedules: schedules,
-    checkConflict: checkConflict,
-    onSave: d => {
-      saveSchedule(d, false);
-      setQuickModal(null);
-    },
-    onClose: () => setQuickModal(null),
-    wName: wName,
-    godisnji: godisnji,
-    setGodisnji: setGodisnji
-  }), modal?.type === 'entry' && /*#__PURE__*/React.createElement(EntryModal, {
-    data: modal.data,
-    isEdit: modal.isEdit,
-    workers: workers,
-    departments: departments,
-    setDepartments: setDepartments,
-    schedules: schedules,
-    checkConflict: checkConflict,
-    vehicles: vehicles,
-    onSave: d => {
-      saveSchedule(d, modal.isEdit);
-      setModal(null);
-    },
-    onClose: () => setModal(null),
-    wName: wName
-  }), historyModal && /*#__PURE__*/React.createElement(HistoryDetailModal, {
-    schedule: historyModal,
-    history: history.filter(h => h.scheduleId === historyModal.id),
-    workers: workers,
-    wName: wName,
-    dName: dName,
-    restoreVersion: restoreVersion,
-    onClose: () => setHistoryModal(null)
-  }));
+  }, "Ovo je prvi put. Odaberite PIN za za\u0161titu aplikacije.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.72rem',
+      fontWeight: 600,
+      color: 'var(--text-muted)',
+      display: 'block',
+      marginBottom: '0.25rem'
+    }
+  }, "Novi PIN (min. 4 znaka)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: showPin ? 'text' : 'password',
+    value: pin,
+    onChange: e => setPin(e.target.value),
+    onKeyDown: handleKeyDown,
+    autoFocus: true,
+    placeholder: "Unesite PIN...",
+    style: {
+      width: '100%',
+      padding: '0.6rem 2.5rem 0.6rem 0.75rem',
+      border: '2px solid var(--border)',
+      borderRadius: 8,
+      fontSize: '1rem',
+      letterSpacing: '0.15em',
+      outline: 'none',
+      boxSizing: 'border-box'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowPin(!showPin),
+    style: {
+      position: 'absolute',
+      right: 8,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: '1rem',
+      color: 'var(--text-muted)'
+    }
+  }, showPin ? '🙈' : '👁️'))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.72rem',
+      fontWeight: 600,
+      color: 'var(--text-muted)',
+      display: 'block',
+      marginBottom: '0.25rem'
+    }
+  }, "Potvrdite PIN"), /*#__PURE__*/React.createElement("input", {
+    type: showPin ? 'text' : 'password',
+    value: confirmPin,
+    onChange: e => setConfirmPin(e.target.value),
+    onKeyDown: handleKeyDown,
+    placeholder: "Ponovite PIN...",
+    style: {
+      width: '100%',
+      padding: '0.6rem 0.75rem',
+      border: '2px solid var(--border)',
+      borderRadius: 8,
+      fontSize: '1rem',
+      letterSpacing: '0.15em',
+      outline: 'none',
+      boxSizing: 'border-box'
+    }
+  })), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#c53030',
+      fontSize: '0.78rem',
+      fontWeight: 600,
+      marginBottom: '0.5rem',
+      padding: '0.4rem 0.6rem',
+      background: '#fde8e8',
+      borderRadius: 6
+    }
+  }, error), /*#__PURE__*/React.createElement("button", {
+    onClick: handleSetup,
+    style: {
+      width: '100%',
+      padding: '0.65rem',
+      background: 'var(--green)',
+      color: 'white',
+      border: 'none',
+      borderRadius: 8,
+      fontSize: '0.9rem',
+      fontWeight: 700,
+      cursor: 'pointer',
+      marginTop: '0.25rem'
+    }
+  }, "Postavi PIN i u\u0111i")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.85rem',
+      fontWeight: 600,
+      color: 'var(--text)'
+    }
+  }, "Prijava")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.72rem',
+      fontWeight: 600,
+      color: 'var(--text-muted)',
+      display: 'block',
+      marginBottom: '0.25rem'
+    }
+  }, "PIN"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: showPin ? 'text' : 'password',
+    value: pin,
+    onChange: e => setPin(e.target.value),
+    onKeyDown: handleKeyDown,
+    autoFocus: true,
+    placeholder: "Unesite PIN...",
+    style: {
+      width: '100%',
+      padding: '0.6rem 2.5rem 0.6rem 0.75rem',
+      border: '2px solid var(--border)',
+      borderRadius: 8,
+      fontSize: '1rem',
+      letterSpacing: '0.15em',
+      outline: 'none',
+      boxSizing: 'border-box'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowPin(!showPin),
+    style: {
+      position: 'absolute',
+      right: 8,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: '1rem',
+      color: 'var(--text-muted)'
+    }
+  }, showPin ? '🙈' : '👁️'))), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#c53030',
+      fontSize: '0.78rem',
+      fontWeight: 600,
+      marginBottom: '0.5rem',
+      padding: '0.4rem 0.6rem',
+      background: '#fde8e8',
+      borderRadius: 6
+    }
+  }, error), /*#__PURE__*/React.createElement("button", {
+    onClick: handleLogin,
+    style: {
+      width: '100%',
+      padding: '0.65rem',
+      background: 'var(--green)',
+      color: 'white',
+      border: 'none',
+      borderRadius: 8,
+      fontSize: '0.9rem',
+      fontWeight: 700,
+      cursor: 'pointer',
+      marginTop: '0.25rem'
+    }
+  }, "Prijavi se"))));
 }
-
 // ─── SCHEDULE VIEW ────────────────────────────────────────────────────────────
 function ScheduleView(_ref2) {
   let {
@@ -8100,6 +8033,453 @@ function SihtaricaView(_ref29) {
     className: "btn btn-primary",
     onClick: saveGodisnji
   }, "\uD83D\uDCBE Sa\u010Duvaj")))));
+}
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(AUTH_SESSION_KEY) === 'true');
+  if (!isAuthenticated) {
+    return /*#__PURE__*/React.createElement(LoginScreen, {
+      onLogin: () => setIsAuthenticated(true)
+    });
+  }
+  return /*#__PURE__*/React.createElement(AppMain, {
+    onLogout: () => {
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
+      setIsAuthenticated(false);
+    }
+  });
+}
+function AppMain(_ref42) {
+  let {
+    onLogout
+  } = _ref42;
+  const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
+  const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
+  const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
+  const [history, setHistory] = useStorage('sumarija_history', []);
+  const [activeTab, setActiveTab] = useState('raspored');
+  const [selectedDate, setSelectedDate] = useState(today());
+  const [sidebarFilter, setSidebarFilter] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [historyModal, setHistoryModal] = useState(null);
+  const [quickModal, setQuickModal] = useState(null); // { worker }
+  const [filterTab, setFilterTab] = useState('dan');
+  const [filterWorker, setFilterWorker] = useState('');
+  const [filterDept, setFilterDept] = useState('');
+  const [filterJob, setFilterJob] = useState('');
+  // godisnji: { workerId: [ { date, type, note } ] }
+  const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
+  // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
+  const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
+  // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
+  const [holidays, setHolidays] = useStorage('sumarija_holidays', {});
+  const addHistory = (action, scheduleId, oldData, newData) => {
+    setHistory(h => [{
+      id: uid(),
+      timestamp: Date.now(),
+      action,
+      scheduleId,
+      date: newData?.date || oldData?.date,
+      oldData,
+      newData
+    }, ...h].slice(0, 200));
+  };
+
+  // Day schedules
+  const daySchedules = useMemo(() => schedules.filter(s => s.date === selectedDate && (!sidebarFilter || s.deptId === sidebarFilter)), [schedules, selectedDate, sidebarFilter]);
+
+  // Dept summary for sidebar
+  const deptCounts = useMemo(() => {
+    const counts = {};
+    schedules.filter(s => s.date === selectedDate).forEach(s => {
+      counts[s.deptId] = (counts[s.deptId] || 0) + s.allWorkers.length;
+    });
+    return counts;
+  }, [schedules, selectedDate]);
+
+  // Stats
+  const totalToday = useMemo(() => new Set(daySchedules.flatMap(s => s.allWorkers)).size, [daySchedules]);
+  const statsByJob = useMemo(() => {
+    const m = {};
+    daySchedules.forEach(s => {
+      if (!m[s.jobType]) m[s.jobType] = new Set();
+      s.allWorkers.forEach(w => m[s.jobType].add(w));
+    });
+    return m;
+  }, [daySchedules]);
+  const statsByDept = useMemo(() => {
+    const m = {};
+    daySchedules.forEach(s => {
+      if (!m[s.deptId]) m[s.deptId] = new Set();
+      s.allWorkers.forEach(w => m[s.deptId].add(w));
+    });
+    return m;
+  }, [daySchedules]);
+
+  // Conflict check
+  const checkConflict = function (newSched) {
+    let excludeId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+    const conflicts = [];
+    newSched.allWorkers.forEach(wId => {
+      const existing = schedules.find(s => s.date === newSched.date && s.id !== excludeId && s.allWorkers.includes(wId));
+      if (existing) conflicts.push(wId);
+    });
+    return conflicts;
+  };
+  const wName = id => workers.find(w => w.id === id)?.name || id;
+  const dName = id => {
+    const d = departments.find(d => d.id === id);
+    return d ? `${d.gospodarskaJedinica} — Odjel ${d.brojOdjela}` : id;
+  };
+
+  // Save schedule
+  const saveSchedule = (data, isEdit) => {
+    if (!isEdit && holidays[data.date]) {
+      return alert(`Nije moguće rasporediti radnika na ${data.date} — praznik: "${holidays[data.date]}"`);
+    }
+    if (isEdit) {
+      const old = schedules.find(s => s.id === data.id);
+      setSchedules(prev => prev.map(s => s.id === data.id ? data : s));
+      addHistory('edit', data.id, old, data);
+    } else {
+      const newId = uid();
+      const nd = {
+        ...data,
+        id: newId
+      };
+      setSchedules(prev => [...prev, nd]);
+      addHistory('create', newId, null, nd);
+    }
+  };
+  const deleteSchedule = id => {
+    const old = schedules.find(s => s.id === id);
+    setSchedules(prev => prev.filter(s => s.id !== id));
+    addHistory('delete', id, old, null);
+  };
+  const restoreVersion = histItem => {
+    if (!histItem.oldData) return;
+    const exists = schedules.find(s => s.id === histItem.scheduleId);
+    if (exists) {
+      setSchedules(prev => prev.map(s => s.id === histItem.scheduleId ? histItem.oldData : s));
+    } else {
+      setSchedules(prev => [...prev, histItem.oldData]);
+    }
+    addHistory('restore', histItem.scheduleId, exists, histItem.oldData);
+    setHistoryModal(null);
+  };
+  const copyFromDate = fromDate => {
+    if (holidays[selectedDate]) {
+      return alert(`Nije moguće kopirati raspored na ${selectedDate} — praznik: "${holidays[selectedDate]}"`);
+    }
+    const source = schedules.filter(s => s.date === fromDate);
+    const newOnes = source.map(s => ({
+      ...s,
+      id: uid(),
+      date: selectedDate
+    }));
+    setSchedules(prev => {
+      const cleaned = prev.filter(s => s.date !== selectedDate);
+      return [...cleaned, ...newOnes];
+    });
+    newOnes.forEach(s => addHistory('create', s.id, null, s));
+  };
+  const prevDay = () => {
+    const d = new Date(selectedDate);
+    do {
+      d.setDate(d.getDate() - 1);
+    } while (d.getDay() === 0); // skip Sunday
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+  const nextDay = () => {
+    const d = new Date(selectedDate);
+    do {
+      d.setDate(d.getDate() + 1);
+    } while (d.getDay() === 0); // skip Sunday
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  // Print
+  const handlePrint = () => window.print();
+
+  // Quick assign from panel click
+  const onWorkerClick = worker => setQuickModal({
+    worker
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: '100%',
+      maxWidth: '100vw',
+      overflowX: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "app-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "app-title"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Raspored"), FIREBASE_ENABLED ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.65rem',
+      background: 'rgba(255,255,255,0.15)',
+      padding: '0.15rem 0.5rem',
+      borderRadius: 10,
+      marginLeft: '0.25rem',
+      fontFamily: 'var(--mono)'
+    }
+  }, "\uD83D\uDD34 live sync") : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.65rem',
+      background: 'rgba(255,255,255,0.1)',
+      padding: '0.15rem 0.5rem',
+      borderRadius: 10,
+      marginLeft: '0.25rem',
+      fontFamily: 'var(--mono)',
+      opacity: 0.6
+    }
+  }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
+    className: "nav-tabs"
+  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref43 => {
+    let [k, l] = _ref43;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      className: `nav-tab ${activeTab === k ? 'active' : ''}`,
+      onClick: () => setActiveTab(k)
+    }, l);
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "nav-tab no-print",
+    onClick: onLogout,
+    title: "Odjavi se",
+    style: {
+      marginLeft: 'auto',
+      opacity: 0.7,
+      fontSize: '0.75rem'
+    }
+  }, "\uD83D\uDD12 Odjava"))), /*#__PURE__*/React.createElement("div", {
+    className: "app-layout"
+  }, activeTab === 'raspored' && /*#__PURE__*/React.createElement("aside", {
+    className: "sidebar"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Odjeli"), /*#__PURE__*/React.createElement("button", {
+    className: `sidebar-item ${!sidebarFilter ? 'active' : ''}`,
+    onClick: () => setSidebarFilter(null)
+  }, /*#__PURE__*/React.createElement("span", null, "Svi odjeli"), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, Object.values(statsByDept).reduce((a, s) => a + s.size, 0))), departments.map(d => /*#__PURE__*/React.createElement("button", {
+    key: d.id,
+    className: `sidebar-item ${sidebarFilter === d.id ? 'active' : ''}`,
+    onClick: () => setSidebarFilter(d.id)
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
+    }
+  }, d.name), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, statsByDept[d.id]?.size || 0)))), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Vrste posla ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      opacity: 0.5,
+      fontSize: '0.5rem',
+      fontWeight: 400
+    }
+  }, "klikni za brzi unos")), JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+    key: jt,
+    className: "sidebar-item",
+    onClick: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate,
+        jobType: jt
+      }
+    })
+  }, /*#__PURE__*/React.createElement("span", {
+    className: jobBadgeClass(jt),
+    style: {
+      fontSize: '0.65rem'
+    }
+  }, jt), /*#__PURE__*/React.createElement("span", {
+    className: "count"
+  }, statsByJob[jt]?.size || 0))))), /*#__PURE__*/React.createElement("main", {
+    className: "main-content"
+  }, activeTab === 'raspored' && /*#__PURE__*/React.createElement(ScheduleView, {
+    selectedDate: selectedDate,
+    setSelectedDate: setSelectedDate,
+    daySchedules: daySchedules,
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    vehicles: vehicles,
+    wName: wName,
+    dName: dName,
+    totalToday: totalToday,
+    statsByJob: statsByJob,
+    statsByDept: statsByDept,
+    sidebarFilter: sidebarFilter,
+    setSidebarFilter: setSidebarFilter,
+    prevDay: prevDay,
+    nextDay: nextDay,
+    onAdd: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate
+      }
+    }),
+    onAddWithJob: jobType => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate,
+        jobType
+      }
+    }),
+    onEdit: s => setModal({
+      type: 'entry',
+      data: s,
+      isEdit: true
+    }),
+    onDelete: id => {
+      if (confirm('Obrisati ovaj zapis?')) deleteSchedule(id);
+    },
+    onHistory: s => setHistoryModal(s),
+    onAssignVehicle: (rowId, vehicleIds) => {
+      setSchedules(prev => prev.map(s => s.id === rowId ? {
+        ...s,
+        vehicleIds,
+        vehicleId: vehicleIds[0] || ''
+      } : s));
+    },
+    copyFromDate: copyFromDate,
+    handlePrint: handlePrint,
+    yesterday: yesterday(),
+    godisnji: godisnji,
+    holidays: holidays,
+    onWorkerClick: onWorkerClick
+  }), activeTab === 'radnici' && /*#__PURE__*/React.createElement(WorkersView, {
+    workers: workers,
+    setWorkers: setWorkers,
+    schedules: schedules
+  }), activeTab === 'odjeli' && /*#__PURE__*/React.createElement(DepartmentsView, {
+    departments: departments,
+    setDepartments: setDepartments,
+    schedules: schedules,
+    dName: dName
+  }), activeTab === 'spisak' && /*#__PURE__*/React.createElement(SpisakView, {
+    workers: workers,
+    setWorkers: setWorkers,
+    vehicles: vehicles
+  }), activeTab === 'vozila' && /*#__PURE__*/React.createElement(VozaciView, {
+    vehicles: vehicles,
+    setVehicles: setVehicles,
+    workers: workers
+  }), activeTab === 'sihtarica' && /*#__PURE__*/React.createElement(SihtaricaView, {
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    godisnji: godisnji,
+    setGodisnji: setGodisnji,
+    holidays: holidays,
+    setHolidays: setHolidays,
+    wName: wName,
+    dName: dName
+  }), activeTab === 'pregled' && /*#__PURE__*/React.createElement(PregledView, {
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    wName: wName,
+    dName: dName,
+    filterWorker: filterWorker,
+    setFilterWorker: setFilterWorker,
+    filterDept: filterDept,
+    setFilterDept: setFilterDept,
+    filterJob: filterJob,
+    setFilterJob: setFilterJob
+  }), activeTab === 'historija' && /*#__PURE__*/React.createElement(HistorijaView, {
+    history: history,
+    wName: wName,
+    dName: dName,
+    restoreVersion: restoreVersion,
+    schedules: schedules
+  })), activeTab === 'raspored' && /*#__PURE__*/React.createElement(RightPanel, {
+    selectedDate: selectedDate,
+    daySchedules: daySchedules,
+    schedules: schedules,
+    workers: workers,
+    departments: departments,
+    wName: wName,
+    dName: dName,
+    statsByJob: statsByJob,
+    statsByDept: statsByDept,
+    godisnji: godisnji,
+    onAdd: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate
+      }
+    }),
+    onAddWithJob: jobType => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate,
+        jobType
+      }
+    }),
+    copyFromDate: copyFromDate,
+    yesterday: yesterday(),
+    onWorkerClick: onWorkerClick
+  })), activeTab === 'raspored' && /*#__PURE__*/React.createElement("button", {
+    className: "mobile-fab",
+    onClick: () => setModal({
+      type: 'entry',
+      data: {
+        date: selectedDate
+      }
+    })
+  }, "+"), quickModal && /*#__PURE__*/React.createElement(QuickModal, {
+    worker: quickModal.worker,
+    workers: workers,
+    departments: departments,
+    setDepartments: setDepartments,
+    selectedDate: selectedDate,
+    schedules: schedules,
+    checkConflict: checkConflict,
+    onSave: d => {
+      saveSchedule(d, false);
+      setQuickModal(null);
+    },
+    onClose: () => setQuickModal(null),
+    wName: wName,
+    godisnji: godisnji,
+    setGodisnji: setGodisnji
+  }), modal?.type === 'entry' && /*#__PURE__*/React.createElement(EntryModal, {
+    data: modal.data,
+    isEdit: modal.isEdit,
+    workers: workers,
+    departments: departments,
+    setDepartments: setDepartments,
+    schedules: schedules,
+    checkConflict: checkConflict,
+    vehicles: vehicles,
+    onSave: d => {
+      saveSchedule(d, modal.isEdit);
+      setModal(null);
+    },
+    onClose: () => setModal(null),
+    wName: wName
+  }), historyModal && /*#__PURE__*/React.createElement(HistoryDetailModal, {
+    schedule: historyModal,
+    history: history.filter(h => h.scheduleId === historyModal.id),
+    workers: workers,
+    wName: wName,
+    dName: dName,
+    restoreVersion: restoreVersion,
+    onClose: () => setHistoryModal(null)
+  }));
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────

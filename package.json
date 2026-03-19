@@ -4,7 +4,8 @@
   "description": "",
   "main": "sw.js",
   "scripts": {
-    "build": "npx babel app.jsx -o app.js"
+    "build": "cat src/*.jsx > app.jsx && npx babel app.jsx -o app.js",
+    "build:watch": "cat src/*.jsx > app.jsx && npx babel app.jsx -o app.js --watch"
   },
   "repository": {
     "type": "git",
