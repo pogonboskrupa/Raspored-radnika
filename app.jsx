@@ -1300,7 +1300,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   // Auto-detect default vehicle from driver in selected workers
   const driverInWorkers = form.allWorkers.map(wId => workers.find(w => w.id === wId)).find(w => w?.category === 'vozac');
   const defaultVehicle = driverInWorkers ? (vehicles || []).find(v => v.driverId === driverInWorkers.id && v.status === 'vozno') : null;
-  const effectiveVehicleId = vehicleOverride ? form.vehicleId : (defaultVehicle?.id || '');
+  const effectiveVehicleId = defaultVehicle && !vehicleOverride ? defaultVehicle.id : form.vehicleId;
   const selectedVehicle = (vehicles || []).find(v => v.id === effectiveVehicleId);
   const workerCount = form.allWorkers.length;
   const vehicleCapacity = selectedVehicle?.brojMjesta || 0;
