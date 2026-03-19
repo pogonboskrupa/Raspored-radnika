@@ -375,7 +375,6 @@ function App() {
               handlePrint={handlePrint}
               yesterday={yesterday()}
               godisnji={godisnji}
-              holidays={holidays} setHolidays={setHolidays}
               onWorkerClick={onWorkerClick}
             />
           )}
@@ -395,7 +394,7 @@ function App() {
             <SihtaricaView
               schedules={schedules} workers={workers} departments={departments}
               godisnji={godisnji} setGodisnji={setGodisnji}
-              holidays={holidays}
+              holidays={holidays} setHolidays={setHolidays}
               wName={wName} dName={dName}
             />
           )}
@@ -491,35 +490,11 @@ function App() {
 function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, workers, departments, vehicles,
   wName, dName, totalToday, statsByJob, statsByDept,
   sidebarFilter, setSidebarFilter, godisnji,
-  holidays, setHolidays,
   prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday, onWorkerClick }) {
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
-  const [holidayInput, setHolidayInput] = useState(false);
-  const [holidayName, setHolidayName] = useState('');
-  const currentHoliday = holidays?.[selectedDate] || null;
-
-  const toggleHoliday = () => {
-    if (currentHoliday) {
-      if (confirm(`Ukloniti praznik "${currentHoliday}" za ${selectedDate}?`)) {
-        setHolidays(h => { const n = {...h}; delete n[selectedDate]; return n; });
-      }
-    } else {
-      setHolidayInput(true);
-      setHolidayName('');
-    }
-  };
-
-  const saveHoliday = () => {
-    const name = holidayName.trim();
-    if (!name) return alert('Unesite naziv praznika!');
-    setHolidays(h => ({...h, [selectedDate]: name}));
-    setHolidayInput(false);
-    setHolidayName('');
-  };
-
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
@@ -556,10 +531,6 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </div>
         </div>
         <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
-          <button className="btn btn-sm no-print" onClick={toggleHoliday}
-            style={{background: currentHoliday ? '#c53030' : '#ed8936', color:'white', border:'none', fontSize:'0.72rem'}}>
-            {currentHoliday ? '🎉 Ukloni praznik' : '🎉 Praznik'}
-          </button>
           <button className="btn btn-secondary btn-sm no-print" onClick={() => copyFromDate(yesterday)}>
             📋 Kopiraj jučer
           </button>
@@ -572,28 +543,6 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
         </div>
       </div>
 
-      {/* HOLIDAY BANNER / INPUT */}
-      {currentHoliday && (
-        <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.6rem 0.75rem',marginBottom:'0.5rem',background:'linear-gradient(135deg,#fff3e0,#ffe0b2)',border:'2px solid #ffb74d',borderRadius:8}}>
-          <span style={{fontSize:'1.3rem'}}>🎉</span>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:'0.9rem',color:'#e65100'}}>PRAZNIK</div>
-            <div style={{fontSize:'0.82rem',color:'#bf360c'}}>{currentHoliday}</div>
-          </div>
-          <span style={{fontSize:'0.7rem',color:'#e65100',fontStyle:'italic'}}>Automatski upisano svim radnicima u šihtu</span>
-        </div>
-      )}
-      {holidayInput && !currentHoliday && (
-        <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.5rem 0.75rem',marginBottom:'0.5rem',background:'#fff8e1',border:'1px solid #ffcc02',borderRadius:8}}>
-          <span style={{fontSize:'1rem'}}>🎉</span>
-          <input autoFocus className="form-input" placeholder="Naziv praznika (npr. Bajram, Nova godina...)"
-            value={holidayName} onChange={e=>setHolidayName(e.target.value)}
-            onKeyDown={e=>{if(e.key==='Enter')saveHoliday();if(e.key==='Escape'){setHolidayInput(false);setHolidayName('');}}}
-            style={{flex:1,fontSize:'0.85rem',padding:'0.35rem 0.5rem'}} />
-          <button className="btn btn-primary btn-sm" onClick={saveHoliday} style={{whiteSpace:'nowrap'}}>Spremi</button>
-          <button className="btn btn-secondary btn-sm" onClick={()=>{setHolidayInput(false);setHolidayName('');}}>Odustani</button>
-        </div>
-      )}
 
       {/* STATS */}
       <div className="stats-row">
@@ -3049,14 +2998,17 @@ function VozaciView({ vehicles, setVehicles, workers }) {
 }
 
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, holidays, wName, dName }) {
+function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, holidays, setHolidays, wName, dName }) {
   const now = new Date();
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
   const [selWorker, setSelWorker] = useState('');
   const [goModal, setGoModal] = useState(null); // { workerId } or null
   const [goForm, setGoForm] = useState({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
-  const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji'
+  const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji' | 'praznici'
+  const [holidayInput, setHolidayInput] = useState(false);
+  const [holidayName, setHolidayName] = useState('');
+  const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
 
   const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
   const ODSUTNOST_COLOR = {
@@ -3219,7 +3171,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
 
         {/* View tabs */}
         <div style={{display:'flex',gap:0,borderRadius:6,overflow:'hidden',border:'1px solid var(--border)'}}>
-          {[['mjesecni','Mjesečni'],['radnik','Po radniku'],['godisnji','Godišnji']].map(([k,l])=>(
+          {[['mjesecni','Mjesečni'],['radnik','Po radniku'],['godisnji','Godišnji'],['praznici','🎉 Praznici']].map(([k,l])=>(
             <button key={k} onClick={()=>setSihtView(k)} style={{
               padding:'0.35rem 0.7rem',fontSize:'0.75rem',fontWeight:sihtView===k?700:400,
               border:'none',cursor:'pointer',
@@ -3231,7 +3183,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
       </div>
 
       {/* NAV ROW */}
-      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+      {sihtView !== 'praznici' && <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
         {sihtView !== 'godisnji' ? (
           <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
             <button className="date-nav-btn" onClick={() => { if(selMonth===0){setSelMonth(11);setSelYear(y=>y-1);}else setSelMonth(m=>m-1); }}>◀</button>
@@ -3257,7 +3209,86 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         </select>
 
         <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨️ Štampaj</button>
-      </div>
+      </div>}
+
+      {/* ═══════ PRAZNICI VIEW ═══════ */}
+      {sihtView === 'praznici' && (
+        <div>
+          {/* Add holiday */}
+          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+            <input type="date" className="form-input" value={holidayDate} onChange={e=>setHolidayDate(e.target.value)}
+              style={{fontSize:'0.85rem',padding:'0.35rem 0.5rem'}} />
+            {!holidayInput ? (
+              <button className="btn btn-primary btn-sm" onClick={()=>{setHolidayInput(true);setHolidayName('');}}>
+                + Dodaj praznik
+              </button>
+            ) : (
+              <>
+                <input autoFocus className="form-input" placeholder="Naziv praznika (npr. Bajram, Nova godina...)"
+                  value={holidayName} onChange={e=>setHolidayName(e.target.value)}
+                  onKeyDown={e=>{
+                    if(e.key==='Enter'){
+                      const name=holidayName.trim();
+                      if(!name) return alert('Unesite naziv praznika!');
+                      setHolidays(h=>({...h,[holidayDate]:name}));
+                      setHolidayInput(false);setHolidayName('');
+                    }
+                    if(e.key==='Escape'){setHolidayInput(false);setHolidayName('');}
+                  }}
+                  style={{flex:1,fontSize:'0.85rem',padding:'0.35rem 0.5rem',minWidth:200}} />
+                <button className="btn btn-primary btn-sm" onClick={()=>{
+                  const name=holidayName.trim();
+                  if(!name) return alert('Unesite naziv praznika!');
+                  setHolidays(h=>({...h,[holidayDate]:name}));
+                  setHolidayInput(false);setHolidayName('');
+                }}>Spremi</button>
+                <button className="btn btn-secondary btn-sm" onClick={()=>{setHolidayInput(false);setHolidayName('');}}>Odustani</button>
+              </>
+            )}
+          </div>
+
+          {/* Holiday list */}
+          {Object.keys(holidays||{}).length === 0 ? (
+            <div style={{textAlign:'center',padding:'2rem',color:'var(--text-muted)',fontSize:'0.9rem'}}>
+              Nema upisanih praznika. Kliknite "+ Dodaj praznik" za unos.
+            </div>
+          ) : (
+            <div className="card" style={{overflowX:'auto'}}>
+              <table className="table" style={{width:'100%',fontSize:'0.85rem'}}>
+                <thead>
+                  <tr>
+                    <th style={{padding:'0.5rem 0.75rem'}}>Datum</th>
+                    <th style={{padding:'0.5rem 0.75rem'}}>Dan</th>
+                    <th style={{padding:'0.5rem 0.75rem'}}>Naziv praznika</th>
+                    <th style={{padding:'0.5rem 0.75rem',width:80}}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(holidays).sort(([a],[b])=>a.localeCompare(b)).map(([date,name])=>{
+                    const d = new Date(date+'T00:00:00');
+                    const dayNames = ['Nedjelja','Ponedjeljak','Utorak','Srijeda','Četvrtak','Petak','Subota'];
+                    return (
+                      <tr key={date}>
+                        <td style={{padding:'0.5rem 0.75rem',fontFamily:'var(--mono)'}}>{date}</td>
+                        <td style={{padding:'0.5rem 0.75rem'}}>{dayNames[d.getDay()]}</td>
+                        <td style={{padding:'0.5rem 0.75rem',fontWeight:600}}>🎉 {name}</td>
+                        <td style={{padding:'0.5rem 0.75rem',textAlign:'center'}}>
+                          <button className="btn btn-sm" onClick={()=>{
+                            if(confirm(`Ukloniti praznik "${name}" (${date})?`))
+                              setHolidays(h=>{const n={...h};delete n[date];return n;});
+                          }} style={{background:'#c53030',color:'white',border:'none',fontSize:'0.72rem'}}>
+                            Ukloni
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ═══════ MJESEČNI VIEW ═══════ */}
       {sihtView === 'mjesecni' && (<>

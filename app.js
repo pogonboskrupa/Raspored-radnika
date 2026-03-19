@@ -697,8 +697,6 @@ function App() {
     handlePrint: handlePrint,
     yesterday: yesterday(),
     godisnji: godisnji,
-    holidays: holidays,
-    setHolidays: setHolidays,
     onWorkerClick: onWorkerClick
   }), activeTab === 'radnici' && /*#__PURE__*/React.createElement(WorkersView, {
     workers: workers,
@@ -724,6 +722,7 @@ function App() {
     godisnji: godisnji,
     setGodisnji: setGodisnji,
     holidays: holidays,
+    setHolidays: setHolidays,
     wName: wName,
     dName: dName
   }), activeTab === 'pregled' && /*#__PURE__*/React.createElement(PregledView, {
@@ -839,8 +838,6 @@ function ScheduleView(_ref2) {
     sidebarFilter,
     setSidebarFilter,
     godisnji,
-    holidays,
-    setHolidays,
     prevDay,
     nextDay,
     onAdd,
@@ -856,36 +853,6 @@ function ScheduleView(_ref2) {
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
-  const [holidayInput, setHolidayInput] = useState(false);
-  const [holidayName, setHolidayName] = useState('');
-  const currentHoliday = holidays?.[selectedDate] || null;
-  const toggleHoliday = () => {
-    if (currentHoliday) {
-      if (confirm(`Ukloniti praznik "${currentHoliday}" za ${selectedDate}?`)) {
-        setHolidays(h => {
-          const n = {
-            ...h
-          };
-          delete n[selectedDate];
-          return n;
-        });
-      }
-    } else {
-      setHolidayInput(true);
-      setHolidayName('');
-    }
-  };
-  const saveHoliday = () => {
-    const name = holidayName.trim();
-    if (!name) return alert('Unesite naziv praznika!');
-    setHolidays(h => ({
-      ...h,
-      [selectedDate]: name
-    }));
-    setHolidayInput(false);
-    setHolidayName('');
-  };
-
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
@@ -944,15 +911,6 @@ function ScheduleView(_ref2) {
       alignItems: 'center'
     }
   }, /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-sm no-print",
-    onClick: toggleHoliday,
-    style: {
-      background: currentHoliday ? '#c53030' : '#ed8936',
-      color: 'white',
-      border: 'none',
-      fontSize: '0.72rem'
-    }
-  }, currentHoliday ? '🎉 Ukloni praznik' : '🎉 Praznik'), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm no-print",
     onClick: () => copyFromDate(yesterday)
   }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("button", {
@@ -961,88 +919,7 @@ function ScheduleView(_ref2) {
   }, "\uD83D\uDDA8\uFE0F Print"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm no-print",
     onClick: onAdd
-  }, "+ Novi unos"))), currentHoliday && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      padding: '0.6rem 0.75rem',
-      marginBottom: '0.5rem',
-      background: 'linear-gradient(135deg,#fff3e0,#ffe0b2)',
-      border: '2px solid #ffb74d',
-      borderRadius: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '1.3rem'
-    }
-  }, "\uD83C\uDF89"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: '0.9rem',
-      color: '#e65100'
-    }
-  }, "PRAZNIK"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.82rem',
-      color: '#bf360c'
-    }
-  }, currentHoliday)), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '0.7rem',
-      color: '#e65100',
-      fontStyle: 'italic'
-    }
-  }, "Automatski upisano svim radnicima u \u0161ihtu")), holidayInput && !currentHoliday && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      padding: '0.5rem 0.75rem',
-      marginBottom: '0.5rem',
-      background: '#fff8e1',
-      border: '1px solid #ffcc02',
-      borderRadius: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '1rem'
-    }
-  }, "\uD83C\uDF89"), /*#__PURE__*/React.createElement("input", {
-    autoFocus: true,
-    className: "form-input",
-    placeholder: "Naziv praznika (npr. Bajram, Nova godina...)",
-    value: holidayName,
-    onChange: e => setHolidayName(e.target.value),
-    onKeyDown: e => {
-      if (e.key === 'Enter') saveHoliday();
-      if (e.key === 'Escape') {
-        setHolidayInput(false);
-        setHolidayName('');
-      }
-    },
-    style: {
-      flex: 1,
-      fontSize: '0.85rem',
-      padding: '0.35rem 0.5rem'
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-primary btn-sm",
-    onClick: saveHoliday,
-    style: {
-      whiteSpace: 'nowrap'
-    }
-  }, "Spremi"), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-secondary btn-sm",
-    onClick: () => {
-      setHolidayInput(false);
-      setHolidayName('');
-    }
-  }, "Odustani")), /*#__PURE__*/React.createElement("div", {
+  }, "+ Novi unos"))), /*#__PURE__*/React.createElement("div", {
     className: "stats-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "stat-card"
@@ -5688,6 +5565,7 @@ function SihtaricaView(_ref29) {
     godisnji,
     setGodisnji,
     holidays,
+    setHolidays,
     wName,
     dName
   } = _ref29;
@@ -5702,8 +5580,10 @@ function SihtaricaView(_ref29) {
     type: 'Godišnji odmor',
     note: ''
   });
-  const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji'
-
+  const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji' | 'praznici'
+  const [holidayInput, setHolidayInput] = useState(false);
+  const [holidayName, setHolidayName] = useState('');
+  const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
   const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Slobodan dan', 'Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': {
@@ -6011,7 +5891,7 @@ function SihtaricaView(_ref29) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref32 => {
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['praznici', '🎉 Praznici']].map(_ref32 => {
     let [k, l] = _ref32;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
@@ -6026,7 +5906,7 @@ function SihtaricaView(_ref29) {
         color: sihtView === k ? 'white' : 'var(--text-muted)'
       }
     }, l);
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), sihtView !== 'praznici' && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -6099,7 +5979,158 @@ function SihtaricaView(_ref29) {
   }, w.name))), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm",
     onClick: () => window.print()
-  }, "\uD83D\uDDA8\uFE0F \u0160tampaj")), sihtView === 'mjesecni' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDDA8\uFE0F \u0160tampaj")), sihtView === 'praznici' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      marginBottom: '1rem',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "form-input",
+    value: holidayDate,
+    onChange: e => setHolidayDate(e.target.value),
+    style: {
+      fontSize: '0.85rem',
+      padding: '0.35rem 0.5rem'
+    }
+  }), !holidayInput ? /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: () => {
+      setHolidayInput(true);
+      setHolidayName('');
+    }
+  }, "+ Dodaj praznik") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    className: "form-input",
+    placeholder: "Naziv praznika (npr. Bajram, Nova godina...)",
+    value: holidayName,
+    onChange: e => setHolidayName(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') {
+        const name = holidayName.trim();
+        if (!name) return alert('Unesite naziv praznika!');
+        setHolidays(h => ({
+          ...h,
+          [holidayDate]: name
+        }));
+        setHolidayInput(false);
+        setHolidayName('');
+      }
+      if (e.key === 'Escape') {
+        setHolidayInput(false);
+        setHolidayName('');
+      }
+    },
+    style: {
+      flex: 1,
+      fontSize: '0.85rem',
+      padding: '0.35rem 0.5rem',
+      minWidth: 200
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: () => {
+      const name = holidayName.trim();
+      if (!name) return alert('Unesite naziv praznika!');
+      setHolidays(h => ({
+        ...h,
+        [holidayDate]: name
+      }));
+      setHolidayInput(false);
+      setHolidayName('');
+    }
+  }, "Spremi"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    onClick: () => {
+      setHolidayInput(false);
+      setHolidayName('');
+    }
+  }, "Odustani"))), Object.keys(holidays || {}).length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: '2rem',
+      color: 'var(--text-muted)',
+      fontSize: '0.9rem'
+    }
+  }, "Nema upisanih praznika. Kliknite \"+ Dodaj praznik\" za unos.") : /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "table",
+    style: {
+      width: '100%',
+      fontSize: '0.85rem'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      padding: '0.5rem 0.75rem'
+    }
+  }, "Datum"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      padding: '0.5rem 0.75rem'
+    }
+  }, "Dan"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      padding: '0.5rem 0.75rem'
+    }
+  }, "Naziv praznika"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      padding: '0.5rem 0.75rem',
+      width: 80
+    }
+  }))), /*#__PURE__*/React.createElement("tbody", null, Object.entries(holidays).sort((_ref33, _ref34) => {
+    let [a] = _ref33;
+    let [b] = _ref34;
+    return a.localeCompare(b);
+  }).map(_ref35 => {
+    let [date, name] = _ref35;
+    const d = new Date(date + 'T00:00:00');
+    const dayNames = ['Nedjelja', 'Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota'];
+    return /*#__PURE__*/React.createElement("tr", {
+      key: date
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: '0.5rem 0.75rem',
+        fontFamily: 'var(--mono)'
+      }
+    }, date), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: '0.5rem 0.75rem'
+      }
+    }, dayNames[d.getDay()]), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: '0.5rem 0.75rem',
+        fontWeight: 600
+      }
+    }, "\uD83C\uDF89 ", name), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: '0.5rem 0.75rem',
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-sm",
+      onClick: () => {
+        if (confirm(`Ukloniti praznik "${name}" (${date})?`)) setHolidays(h => {
+          const n = {
+            ...h
+          };
+          delete n[date];
+          return n;
+        });
+      },
+      style: {
+        background: '#c53030',
+        color: 'white',
+        border: 'none',
+        fontSize: '0.72rem'
+      }
+    }, "Ukloni")));
+  }))))), sihtView === 'mjesecni' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '0.5rem',
@@ -6138,8 +6169,8 @@ function SihtaricaView(_ref29) {
       color: 'var(--text-muted)',
       fontWeight: 700
     }
-  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref33 => {
-    let [k, v] = _ref33;
+  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref36 => {
+    let [k, v] = _ref36;
     return /*#__PURE__*/React.createElement("span", {
       key: k,
       style: {
@@ -6644,8 +6675,8 @@ function SihtaricaView(_ref29) {
         borderRadius: 3,
         padding: '0.1rem 0.4rem'
       }
-    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref34 => {
-      let [k, v] = _ref34;
+    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref37 => {
+      let [k, v] = _ref37;
       const oc = ODSUTNOST_COLOR[k] || {
         bg: '#f0f0f0',
         color: '#555',
@@ -6852,12 +6883,12 @@ function SihtaricaView(_ref29) {
           fontSize: '0.75rem',
           width: '100%'
         }
-      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref35 => {
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref38 => {
         let {
           d,
           dw,
           wknd
-        } = _ref35;
+        } = _ref38;
         return /*#__PURE__*/React.createElement("th", {
           key: d,
           style: {
@@ -6876,13 +6907,13 @@ function SihtaricaView(_ref29) {
             opacity: 0.7
           }
         }, 'NPUSČPS'[dw]));
-      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref36 => {
+      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref39 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref36;
+        } = _ref39;
         let bg = wknd ? '#f0ede6' : 'white';
         let content = wknd ? /*#__PURE__*/React.createElement("span", {
           style: {
@@ -6944,13 +6975,13 @@ function SihtaricaView(_ref29) {
           gridTemplateColumns: `repeat(${mo.days.length}, 1fr)`,
           gap: '1.5px'
         }
-      }, mo.days.map(_ref37 => {
+      }, mo.days.map(_ref40 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref37;
+        } = _ref40;
         let bg,
           color,
           label = String(d),
@@ -7011,8 +7042,8 @@ function SihtaricaView(_ref29) {
           padding: '0.1rem 0.4rem',
           fontWeight: 700
         }
-      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref38 => {
-        let [k, v] = _ref38;
+      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref41 => {
+        let [k, v] = _ref41;
         const oc = ODSUTNOST_COLOR[k] || {
           bg: '#f0f0f0',
           color: '#555',
