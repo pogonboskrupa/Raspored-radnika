@@ -499,6 +499,9 @@ function App() {
 
   // Save schedule
   const saveSchedule = (data, isEdit) => {
+    if (!isEdit && holidays[data.date]) {
+      return alert(`Nije moguće rasporediti radnika na ${data.date} — praznik: "${holidays[data.date]}"`);
+    }
     if (isEdit) {
       const old = schedules.find(s => s.id === data.id);
       setSchedules(prev => prev.map(s => s.id === data.id ? data : s));
@@ -530,6 +533,9 @@ function App() {
     setHistoryModal(null);
   };
   const copyFromDate = fromDate => {
+    if (holidays[selectedDate]) {
+      return alert(`Nije moguće kopirati raspored na ${selectedDate} — praznik: "${holidays[selectedDate]}"`);
+    }
     const source = schedules.filter(s => s.date === fromDate);
     const newOnes = source.map(s => ({
       ...s,
@@ -701,6 +707,7 @@ function App() {
     handlePrint: handlePrint,
     yesterday: yesterday(),
     godisnji: godisnji,
+    holidays: holidays,
     onWorkerClick: onWorkerClick
   }), activeTab === 'radnici' && /*#__PURE__*/React.createElement(WorkersView, {
     workers: workers,
@@ -852,9 +859,11 @@ function ScheduleView(_ref2) {
     copyFromDate,
     handlePrint,
     yesterday,
+    holidays,
     onWorkerClick
   } = _ref2;
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const currentHoliday = holidays?.[selectedDate] || null;
   const isSaturday = new Date(selectedDate + 'T00:00:00').getDay() === 6;
   const hasSaturdayEntries = isSaturday && daySchedules.length > 0;
   const [saturdayWorkMode, setSaturdayWorkMode] = useState(false);
@@ -920,7 +929,7 @@ function ScheduleView(_ref2) {
       flexWrap: 'wrap',
       alignItems: 'center'
     }
-  }, (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+  }, !currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm no-print",
     onClick: () => copyFromDate(yesterday)
   }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("button", {
@@ -929,7 +938,43 @@ function ScheduleView(_ref2) {
   }, "\uD83D\uDDA8\uFE0F Print"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm no-print",
     onClick: onAdd
-  }, "+ Novi unos")))), isSaturday && !saturdayWorkMode && !hasSaturdayEntries && /*#__PURE__*/React.createElement("div", {
+  }, "+ Novi unos")))), currentHoliday && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: '3rem 1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '3rem',
+      marginBottom: '0.75rem'
+    }
+  }, "\uD83C\uDF89"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '1.1rem',
+      fontWeight: 700,
+      color: '#e65100',
+      marginBottom: '0.5rem'
+    }
+  }, "PRAZNIK"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '1rem',
+      fontWeight: 600,
+      color: '#bf360c',
+      marginBottom: '0.5rem'
+    }
+  }, currentHoliday), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '0.85rem'
+    }
+  }, selectedDate), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '0.82rem',
+      marginTop: '0.75rem',
+      fontStyle: 'italic'
+    }
+  }, "Na praznik nije mogu\u0107e rasporediti radnike.")), isSaturday && !saturdayWorkMode && !hasSaturdayEntries && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
       padding: '3rem 1rem'
@@ -959,7 +1004,7 @@ function ScheduleView(_ref2) {
       fontSize: '0.9rem',
       padding: '0.5rem 1.2rem'
     }
-  }, "\uD83D\uDEE0\uFE0F Dodaj kao radni dan")), (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDEE0\uFE0F Dodaj kao radni dan")), !currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "stats-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "stat-card"

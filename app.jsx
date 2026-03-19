@@ -251,6 +251,9 @@ function App() {
 
   // Save schedule
   const saveSchedule = (data, isEdit) => {
+    if (!isEdit && holidays[data.date]) {
+      return alert(`Nije moguće rasporediti radnika na ${data.date} — praznik: "${holidays[data.date]}"`);
+    }
     if (isEdit) {
       const old = schedules.find(s => s.id === data.id);
       setSchedules(prev => prev.map(s => s.id === data.id ? data : s));
@@ -282,6 +285,9 @@ function App() {
   };
 
   const copyFromDate = (fromDate) => {
+    if (holidays[selectedDate]) {
+      return alert(`Nije moguće kopirati raspored na ${selectedDate} — praznik: "${holidays[selectedDate]}"`);
+    }
     const source = schedules.filter(s => s.date === fromDate);
     const newOnes = source.map(s => ({ ...s, id: uid(), date: selectedDate }));
     setSchedules(prev => {
@@ -377,6 +383,7 @@ function App() {
               handlePrint={handlePrint}
               yesterday={yesterday()}
               godisnji={godisnji}
+              holidays={holidays}
               onWorkerClick={onWorkerClick}
             />
           )}
@@ -492,9 +499,10 @@ function App() {
 function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, workers, departments, vehicles,
   wName, dName, totalToday, statsByJob, statsByDept,
   sidebarFilter, setSidebarFilter, godisnji,
-  prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday, onWorkerClick }) {
+  prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday, holidays, onWorkerClick }) {
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const currentHoliday = holidays?.[selectedDate] || null;
   const isSaturday = new Date(selectedDate+'T00:00:00').getDay() === 6;
   const hasSaturdayEntries = isSaturday && daySchedules.length > 0;
   const [saturdayWorkMode, setSaturdayWorkMode] = useState(false);
@@ -537,7 +545,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </div>
         </div>
         <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
-          {(!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
+          {!currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
             <button className="btn btn-secondary btn-sm no-print" onClick={() => copyFromDate(yesterday)}>
               📋 Kopiraj jučer
             </button>
@@ -550,6 +558,19 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </>}
         </div>
       </div>
+
+      {/* HOLIDAY NOTICE */}
+      {currentHoliday && (
+        <div style={{textAlign:'center',padding:'3rem 1rem'}}>
+          <div style={{fontSize:'3rem',marginBottom:'0.75rem'}}>🎉</div>
+          <div style={{fontSize:'1.1rem',fontWeight:700,color:'#e65100',marginBottom:'0.5rem'}}>PRAZNIK</div>
+          <div style={{fontSize:'1rem',fontWeight:600,color:'#bf360c',marginBottom:'0.5rem'}}>{currentHoliday}</div>
+          <div style={{color:'var(--text-muted)',fontSize:'0.85rem'}}>{selectedDate}</div>
+          <div style={{color:'var(--text-muted)',fontSize:'0.82rem',marginTop:'0.75rem',fontStyle:'italic'}}>
+            Na praznik nije moguće rasporediti radnike.
+          </div>
+        </div>
+      )}
 
       {/* SATURDAY NOTICE */}
       {isSaturday && !saturdayWorkMode && !hasSaturdayEntries && (
@@ -564,7 +585,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
         </div>
       )}
 
-      {(!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
+      {!currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
       {/* STATS */}
       <div className="stats-row">
         <div className="stat-card">
