@@ -65,6 +65,14 @@ const WORKER_CATEGORIES = [{
   color: '#5a3d00',
   pale: '#fdf5e8',
   border: '#d4b06a'
+}, {
+  id: 'vozac',
+  label: 'Vozači',
+  short: 'Vozač',
+  icon: '🚗',
+  color: '#2a6478',
+  pale: '#e4f0f5',
+  border: '#8bbdd4'
 },
 // legacy — kept for backwards compat
 {
@@ -78,7 +86,7 @@ const WORKER_CATEGORIES = [{
 }];
 
 // Columns shown in the Spisak tab (ordered)
-const SPISAK_COLUMNS = ['primac_panj', 'poslovoda_isk', 'poslovoda_uzg', 'otpremac', 'radnik_primka', 'pomocni', 'vlastita_rezija'];
+const SPISAK_COLUMNS = ['primac_panj', 'poslovoda_isk', 'poslovoda_uzg', 'otpremac', 'radnik_primka', 'pomocni', 'vlastita_rezija', 'vozac'];
 const getCatById = id => WORKER_CATEGORIES.find(c => c.id === id);
 const INITIAL_WORKERS = [
 // PRIMAČI (kolona B)
