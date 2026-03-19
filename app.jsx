@@ -1,5 +1,54 @@
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
+// ─── TOAST NOTIFIKACIJE ─────────────────────────────────────────────────────
+// Globalni sistem za prikazivanje grešaka korisniku
+const _toastListeners = [];
+let _toastId = 0;
+
+function showToast(message, type = 'error', duration = 5000) {
+  const id = ++_toastId;
+  const toast = { id, message, type, duration };
+  _toastListeners.forEach(fn => fn(toast));
+  return id;
+}
+
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    const handler = (toast) => {
+      setToasts(prev => [...prev, toast]);
+      if (toast.duration > 0) {
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== toast.id)), toast.duration);
+      }
+    };
+    _toastListeners.push(handler);
+    return () => { const i = _toastListeners.indexOf(handler); if (i >= 0) _toastListeners.splice(i, 1); };
+  }, []);
+
+  if (toasts.length === 0) return null;
+
+  return (
+    <div style={{position:'fixed',bottom:20,right:20,zIndex:99999,display:'flex',flexDirection:'column',gap:8,maxWidth:360}}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          padding:'0.6rem 1rem',borderRadius:10,fontSize:'0.8rem',fontWeight:600,
+          boxShadow:'0 4px 20px rgba(0,0,0,0.18)',animation:'fadeIn 0.2s ease',
+          display:'flex',alignItems:'center',gap:8,
+          background: t.type === 'error' ? '#fde8e8' : t.type === 'warn' ? '#fef3cd' : '#e8f5e9',
+          color: t.type === 'error' ? '#c53030' : t.type === 'warn' ? '#856404' : '#2d5a27',
+          border: `1px solid ${t.type === 'error' ? '#f5c6cb' : t.type === 'warn' ? '#ffeeba' : '#c3e6cb'}`
+        }}>
+          <span>{t.type === 'error' ? '⚠️' : t.type === 'warn' ? '⚡' : '✅'}</span>
+          <span style={{flex:1}}>{t.message}</span>
+          <button onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:'1rem',opacity:0.5,padding:0}}>×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── DEMO DATA ───────────────────────────────────────────────────────────────
 // Kategorije radnika u šumariji
 const WORKER_CATEGORIES = [
@@ -100,8 +149,21 @@ function useStorage(key, init) {
       }
       const s = localStorage.getItem(key);
       return s ? JSON.parse(s) : init;
-    } catch { return init; }
+    } catch (e) {
+      console.error('localStorage čitanje neuspjelo za ' + key, e);
+      showToast('Greška pri čitanju lokalnih podataka (' + key.replace('sumarija_', '') + ')', 'warn');
+      return init;
+    }
   });
+
+  const safeLocalWrite = useCallback((k, data) => {
+    try {
+      localStorage.setItem(k, JSON.stringify(data));
+    } catch (e) {
+      console.error('localStorage pisanje neuspjelo za ' + k, e);
+      showToast('Podaci NISU spašeni lokalno — memorija puna ili nedostupna!', 'error');
+    }
+  }, []);
 
   // Firebase real-time listener
   useEffect(() => {
@@ -110,10 +172,18 @@ function useStorage(key, init) {
     const handler = ref.on('value', snap => {
       const data = snap.val();
       if (data !== null && data !== undefined) {
-        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-        setVal(parsed);
-        try { localStorage.setItem(key, JSON.stringify(parsed)); } catch {}
+        try {
+          const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+          setVal(parsed);
+          safeLocalWrite(key, parsed);
+        } catch (e) {
+          console.error('Firebase parse greška za ' + key, e);
+          showToast('Greška pri obradi podataka sa servera (' + key.replace('sumarija_', '') + ')', 'error');
+        }
       }
+    }, (error) => {
+      console.error('Firebase listener greška za ' + key, error);
+      showToast('Izgubljena veza sa serverom — radite u offline modu', 'warn');
     });
     return () => ref.off('value', handler);
   }, [key]);
@@ -122,20 +192,21 @@ function useStorage(key, init) {
   const setValAndSync = useCallback((updater) => {
     setVal(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      // Write to localStorage always
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
-      // Write to Firebase if enabled
+      safeLocalWrite(key, next);
       if (FIREBASE_ENABLED) {
-        fbRef(key).set(JSON.stringify(next)).catch(e => console.warn('Firebase write error:', e));
+        fbRef(key).set(JSON.stringify(next)).catch(e => {
+          console.error('Firebase pisanje neuspjelo za ' + key, e);
+          showToast('Podaci NISU spašeni na server! Provjerite internet vezu.', 'error');
+        });
       }
       return next;
     });
-  }, [key]);
+  }, [key, safeLocalWrite]);
 
   return [val, FIREBASE_ENABLED ? setValAndSync : (updater) => {
     setVal(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+      safeLocalWrite(key, next);
       return next;
     });
   }];
@@ -164,6 +235,62 @@ const fmtTime = ts => {
   return d.toLocaleTimeString('bs-BA', { hour:'2-digit', minute:'2-digit' });
 };
 
+// ─── ERROR BOUNDARY ─────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error('ErrorBoundary uhvatio grešku:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{minHeight:'100vh',display:'flex',justifyContent:'center',alignItems:'center',background:'linear-gradient(135deg, #fde8e8 0%, #fff5f5 100%)',padding:'1rem'}}>
+          <div style={{background:'white',borderRadius:16,boxShadow:'0 8px 32px rgba(0,0,0,0.12)',padding:'2rem',maxWidth:480,width:'100%',textAlign:'center'}}>
+            <div style={{fontSize:'3rem',marginBottom:'0.5rem'}}>⚠️</div>
+            <h2 style={{margin:'0 0 0.5rem',color:'#c53030',fontSize:'1.1rem',fontFamily:'var(--mono)'}}>
+              Došlo je do greške
+            </h2>
+            <p style={{color:'#666',fontSize:'0.85rem',margin:'0 0 1rem',lineHeight:1.5}}>
+              Aplikacija je naišla na neočekivanu grešku. Vaši podaci su sigurni.
+            </p>
+
+            {/* Error details (collapsible) */}
+            <details style={{textAlign:'left',marginBottom:'1rem',background:'#f8f8f8',borderRadius:8,padding:'0.5rem 0.75rem',fontSize:'0.72rem'}}>
+              <summary style={{cursor:'pointer',fontWeight:600,color:'#888',marginBottom:'0.25rem'}}>Tehnički detalji</summary>
+              <pre style={{whiteSpace:'pre-wrap',wordBreak:'break-word',color:'#c53030',margin:'0.25rem 0',maxHeight:200,overflow:'auto'}}>
+                {this.state.error && this.state.error.toString()}
+                {this.state.errorInfo && this.state.errorInfo.componentStack}
+              </pre>
+            </details>
+
+            <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+              <button onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+                style={{padding:'0.6rem 1.2rem',background:'var(--green, #2d5a27)',color:'white',border:'none',borderRadius:8,fontSize:'0.85rem',fontWeight:700,cursor:'pointer'}}>
+                Pokušaj ponovo
+              </button>
+              <button onClick={() => window.location.reload()}
+                style={{padding:'0.6rem 1.2rem',background:'#e2e8f0',color:'#4a5568',border:'none',borderRadius:8,fontSize:'0.85rem',fontWeight:700,cursor:'pointer'}}>
+                Osvježi stranicu
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 // ─── LOGIN / AUTH ────────────────────────────────────────────────────────────
 const AUTH_KEY = 'sumarija_auth';
 const AUTH_SESSION_KEY = 'sumarija_session';
@@ -4239,4 +4366,9 @@ function AppMain({ onLogout }) {
 
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ErrorBoundary>
+    <App />
+    <ToastContainer />
+  </ErrorBoundary>
+);
