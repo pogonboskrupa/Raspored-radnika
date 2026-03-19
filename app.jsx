@@ -292,11 +292,13 @@ function App() {
   };
 
   const prevDay = () => {
-    const d = new Date(selectedDate); d.setDate(d.getDate()-1);
+    const d = new Date(selectedDate);
+    do { d.setDate(d.getDate()-1); } while (d.getDay()===0); // skip Sunday
     setSelectedDate(d.toISOString().split('T')[0]);
   };
   const nextDay = () => {
-    const d = new Date(selectedDate); d.setDate(d.getDate()+1);
+    const d = new Date(selectedDate);
+    do { d.setDate(d.getDate()+1); } while (d.getDay()===0); // skip Sunday
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
@@ -493,6 +495,10 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday, onWorkerClick }) {
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const isSaturday = new Date(selectedDate+'T00:00:00').getDay() === 6;
+  const hasSaturdayEntries = isSaturday && daySchedules.length > 0;
+  const [saturdayWorkMode, setSaturdayWorkMode] = useState(false);
+  useEffect(() => { setSaturdayWorkMode(false); }, [selectedDate]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
   // Group by dept — exclude Otprema
@@ -531,19 +537,34 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </div>
         </div>
         <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
-          <button className="btn btn-secondary btn-sm no-print" onClick={() => copyFromDate(yesterday)}>
-            📋 Kopiraj jučer
-          </button>
-          <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>
-            🖨️ Print
-          </button>
-          <button className="btn btn-primary btn-sm no-print" onClick={onAdd}>
-            + Novi unos
-          </button>
+          {(!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
+            <button className="btn btn-secondary btn-sm no-print" onClick={() => copyFromDate(yesterday)}>
+              📋 Kopiraj jučer
+            </button>
+            <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>
+              🖨️ Print
+            </button>
+            <button className="btn btn-primary btn-sm no-print" onClick={onAdd}>
+              + Novi unos
+            </button>
+          </>}
         </div>
       </div>
 
+      {/* SATURDAY NOTICE */}
+      {isSaturday && !saturdayWorkMode && !hasSaturdayEntries && (
+        <div style={{textAlign:'center',padding:'3rem 1rem'}}>
+          <div style={{fontSize:'3rem',marginBottom:'0.75rem'}}>📅</div>
+          <div style={{fontSize:'1.1rem',fontWeight:700,color:'var(--text)',marginBottom:'0.5rem'}}>Subota, {selectedDate}</div>
+          <div style={{color:'var(--text-muted)',marginBottom:'1.5rem',fontSize:'0.9rem'}}>Subota je neradni dan.</div>
+          <button className="btn btn-primary no-print" onClick={()=>setSaturdayWorkMode(true)}
+            style={{fontSize:'0.9rem',padding:'0.5rem 1.2rem'}}>
+            🛠️ Dodaj kao radni dan
+          </button>
+        </div>
+      )}
 
+      {(!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
       {/* STATS */}
       <div className="stats-row">
         <div className="stat-card">
@@ -873,6 +894,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </div>
         );
       })()}
+      </>}
     </div>
   );
 }

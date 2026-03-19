@@ -544,12 +544,16 @@ function App() {
   };
   const prevDay = () => {
     const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
+    do {
+      d.setDate(d.getDate() - 1);
+    } while (d.getDay() === 0); // skip Sunday
     setSelectedDate(d.toISOString().split('T')[0]);
   };
   const nextDay = () => {
     const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
+    do {
+      d.setDate(d.getDate() + 1);
+    } while (d.getDay() === 0); // skip Sunday
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
@@ -851,6 +855,12 @@ function ScheduleView(_ref2) {
     onWorkerClick
   } = _ref2;
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const isSaturday = new Date(selectedDate + 'T00:00:00').getDay() === 6;
+  const hasSaturdayEntries = isSaturday && daySchedules.length > 0;
+  const [saturdayWorkMode, setSaturdayWorkMode] = useState(false);
+  useEffect(() => {
+    setSaturdayWorkMode(false);
+  }, [selectedDate]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
   // Group by dept — exclude Otprema
@@ -910,7 +920,7 @@ function ScheduleView(_ref2) {
       flexWrap: 'wrap',
       alignItems: 'center'
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm no-print",
     onClick: () => copyFromDate(yesterday)
   }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("button", {
@@ -919,7 +929,37 @@ function ScheduleView(_ref2) {
   }, "\uD83D\uDDA8\uFE0F Print"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm no-print",
     onClick: onAdd
-  }, "+ Novi unos"))), /*#__PURE__*/React.createElement("div", {
+  }, "+ Novi unos")))), isSaturday && !saturdayWorkMode && !hasSaturdayEntries && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: '3rem 1rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '3rem',
+      marginBottom: '0.75rem'
+    }
+  }, "\uD83D\uDCC5"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '1.1rem',
+      fontWeight: 700,
+      color: 'var(--text)',
+      marginBottom: '0.5rem'
+    }
+  }, "Subota, ", selectedDate), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--text-muted)',
+      marginBottom: '1.5rem',
+      fontSize: '0.9rem'
+    }
+  }, "Subota je neradni dan."), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary no-print",
+    onClick: () => setSaturdayWorkMode(true),
+    style: {
+      fontSize: '0.9rem',
+      padding: '0.5rem 1.2rem'
+    }
+  }, "\uD83D\uDEE0\uFE0F Dodaj kao radni dan")), (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "stats-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "stat-card"
@@ -1574,7 +1614,7 @@ function ScheduleView(_ref2) {
         }
       }, s.short));
     }))));
-  })());
+  })()));
 }
 
 // ─── RIGHT PANEL ──────────────────────────────────────────────────────────────
