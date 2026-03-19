@@ -704,10 +704,11 @@ function App() {
       if (confirm('Obrisati ovaj zapis?')) deleteSchedule(id);
     },
     onHistory: s => setHistoryModal(s),
-    onAssignVehicle: (rowId, vehicleId) => {
+    onAssignVehicle: (rowId, vehicleIds) => {
       setSchedules(prev => prev.map(s => s.id === rowId ? {
         ...s,
-        vehicleId
+        vehicleIds,
+        vehicleId: vehicleIds[0] || ''
       } : s));
     },
     copyFromDate: copyFromDate,
@@ -893,6 +894,13 @@ function ScheduleView(_ref2) {
     return () => document.removeEventListener('mousedown', handler);
   }, [vehiclePopup]);
 
+  // Helper: get vehicleIds array from schedule (backward compat with single vehicleId)
+  const getVehicleIds = row => {
+    if (row.vehicleIds && row.vehicleIds.length > 0) return row.vehicleIds;
+    if (row.vehicleId) return [row.vehicleId];
+    return [];
+  };
+
   // Available vehicles: only 'vozno' status
   const availableVehicles = useMemo(() => (vehicles || []).filter(v => v.status === 'vozno'), [vehicles]);
 
@@ -903,14 +911,15 @@ function ScheduleView(_ref2) {
   const vehicleUsageMap = useMemo(() => {
     const m = {};
     daySchedules.forEach(s => {
-      if (s.vehicleId) {
-        if (!m[s.vehicleId]) m[s.vehicleId] = {
+      const vIds = s.vehicleIds?.length ? s.vehicleIds : s.vehicleId ? [s.vehicleId] : [];
+      vIds.forEach(vid => {
+        if (!m[vid]) m[vid] = {
           total: 0,
           rows: []
         };
-        m[s.vehicleId].total += (s.allWorkers || []).length;
-        m[s.vehicleId].rows.push(s.id);
-      }
+        m[vid].total += (s.allWorkers || []).length;
+        m[vid].rows.push(s.id);
+      });
     });
     return m;
   }, [daySchedules]);
@@ -918,7 +927,7 @@ function ScheduleView(_ref2) {
     const rect = e.currentTarget.getBoundingClientRect();
     setVehiclePopup(vehiclePopup?.rowId === row.id ? null : {
       rowId: row.id,
-      vehicleId: row.vehicleId || '',
+      vehicleIds: getVehicleIds(row),
       rect
     });
   };
@@ -1177,58 +1186,71 @@ function ScheduleView(_ref2) {
       onClick: e => openVehiclePopup(row, e),
       className: "no-print"
     }, (() => {
-      const v = vehicles?.find(v => v.id === row.vehicleId);
-      if (!v) return /*#__PURE__*/React.createElement("span", {
+      const vIds = getVehicleIds(row);
+      if (vIds.length === 0) return /*#__PURE__*/React.createElement("span", {
         style: {
           color: 'var(--green)',
           fontWeight: 600,
           fontSize: '0.75rem'
         }
       }, "+ Dodijeli vozilo");
-      const driver = workers.find(w => w.id === v.driverId);
-      const usage = vehicleUsageMap[v.id];
-      const totalInVehicle = usage?.total || 0;
-      const cap = v.brojMjesta || 0;
-      const over = totalInVehicle > cap;
       return /*#__PURE__*/React.createElement("div", {
         style: {
           display: 'flex',
           flexDirection: 'column',
-          gap: '1px'
+          gap: '3px'
         }
-      }, /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontWeight: 600
-        }
-      }, "\uD83D\uDE97 ", v.registracija), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.7rem',
-          color: 'var(--text-muted)'
-        }
-      }, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), driver && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.7rem',
-          color: '#2a6478'
-        }
-      }, "\uD83E\uDDD1\u200D\u2708\uFE0F ", driver.name), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.65rem',
-          fontWeight: 700,
-          marginTop: '2px',
-          color: over ? '#c53030' : totalInVehicle === cap ? '#b5620a' : '#2d5a27',
-          background: over ? '#fde8e8' : totalInVehicle === cap ? '#fdf0e0' : '#e8f5e9',
-          border: `1px solid ${over ? '#f5b5b5' : totalInVehicle === cap ? '#e8c17a' : '#a5d6a7'}`,
-          borderRadius: 3,
-          padding: '0.1rem 0.3rem',
-          display: 'inline-block'
-        }
-      }, over ? '⚠️' : '👥', " ", totalInVehicle, "/", cap, over && ` (+${totalInVehicle - cap})`), over && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.6rem',
-          color: '#c53030',
-          fontWeight: 600
-        }
-      }, "Prekora\u010Den kapacitet!"));
+      }, vIds.map(vid => {
+        const v = vehicles?.find(v => v.id === vid);
+        if (!v) return null;
+        const driver = workers.find(w => w.id === v.driverId);
+        const usage = vehicleUsageMap[v.id];
+        const totalInVehicle = usage?.total || 0;
+        const cap = v.brojMjesta || 0;
+        const over = totalInVehicle > cap;
+        return /*#__PURE__*/React.createElement("div", {
+          key: vid,
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1px',
+            paddingBottom: '2px',
+            borderBottom: vIds.length > 1 ? '1px dotted var(--border)' : 'none'
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontWeight: 600
+          }
+        }, "\uD83D\uDE97 ", v.registracija), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: '0.7rem',
+            color: 'var(--text-muted)'
+          }
+        }, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), driver && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: '0.7rem',
+            color: '#2a6478'
+          }
+        }, "\uD83E\uDDD1\u200D\u2708\uFE0F ", driver.name), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            marginTop: '1px',
+            color: over ? '#c53030' : totalInVehicle === cap ? '#b5620a' : '#2d5a27',
+            background: over ? '#fde8e8' : totalInVehicle === cap ? '#fdf0e0' : '#e8f5e9',
+            border: `1px solid ${over ? '#f5b5b5' : totalInVehicle === cap ? '#e8c17a' : '#a5d6a7'}`,
+            borderRadius: 3,
+            padding: '0.1rem 0.3rem',
+            display: 'inline-block'
+          }
+        }, over ? '⚠️' : '👥', " ", totalInVehicle, "/", cap, over && ` (+${totalInVehicle - cap})`), over && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: '0.6rem',
+            color: '#c53030',
+            fontWeight: 600
+          }
+        }, "Prekora\u010Den kapacitet!"));
+      }));
     })())), /*#__PURE__*/React.createElement("td", {
       "data-label": "Napomena",
       style: {
@@ -1355,12 +1377,7 @@ function ScheduleView(_ref2) {
     }, /*#__PURE__*/React.createElement("span", {
       className: "role-dot"
     }), wName(wId)))), rows.map(row => {
-      const v = vehicles?.find(x => x.id === row.vehicleId);
-      const driver = v ? workers.find(w => w.id === v.driverId) : null;
-      const usage = v ? vehicleUsageMap[v.id] : null;
-      const totalInVehicle = usage?.total || 0;
-      const cap = v?.brojMjesta || 0;
-      const over = v && totalInVehicle > cap;
+      const vIds = getVehicleIds(row);
       return /*#__PURE__*/React.createElement("div", {
         key: row.id,
         style: {
@@ -1369,45 +1386,58 @@ function ScheduleView(_ref2) {
       }, /*#__PURE__*/React.createElement("div", {
         className: "no-print",
         style: {
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          fontSize: '0.75rem',
-          color: 'var(--text-muted)',
           cursor: 'pointer'
         },
         onClick: e => openVehiclePopup(row, e)
-      }, v ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE97"), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontWeight: 600
-        }
-      }, v.registracija), /*#__PURE__*/React.createElement("span", null, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), driver && /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: '#2a6478'
-        }
-      }, "(", driver.name, ")"), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontWeight: 700,
-          fontSize: '0.65rem',
-          color: over ? '#c53030' : '#2d5a27',
-          background: over ? '#fde8e8' : '#e8f5e9',
-          border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,
-          borderRadius: 3,
-          padding: '0.1rem 0.3rem'
-        }
-      }, over ? '⚠️' : '👥', " ", totalInVehicle, "/", cap), over && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.6rem',
-          color: '#c53030',
-          fontWeight: 600
-        }
-      }, "Prekora\u010Den!")) : /*#__PURE__*/React.createElement("span", {
+      }, vIds.length === 0 ? /*#__PURE__*/React.createElement("span", {
         style: {
           color: 'var(--green)',
           fontWeight: 600,
           fontSize: '0.75rem'
         }
-      }, "+ Dodijeli vozilo")));
+      }, "+ Dodijeli vozilo") : /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.3rem'
+        }
+      }, vIds.map(vid => {
+        const v = vehicles?.find(x => x.id === vid);
+        if (!v) return null;
+        const driver = workers.find(w => w.id === v.driverId);
+        const usage = vehicleUsageMap[v.id];
+        const totalInVehicle = usage?.total || 0;
+        const cap = v.brojMjesta || 0;
+        const over = totalInVehicle > cap;
+        return /*#__PURE__*/React.createElement("span", {
+          key: vid,
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            fontSize: '0.75rem',
+            color: 'var(--text-muted)'
+          }
+        }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE97"), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontWeight: 600
+          }
+        }, v.registracija), /*#__PURE__*/React.createElement("span", null, v.tipVozila), driver && /*#__PURE__*/React.createElement("span", {
+          style: {
+            color: '#2a6478'
+          }
+        }, "(", driver.name, ")"), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontWeight: 700,
+            fontSize: '0.65rem',
+            color: over ? '#c53030' : '#2d5a27',
+            background: over ? '#fde8e8' : '#e8f5e9',
+            border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,
+            borderRadius: 3,
+            padding: '0.1rem 0.3rem'
+          }
+        }, over ? '⚠️' : '👥', " ", totalInVehicle, "/", cap));
+      }))));
     }), rows.map(row => /*#__PURE__*/React.createElement("div", {
       key: row.id + '-act',
       style: {
@@ -1761,16 +1791,16 @@ function ScheduleView(_ref2) {
     onClick: e => e.stopPropagation(),
     style: {
       position: 'fixed',
-      top: Math.min(vehiclePopup.rect?.bottom || 200, window.innerHeight - 380),
-      left: Math.min(Math.max(vehiclePopup.rect?.left || 100, 8), window.innerWidth - 340),
+      top: Math.min(vehiclePopup.rect?.bottom || 200, window.innerHeight - 420),
+      left: Math.min(Math.max(vehiclePopup.rect?.left || 100, 8), window.innerWidth - 350),
       zIndex: 9999,
       background: 'white',
       border: '1px solid var(--border)',
       borderRadius: 10,
       boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
       padding: '0.85rem',
-      width: 320,
-      maxHeight: '70vh',
+      width: 330,
+      maxHeight: '75vh',
       overflowY: 'auto'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -1782,7 +1812,7 @@ function ScheduleView(_ref2) {
       alignItems: 'center',
       justifyContent: 'space-between'
     }
-  }, "\uD83D\uDE97 Dodijeli vozilo", /*#__PURE__*/React.createElement("button", {
+  }, "\uD83D\uDE97 Vozila za ovaj raspored", /*#__PURE__*/React.createElement("button", {
     onClick: () => setVehiclePopup(null),
     style: {
       background: 'none',
@@ -1792,120 +1822,177 @@ function ScheduleView(_ref2) {
       color: 'var(--text-muted)',
       lineHeight: 1
     }
-  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+  }, "\u2715")), vehiclePopup.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: '0.5rem'
+      marginBottom: '0.6rem'
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
-      fontSize: '0.72rem',
+      fontSize: '0.7rem',
       fontWeight: 600,
       color: 'var(--text-muted)',
       display: 'block',
-      marginBottom: '0.25rem'
+      marginBottom: '0.3rem',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em'
     }
-  }, "\u0160ofer"), /*#__PURE__*/React.createElement("select", {
+  }, "Dodijeljena vozila (", vehiclePopup.vehicleIds.length, ")"), vehiclePopup.vehicleIds.map((vid, idx) => {
+    const v = availableVehicles.find(v => v.id === vid);
+    if (!v) return null;
+    const driver = workers.find(w => w.id === v.driverId);
+    const usage = vehicleUsageMap[v.id];
+    const totalInVehicle = usage?.total || 0;
+    const cap = v.brojMjesta || 0;
+    const over = totalInVehicle > cap;
+    return /*#__PURE__*/React.createElement("div", {
+      key: vid,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.4rem 0.5rem',
+        marginBottom: '0.25rem',
+        background: over ? '#fde8e8' : '#f0f7f0',
+        border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,
+        borderRadius: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        fontSize: '0.78rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600
+      }
+    }, "\uD83D\uDE97 ", v.registracija, " \u2014 ", v.tipVozila), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.68rem',
+        color: 'var(--text-muted)'
+      }
+    }, driver ? `🧑‍✈️ ${driver.name} · ` : '', v.brojMjesta, " mj.", /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        color: over ? '#c53030' : '#2d5a27',
+        marginLeft: '0.3rem'
+      }
+    }, "(", totalInVehicle, "/", cap, over ? ` +${totalInVehicle - cap}` : '', ")"))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setVehiclePopup(p => ({
+        ...p,
+        vehicleIds: p.vehicleIds.filter(id => id !== vid)
+      })),
+      style: {
+        background: '#c53030',
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        fontSize: '0.7rem',
+        padding: '0.2rem 0.4rem',
+        fontWeight: 600
+      }
+    }, "\u2715"));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: vehiclePopup.vehicleIds.length > 0 ? '1px solid var(--border)' : 'none',
+      paddingTop: vehiclePopup.vehicleIds.length > 0 ? '0.5rem' : 0
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.7rem',
+      fontWeight: 600,
+      color: 'var(--text-muted)',
+      display: 'block',
+      marginBottom: '0.3rem',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em'
+    }
+  }, "Dodaj vozilo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.68rem',
+      color: 'var(--text-muted)',
+      display: 'block',
+      marginBottom: '0.15rem'
+    }
+  }, "Po \u0161oferu:"), /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     style: {
       width: '100%',
       fontSize: '0.82rem',
-      padding: '0.4rem'
+      padding: '0.35rem'
     },
-    value: (() => {
-      const v = availableVehicles.find(v => v.id === vehiclePopup.vehicleId);
-      return v?.driverId || '';
-    })(),
+    value: "",
     onChange: e => {
       const dId = e.target.value;
-      if (!dId) {
+      if (!dId) return;
+      const defV = availableVehicles.find(v => v.driverId === dId);
+      if (defV && !vehiclePopup.vehicleIds.includes(defV.id)) {
         setVehiclePopup(p => ({
           ...p,
-          vehicleId: ''
+          vehicleIds: [...p.vehicleIds, defV.id]
         }));
-        return;
       }
-      const defV = availableVehicles.find(v => v.driverId === dId);
-      setVehiclePopup(p => ({
-        ...p,
-        vehicleId: defV?.id || ''
-      }));
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "\u2014 Odaberi \u0161ofera \u2014"), drivers.map(d => {
     const dv = availableVehicles.find(v => v.driverId === d.id);
+    const already = dv && vehiclePopup.vehicleIds.includes(dv.id);
     return /*#__PURE__*/React.createElement("option", {
       key: d.id,
-      value: d.id
-    }, d.name, dv ? ` (${dv.registracija})` : ' (bez vozila)');
+      value: d.id,
+      disabled: already || !dv
+    }, d.name, dv ? ` (${dv.registracija})` : ' (bez vozila)', already ? ' ✓' : '');
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: '0.5rem'
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
-      fontSize: '0.72rem',
-      fontWeight: 600,
+      fontSize: '0.68rem',
       color: 'var(--text-muted)',
       display: 'block',
-      marginBottom: '0.25rem'
+      marginBottom: '0.15rem'
     }
-  }, "Vozilo"), /*#__PURE__*/React.createElement("select", {
+  }, "Ili po vozilu:"), /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     style: {
       width: '100%',
       fontSize: '0.82rem',
-      padding: '0.4rem'
+      padding: '0.35rem'
     },
-    value: vehiclePopup.vehicleId,
-    onChange: e => setVehiclePopup(p => ({
-      ...p,
-      vehicleId: e.target.value
-    }))
+    value: "",
+    onChange: e => {
+      const vId = e.target.value;
+      if (vId && !vehiclePopup.vehicleIds.includes(vId)) {
+        setVehiclePopup(p => ({
+          ...p,
+          vehicleIds: [...p.vehicleIds, vId]
+        }));
+      }
+    }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Bez vozila \u2014"), availableVehicles.map(v => {
+  }, "\u2014 Odaberi vozilo \u2014"), availableVehicles.map(v => {
     const dr = workers.find(w => w.id === v.driverId);
     const usage = vehicleUsageMap[v.id];
     const totalUsed = usage?.total || 0;
     const cap = v.brojMjesta || 0;
-    const isFull = totalUsed >= cap;
+    const already = vehiclePopup.vehicleIds.includes(v.id);
     return /*#__PURE__*/React.createElement("option", {
       key: v.id,
-      value: v.id
-    }, v.registracija, " \u2014 ", v.tipVozila, " \xB7 ", v.brojMjesta, " mj.", dr ? ` (${dr.name})` : '', isFull ? ' ⚠️ PUNO' : ` (${totalUsed}/${cap})`);
-  }))), vehiclePopup.vehicleId && (() => {
-    const v = availableVehicles.find(v => v.id === vehiclePopup.vehicleId);
-    if (!v) return null;
-    const currentRow = daySchedules.find(s => s.id === vehiclePopup.rowId);
-    const currentRowWorkers = (currentRow?.allWorkers || []).length;
-    // Calculate what usage would be if we assign this vehicle
-    const otherUsage = daySchedules.filter(s => s.vehicleId === v.id && s.id !== vehiclePopup.rowId).reduce((sum, s) => sum + (s.allWorkers || []).length, 0);
-    const newTotal = otherUsage + currentRowWorkers;
-    const cap = v.brojMjesta || 0;
-    const over = newTotal > cap;
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: '0.6rem',
-        padding: '0.4rem 0.5rem',
-        borderRadius: 6,
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        background: over ? '#fde8e8' : newTotal === cap ? '#fdf0e0' : '#e8f5e9',
-        color: over ? '#c53030' : newTotal === cap ? '#b5620a' : '#2d5a27',
-        border: `1px solid ${over ? '#f5b5b5' : newTotal === cap ? '#e8c17a' : '#a5d6a7'}`
-      }
-    }, over ? '⚠️ Prekoračen kapacitet!' : '👥 Kapacitet:', " ", newTotal, "/", cap, over && ` (+${newTotal - cap} višak)`, otherUsage > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '0.68rem',
-        fontWeight: 400,
-        marginTop: '0.2rem'
-      }
-    }, "Vozilo koriste jo\u0161 ", otherUsage, " radnika u drugim ekipama"));
-  })(), /*#__PURE__*/React.createElement("div", {
+      value: v.id,
+      disabled: already
+    }, v.registracija, " \u2014 ", v.tipVozila, " \xB7 ", v.brojMjesta, " mj.", dr ? ` (${dr.name})` : '', " (", totalUsed, "/", cap, ")", already ? ' ✓' : '');
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      gap: '0.4rem'
+      gap: '0.4rem',
+      marginTop: '0.3rem'
     }
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm",
@@ -1913,13 +2000,10 @@ function ScheduleView(_ref2) {
       flex: 1
     },
     onClick: () => {
-      onAssignVehicle(vehiclePopup.rowId, vehiclePopup.vehicleId);
+      onAssignVehicle(vehiclePopup.rowId, vehiclePopup.vehicleIds);
       setVehiclePopup(null);
     }
-  }, "Spremi"), (() => {
-    const r = daySchedules.find(s => s.id === vehiclePopup.rowId);
-    return r?.vehicleId;
-  })() && /*#__PURE__*/React.createElement("button", {
+  }, "Spremi"), vehiclePopup.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("button", {
     className: "btn btn-sm",
     style: {
       background: '#c53030',
@@ -1927,10 +2011,10 @@ function ScheduleView(_ref2) {
       border: 'none'
     },
     onClick: () => {
-      onAssignVehicle(vehiclePopup.rowId, '');
+      onAssignVehicle(vehiclePopup.rowId, []);
       setVehiclePopup(null);
     }
-  }, "Ukloni"), /*#__PURE__*/React.createElement("button", {
+  }, "Ukloni sve"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm",
     onClick: () => setVehiclePopup(null)
   }, "Odustani")))), document.body));
@@ -2867,11 +2951,12 @@ function EntryModal(_ref15) {
     allWorkers: data.allWorkers || [],
     note: data.note || '',
     vehicleId: data.vehicleId || '',
+    vehicleIds: data.vehicleIds || (data.vehicleId ? [data.vehicleId] : []),
     overrides: data.overrides || []
   });
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
-  const [vehicleOverride, setVehicleOverride] = useState(!!data.vehicleId);
+  const [vehicleOverride, setVehicleOverride] = useState(!!data.vehicleId || data.vehicleIds && data.vehicleIds.length > 0);
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
@@ -2923,9 +3008,11 @@ function EntryModal(_ref15) {
       setConflicts(c);
       return;
     }
+    const finalVehicleIds = form.vehicleIds.length > 0 ? form.vehicleIds : effectiveVehicleId ? [effectiveVehicleId] : [];
     onSave({
       ...form,
-      vehicleId: effectiveVehicleId,
+      vehicleId: finalVehicleIds[0] || '',
+      vehicleIds: finalVehicleIds,
       overrides: forceOverride ? c : []
     });
   };
