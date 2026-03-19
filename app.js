@@ -719,7 +719,8 @@ function App() {
     dName: dName
   }), activeTab === 'spisak' && /*#__PURE__*/React.createElement(SpisakView, {
     workers: workers,
-    setWorkers: setWorkers
+    setWorkers: setWorkers,
+    vehicles: vehicles
   }), activeTab === 'vozila' && /*#__PURE__*/React.createElement(VozaciView, {
     vehicles: vehicles,
     setVehicles: setVehicles,
@@ -5021,7 +5022,8 @@ function HistorijaView(_ref27) {
 function SpisakView(_ref29) {
   let {
     workers,
-    setWorkers
+    setWorkers,
+    vehicles
   } = _ref29;
   // editing: { workerId, field } | null
   const [editing, setEditing] = useState(null);
@@ -5608,7 +5610,132 @@ function SpisakView(_ref29) {
         textAlign: 'center'
       }
     }, "Nema radnika")));
-  })), /*#__PURE__*/React.createElement("div", {
+  })), (() => {
+    const vozacCat = WORKER_CATEGORIES.find(c => c.id === 'vozac');
+    const allDrivers = workers.filter(w => w.category === 'vozac');
+    const activeDrivers = allDrivers.filter(w => w.status === 'aktivan');
+    const inactiveDrivers = allDrivers.filter(w => w.status !== 'aktivan');
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '1.5rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        marginBottom: '0.75rem',
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '1.2rem'
+      }
+    }, "\uD83D\uDE97"), /*#__PURE__*/React.createElement("div", {
+      className: "section-title",
+      style: {
+        margin: 0
+      }
+    }, "Voza\u010Di"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)'
+      }
+    }, activeDrivers.length, " aktivnih / ", allDrivers.length, " ukupno")), allDrivers.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '1.5rem',
+        textAlign: 'center',
+        color: 'var(--text-light)',
+        fontSize: '0.85rem',
+        background: 'var(--surface)',
+        borderRadius: 8,
+        border: '1px solid var(--border)'
+      }
+    }, "Nema voza\u010Da. Dodajte voza\u010De u kolonu \"Voza\u010Di\" iznad.") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '0.6rem'
+      }
+    }, activeDrivers.concat(inactiveDrivers).map(w => {
+      const driverVehicles = (vehicles || []).filter(v => v.driverId === w.id);
+      const isInactive = w.status !== 'aktivan';
+      return /*#__PURE__*/React.createElement("div", {
+        key: w.id,
+        style: {
+          background: isInactive ? '#fafafa' : 'var(--surface)',
+          border: `1px solid ${vozacCat.border}`,
+          borderLeft: `4px solid ${isInactive ? '#ccc' : vozacCat.color}`,
+          borderRadius: 8,
+          padding: '0.6rem 0.75rem',
+          opacity: isInactive ? 0.6 : 1
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          marginBottom: '0.3rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '1rem'
+        }
+      }, isInactive ? '⛔' : '🚗'), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 700,
+          fontSize: '0.9rem',
+          flex: 1,
+          textDecoration: isInactive ? 'line-through' : 'none'
+        }
+      }, w.name), isInactive && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.65rem',
+          color: 'var(--red)',
+          fontWeight: 600
+        }
+      }, "Neaktivan")), w.phone && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '0.72rem',
+          color: 'var(--text-muted)',
+          marginBottom: '0.3rem'
+        }
+      }, "\uD83D\uDCDE ", w.phone), driverVehicles.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: '0.2rem'
+        }
+      }, driverVehicles.map(v => /*#__PURE__*/React.createElement("div", {
+        key: v.id,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          fontSize: '0.75rem',
+          padding: '0.2rem 0.4rem',
+          marginTop: '0.2rem',
+          background: v.status === 'vozno' ? '#e8f5e9' : '#fff3e0',
+          borderRadius: 4,
+          border: `1px solid ${v.status === 'vozno' ? '#a5d6a7' : '#ffcc80'}`
+        }
+      }, /*#__PURE__*/React.createElement("span", null, v.status === 'vozno' ? '🟢' : '🟠'), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 600
+        }
+      }, v.registracija), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: 'var(--text-muted)'
+        }
+      }, "\xB7 ", v.tipVozila, " \xB7 ", v.brojMjesta, " mj.")))) : /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '0.7rem',
+          color: 'var(--text-light)',
+          fontStyle: 'italic',
+          marginTop: '0.2rem'
+        }
+      }, "Nema dodijeljenog vozila"));
+    })));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: '0.75rem',
       fontSize: '0.72rem',
