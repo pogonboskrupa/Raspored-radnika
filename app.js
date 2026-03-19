@@ -862,15 +862,26 @@ function ScheduleView(_ref2) {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
 
-  // Group by dept
+  // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
-    daySchedules.forEach(s => {
+    daySchedules.filter(s => s.jobType !== 'Otprema').forEach(s => {
       if (!m[s.deptId]) m[s.deptId] = [];
       m[s.deptId].push(s);
     });
     return m;
   }, [daySchedules]);
+
+  // Otprema entries grouped by dept
+  const otpremaRows = useMemo(() => daySchedules.filter(s => s.jobType === 'Otprema'), [daySchedules]);
+  const otpremaByDept = useMemo(() => {
+    const m = {};
+    otpremaRows.forEach(s => {
+      if (!m[s.deptId]) m[s.deptId] = [];
+      m[s.deptId].push(s);
+    });
+    return m;
+  }, [otpremaRows]);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       maxWidth: '100%',
@@ -1099,7 +1110,176 @@ function ScheduleView(_ref2) {
       title: "Bri\u0161i",
       onClick: () => onDelete(row.id)
     }, "\uD83D\uDDD1\uFE0F"))))))));
-  }), /*#__PURE__*/React.createElement("div", {
+  }), otpremaRows.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      marginTop: '0.75rem',
+      borderLeft: '4px solid #6b3080'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      padding: '0.6rem 0.75rem',
+      background: '#f0e8f5',
+      borderBottom: '1px solid #c4a0d8'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.1rem'
+    }
+  }, "\uD83D\uDE9B"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: '0.95rem',
+      color: '#6b3080',
+      flex: 1
+    }
+  }, "Otprema"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.72rem',
+      fontWeight: 700,
+      color: 'white',
+      background: '#6b3080',
+      borderRadius: 4,
+      padding: '0.15rem 0.5rem'
+    }
+  }, new Set(otpremaRows.flatMap(r => r.allWorkers)).size, " radnika"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.68rem',
+      color: '#6b3080'
+    }
+  }, Object.keys(otpremaByDept).length, " ", Object.keys(otpremaByDept).length === 1 ? 'odjel' : 'odjela')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0.5rem 0.75rem'
+    }
+  }, Object.entries(otpremaByDept).map(_ref5 => {
+    let [deptId, rows] = _ref5;
+    const allW = [...new Set(rows.flatMap(r => r.allWorkers))];
+    return /*#__PURE__*/React.createElement("div", {
+      key: deptId,
+      style: {
+        marginBottom: '0.6rem',
+        padding: '0.5rem 0.6rem',
+        background: 'var(--bg)',
+        borderRadius: 6,
+        border: '1px solid var(--border)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        marginBottom: '0.35rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.8rem'
+      }
+    }, "\uD83C\uDFD5\uFE0F"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: '0.82rem',
+        color: 'var(--text)',
+        flex: 1
+      }
+    }, dName(deptId)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.68rem',
+        fontWeight: 600,
+        color: '#6b3080',
+        background: '#f0e8f5',
+        borderRadius: 3,
+        padding: '0.1rem 0.35rem',
+        border: '1px solid #c4a0d8'
+      }
+    }, allW.length, " rad.")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '0.25rem'
+      }
+    }, allW.map(wId => /*#__PURE__*/React.createElement("span", {
+      key: wId,
+      className: "worker-pill"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "role-dot"
+    }), wName(wId)))), rows.map(row => {
+      const v = vehicles?.find(x => x.id === row.vehicleId);
+      if (!v) return null;
+      const driver = workers.find(w => w.id === v.driverId);
+      const wCount = (row.allWorkers || []).length;
+      const cap = v.brojMjesta || 0;
+      const over = wCount > cap;
+      return /*#__PURE__*/React.createElement("div", {
+        key: row.id,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          marginTop: '0.3rem',
+          fontSize: '0.75rem',
+          color: 'var(--text-muted)'
+        }
+      }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE97"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 600
+        }
+      }, v.registracija), /*#__PURE__*/React.createElement("span", null, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), driver && /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: '#2a6478'
+        }
+      }, "(", driver.name, ")"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 700,
+          fontSize: '0.65rem',
+          color: over ? '#c53030' : '#2d5a27',
+          background: over ? '#fde8e8' : '#e8f5e9',
+          border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,
+          borderRadius: 3,
+          padding: '0.1rem 0.3rem'
+        }
+      }, over ? '⚠️' : '👥', " ", wCount, "/", cap));
+    }), rows.map(row => /*#__PURE__*/React.createElement("div", {
+      key: row.id + '-act',
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        marginTop: '0.25rem'
+      }
+    }, row.note && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)',
+        fontStyle: 'italic',
+        flex: 1
+      }
+    }, "\uD83D\uDCDD ", row.note), /*#__PURE__*/React.createElement("div", {
+      className: "no-print",
+      style: {
+        display: 'flex',
+        gap: '0.2rem',
+        marginLeft: 'auto'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon btn-sm",
+      title: "Historija",
+      onClick: () => onHistory(row)
+    }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost btn-icon btn-sm",
+      title: "Uredi",
+      onClick: () => onEdit(row)
+    }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-danger btn-icon btn-sm",
+      title: "Bri\u0161i",
+      onClick: () => onDelete(row.id)
+    }, "\uD83D\uDDD1\uFE0F")))));
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "mobile-sidebar-panel",
     style: {
       marginTop: '0.75rem'
@@ -1196,11 +1376,11 @@ function ScheduleView(_ref2) {
     className: "count"
   }, statsByDept[d.id]?.size || 0))))), (() => {
     const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-    const absentWorkerIds = new Set(Object.entries(godisnji || {}).filter(_ref5 => {
-      let [wId, entries] = _ref5;
+    const absentWorkerIds = new Set(Object.entries(godisnji || {}).filter(_ref6 => {
+      let [wId, entries] = _ref6;
       return entries.some(e => e.date === selectedDate);
-    }).map(_ref6 => {
-      let [wId] = _ref6;
+    }).map(_ref7 => {
+      let [wId] = _ref7;
       return wId;
     }));
     const activeWorkers = workers.filter(w => w.status === 'aktivan');
@@ -1288,11 +1468,11 @@ function ScheduleView(_ref2) {
         fontWeight: 500,
         padding: '0.25rem 0'
       }
-    }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref7 => {
+    }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref8 => {
       let {
         cat,
         workers: ws
-      } = _ref7;
+      } = _ref8;
       return /*#__PURE__*/React.createElement("div", {
         key: cat.id,
         style: {
@@ -1357,11 +1537,11 @@ function ScheduleView(_ref2) {
         textTransform: 'uppercase',
         marginBottom: '0.4rem'
       }
-    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref8 => {
+    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref9 => {
       let {
         worker: w,
         entry
-      } = _ref8;
+      } = _ref9;
       const s = ODSUTNOST_SHORT[entry.type] || {
         short: '?',
         icon: '❓',
@@ -1406,7 +1586,7 @@ function ScheduleView(_ref2) {
 }
 
 // ─── RIGHT PANEL ──────────────────────────────────────────────────────────────
-function RightPanel(_ref9) {
+function RightPanel(_ref0) {
   let {
     selectedDate,
     daySchedules,
@@ -1423,14 +1603,14 @@ function RightPanel(_ref9) {
     copyFromDate,
     yesterday,
     onWorkerClick
-  } = _ref9;
+  } = _ref0;
   const [copyDate, setCopyDate] = useState('');
   const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-  const absentWorkers = new Set(Object.entries(godisnji || {}).filter(_ref0 => {
-    let [wId, entries] = _ref0;
+  const absentWorkers = new Set(Object.entries(godisnji || {}).filter(_ref1 => {
+    let [wId, entries] = _ref1;
     return entries.some(e => e.date === selectedDate);
-  }).map(_ref1 => {
-    let [wId] = _ref1;
+  }).map(_ref10 => {
+    let [wId] = _ref10;
     return wId;
   }));
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
@@ -1544,8 +1724,8 @@ function RightPanel(_ref9) {
       fontSize: '0.8rem',
       color: 'var(--text-light)'
     }
-  }, "Nema podataka"), Object.entries(statsByDept).map(_ref10 => {
-    let [dId, ws] = _ref10;
+  }, "Nema podataka"), Object.entries(statsByDept).map(_ref11 => {
+    let [dId, ws] = _ref11;
     return /*#__PURE__*/React.createElement("div", {
       key: dId,
       style: {
@@ -1590,11 +1770,11 @@ function RightPanel(_ref9) {
       color: 'var(--green)',
       fontWeight: 500
     }
-  }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref11 => {
+  }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref12 => {
     let {
       cat,
       workers: ws
-    } = _ref11;
+    } = _ref12;
     return /*#__PURE__*/React.createElement("div", {
       key: cat.id,
       style: {
@@ -1697,11 +1877,11 @@ function RightPanel(_ref9) {
         textTransform: 'uppercase',
         marginBottom: '0.6rem'
       }
-    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref12 => {
+    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref13 => {
       let {
         worker: w,
         entry
-      } = _ref12;
+      } = _ref13;
       const s = ODSUTNOST_SHORT[entry.type] || {
         short: '?',
         icon: '❓',
@@ -1746,7 +1926,7 @@ function RightPanel(_ref9) {
 }
 
 // ─── QUICK ASSIGN MODAL ───────────────────────────────────────────────────────
-function QuickModal(_ref13) {
+function QuickModal(_ref14) {
   let {
     worker,
     workers,
@@ -1760,7 +1940,7 @@ function QuickModal(_ref13) {
     wName,
     godisnji,
     setGodisnji
-  } = _ref13;
+  } = _ref14;
   const cat = getCatById(worker.category);
   const isPrimac = worker.category === 'primac_panj';
 
@@ -2310,7 +2490,7 @@ function QuickModal(_ref13) {
 }
 
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
-function EntryModal(_ref14) {
+function EntryModal(_ref15) {
   let {
     data,
     isEdit,
@@ -2323,7 +2503,7 @@ function EntryModal(_ref14) {
     onSave,
     onClose,
     wName
-  } = _ref14;
+  } = _ref15;
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
@@ -2935,7 +3115,7 @@ function EntryModal(_ref14) {
 }
 
 // ─── HISTORY DETAIL MODAL ─────────────────────────────────────────────────────
-function HistoryDetailModal(_ref15) {
+function HistoryDetailModal(_ref16) {
   let {
     schedule,
     history,
@@ -2944,7 +3124,7 @@ function HistoryDetailModal(_ref15) {
     dName,
     restoreVersion,
     onClose
-  } = _ref15;
+  } = _ref16;
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => e.target === e.currentTarget && onClose()
@@ -3003,7 +3183,7 @@ function HistoryDetailModal(_ref15) {
 // Data shape per day:
 //   primci:    [ { id, primatId, radnici:[wId,...], pomocni:[wId,...], note } ]
 //   otpremaci: [ { id, workerId, deptId, note } ]
-function EkipaView(_ref16) {
+function EkipaView(_ref17) {
   let {
     workers,
     ekipa,
@@ -3014,7 +3194,7 @@ function EkipaView(_ref16) {
     nextDay,
     yesterday,
     departments
-  } = _ref16;
+  } = _ref17;
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const emptyDay = () => ({
     primci: [],
@@ -3153,14 +3333,14 @@ function EkipaView(_ref16) {
   };
 
   // ── Worker picker (inline select) ─────────────────────────────────────────
-  const WorkerSelect = _ref17 => {
+  const WorkerSelect = _ref18 => {
     let {
       value,
       onChange,
       extraAllow = [],
       placeholder = '— Odaberi —',
       style = {}
-    } = _ref17;
+    } = _ref18;
     const opts = activeWorkers.filter(w => !assignedIds.has(w.id) || w.id === value || extraAllow.includes(w.id));
     return /*#__PURE__*/React.createElement("select", {
       value: value || '',
@@ -3238,12 +3418,12 @@ function EkipaView(_ref16) {
     label: 'Otpremači',
     val: numOtpremaci,
     c: C.otpr
-  }].map(_ref18 => {
+  }].map(_ref19 => {
     let {
       label,
       val,
       c
-    } = _ref18;
+    } = _ref19;
     return /*#__PURE__*/React.createElement("div", {
       key: label,
       style: {
@@ -3865,11 +4045,11 @@ function EkipaView(_ref16) {
 }
 
 // ─── WORKER CATEGORY BADGE ────────────────────────────────────────────────────
-function CatBadge(_ref19) {
+function CatBadge(_ref20) {
   let {
     catId,
     size = 'normal'
-  } = _ref19;
+  } = _ref20;
   const cat = getCatById(catId);
   if (!cat) return null;
   const small = size === 'small';
@@ -3892,12 +4072,12 @@ function CatBadge(_ref19) {
 }
 
 // ─── WORKERS VIEW ─────────────────────────────────────────────────────────────
-function WorkersView(_ref20) {
+function WorkersView(_ref21) {
   let {
     workers,
     setWorkers,
     schedules
-  } = _ref20;
+  } = _ref21;
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState('');
   const [activeCat, setActiveCat] = useState('sve'); // 'sve' | catId
@@ -3946,11 +4126,11 @@ function WorkersView(_ref20) {
   };
 
   // ── WORKER MODAL ──
-  const WorkerModal = _ref21 => {
+  const WorkerModal = _ref22 => {
     let {
       worker,
       onClose
-    } = _ref21;
+    } = _ref22;
     const blank = {
       id: uid(),
       name: '',
@@ -4158,11 +4338,11 @@ function WorkersView(_ref20) {
   };
 
   // ── DETAIL MODAL ──
-  const DetailModal = _ref22 => {
+  const DetailModal = _ref23 => {
     let {
       worker,
       onClose
-    } = _ref22;
+    } = _ref23;
     const cat = getCatById(worker.category);
     const sc = workerSchedCount[worker.id] || 0;
     const ls = workerLastSeen[worker.id];
@@ -4754,19 +4934,19 @@ function WorkersView(_ref20) {
 }
 
 // ─── DEPARTMENTS VIEW ─────────────────────────────────────────────────────────
-function DepartmentsView(_ref23) {
+function DepartmentsView(_ref24) {
   let {
     departments,
     setDepartments,
     schedules,
     dName
-  } = _ref23;
+  } = _ref24;
   const [modal, setModal] = useState(null);
-  const DeptModal = _ref24 => {
+  const DeptModal = _ref25 => {
     let {
       dept,
       onClose
-    } = _ref24;
+    } = _ref25;
     const [form, setForm] = useState(dept || {
       id: uid(),
       gospodarskaJedinica: '',
@@ -4899,7 +5079,7 @@ function DepartmentsView(_ref23) {
 }
 
 // ─── PREGLED VIEW ─────────────────────────────────────────────────────────────
-function PregledView(_ref25) {
+function PregledView(_ref26) {
   let {
     schedules,
     workers,
@@ -4912,7 +5092,7 @@ function PregledView(_ref25) {
     setFilterDept,
     filterJob,
     setFilterJob
-  } = _ref25;
+  } = _ref26;
   const [tab, setTab] = useState('radnik');
   const filtered = useMemo(() => schedules.filter(s => (!filterWorker || s.allWorkers.includes(filterWorker)) && (!filterDept || s.deptId === filterDept) && (!filterJob || s.jobType === filterJob)).sort((a, b) => b.date.localeCompare(a.date)), [schedules, filterWorker, filterDept, filterJob]);
 
@@ -5012,8 +5192,8 @@ function PregledView(_ref25) {
     className: "stat-value"
   }, filtered.length), /*#__PURE__*/React.createElement("div", {
     className: "stat-label"
-  }, "Ukupno smjena")), Object.entries(workerStats).map(_ref26 => {
-    let [jt, cnt] = _ref26;
+  }, "Ukupno smjena")), Object.entries(workerStats).map(_ref27 => {
+    let [jt, cnt] = _ref27;
     return /*#__PURE__*/React.createElement("div", {
       className: "stat-card",
       key: jt
@@ -5072,14 +5252,14 @@ function PregledView(_ref25) {
 }
 
 // ─── HISTORIJA VIEW ───────────────────────────────────────────────────────────
-function HistorijaView(_ref27) {
+function HistorijaView(_ref28) {
   let {
     history,
     wName,
     dName,
     restoreVersion,
     schedules
-  } = _ref27;
+  } = _ref28;
   const grouped = useMemo(() => {
     const m = {};
     history.forEach(h => {
@@ -5099,8 +5279,8 @@ function HistorijaView(_ref27) {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
-  }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("p", null, "Historija je prazna.")) : grouped.map(_ref28 => {
-    let [date, items] = _ref28;
+  }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("p", null, "Historija je prazna.")) : grouped.map(_ref29 => {
+    let [date, items] = _ref29;
     return /*#__PURE__*/React.createElement("div", {
       key: date,
       style: {
@@ -5159,12 +5339,12 @@ function HistorijaView(_ref27) {
 }
 
 // ─── SPISAK VIEW ──────────────────────────────────────────────────────────────
-function SpisakView(_ref29) {
+function SpisakView(_ref30) {
   let {
     workers,
     setWorkers,
     vehicles
-  } = _ref29;
+  } = _ref30;
   // editing: { workerId, field } | null
   const [editing, setEditing] = useState(null);
   const [editVal, setEditVal] = useState('');
@@ -5885,12 +6065,12 @@ function SpisakView(_ref29) {
 }
 
 // ─── VOZAČI VIEW ────────────────────────────────────────────────────────────
-function VozaciView(_ref30) {
+function VozaciView(_ref31) {
   let {
     vehicles,
     setVehicles,
     workers
-  } = _ref30;
+  } = _ref31;
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
@@ -6244,7 +6424,7 @@ function VozaciView(_ref30) {
 }
 
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView(_ref31) {
+function SihtaricaView(_ref32) {
   let {
     schedules,
     workers,
@@ -6253,7 +6433,7 @@ function SihtaricaView(_ref31) {
     setGodisnji,
     wName,
     dName
-  } = _ref31;
+  } = _ref32;
   const now = new Date();
   const [selYear, setSelYear] = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
@@ -6322,8 +6502,8 @@ function SihtaricaView(_ref31) {
       });
     });
     // Odsutnost
-    Object.entries(godisnji).forEach(_ref32 => {
-      let [wId, entries] = _ref32;
+    Object.entries(godisnji).forEach(_ref33 => {
+      let [wId, entries] = _ref33;
       if (!m[wId]) return;
       entries.forEach(e => {
         m[wId][e.date] = {
@@ -6550,8 +6730,8 @@ function SihtaricaView(_ref31) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref33 => {
-    let [k, l] = _ref33;
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji']].map(_ref34 => {
+    let [k, l] = _ref34;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       onClick: () => setSihtView(k),
@@ -6677,8 +6857,8 @@ function SihtaricaView(_ref31) {
       color: 'var(--text-muted)',
       fontWeight: 700
     }
-  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref34 => {
-    let [k, v] = _ref34;
+  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref35 => {
+    let [k, v] = _ref35;
     return /*#__PURE__*/React.createElement("span", {
       key: k,
       style: {
@@ -7150,8 +7330,8 @@ function SihtaricaView(_ref31) {
         borderRadius: 3,
         padding: '0.1rem 0.4rem'
       }
-    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref35 => {
-      let [k, v] = _ref35;
+    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref36 => {
+      let [k, v] = _ref36;
       const oc = ODSUTNOST_COLOR[k] || {
         bg: '#f0f0f0',
         color: '#555',
@@ -7358,12 +7538,12 @@ function SihtaricaView(_ref31) {
           fontSize: '0.75rem',
           width: '100%'
         }
-      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref36 => {
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref37 => {
         let {
           d,
           dw,
           wknd
-        } = _ref36;
+        } = _ref37;
         return /*#__PURE__*/React.createElement("th", {
           key: d,
           style: {
@@ -7382,13 +7562,13 @@ function SihtaricaView(_ref31) {
             opacity: 0.7
           }
         }, 'NPUSČPS'[dw]));
-      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref37 => {
+      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref38 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref37;
+        } = _ref38;
         let bg = wknd ? '#f0ede6' : 'white';
         let content = wknd ? /*#__PURE__*/React.createElement("span", {
           style: {
@@ -7439,13 +7619,13 @@ function SihtaricaView(_ref31) {
           gridTemplateColumns: `repeat(${mo.days.length}, 1fr)`,
           gap: '1.5px'
         }
-      }, mo.days.map(_ref38 => {
+      }, mo.days.map(_ref39 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref38;
+        } = _ref39;
         let bg,
           color,
           label = String(d),
@@ -7501,8 +7681,8 @@ function SihtaricaView(_ref31) {
           padding: '0.1rem 0.4rem',
           fontWeight: 700
         }
-      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref39 => {
-        let [k, v] = _ref39;
+      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref40 => {
+        let [k, v] = _ref40;
         const oc = ODSUTNOST_COLOR[k] || {
           bg: '#f0f0f0',
           color: '#555',

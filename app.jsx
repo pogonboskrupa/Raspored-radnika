@@ -508,15 +508,26 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
 
-  // Group by dept
+  // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
-    daySchedules.forEach(s => {
+    daySchedules.filter(s => s.jobType !== 'Otprema').forEach(s => {
       if (!m[s.deptId]) m[s.deptId] = [];
       m[s.deptId].push(s);
     });
     return m;
   }, [daySchedules]);
+
+  // Otprema entries grouped by dept
+  const otpremaRows = useMemo(() => daySchedules.filter(s => s.jobType === 'Otprema'), [daySchedules]);
+  const otpremaByDept = useMemo(() => {
+    const m = {};
+    otpremaRows.forEach(s => {
+      if (!m[s.deptId]) m[s.deptId] = [];
+      m[s.deptId].push(s);
+    });
+    return m;
+  }, [otpremaRows]);
 
   return (
     <div style={{maxWidth:'100%',overflowX:'hidden'}}>
@@ -658,6 +669,80 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
             </table>
           </div>
         ))
+      )}
+
+      {/* ─── OTPREMA SEKCIJA ─── */}
+      {otpremaRows.length > 0 && (
+        <div className="card" style={{marginTop:'0.75rem',borderLeft:'4px solid #6b3080'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.6rem 0.75rem',background:'#f0e8f5',borderBottom:'1px solid #c4a0d8'}}>
+            <span style={{fontSize:'1.1rem'}}>🚛</span>
+            <span style={{fontWeight:700,fontSize:'0.95rem',color:'#6b3080',flex:1}}>Otprema</span>
+            <span style={{fontFamily:'var(--mono)',fontSize:'0.72rem',fontWeight:700,color:'white',background:'#6b3080',borderRadius:4,padding:'0.15rem 0.5rem'}}>
+              {new Set(otpremaRows.flatMap(r => r.allWorkers)).size} radnika
+            </span>
+            <span style={{fontFamily:'var(--mono)',fontSize:'0.68rem',color:'#6b3080'}}>
+              {Object.keys(otpremaByDept).length} {Object.keys(otpremaByDept).length === 1 ? 'odjel' : 'odjela'}
+            </span>
+          </div>
+          <div style={{padding:'0.5rem 0.75rem'}}>
+            {Object.entries(otpremaByDept).map(([deptId, rows]) => {
+              const allW = [...new Set(rows.flatMap(r => r.allWorkers))];
+              return (
+                <div key={deptId} style={{marginBottom:'0.6rem',padding:'0.5rem 0.6rem',background:'var(--bg)',borderRadius:6,border:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.35rem'}}>
+                    <span style={{fontSize:'0.8rem'}}>🏕️</span>
+                    <span style={{fontWeight:700,fontSize:'0.82rem',color:'var(--text)',flex:1}}>{dName(deptId)}</span>
+                    <span style={{fontFamily:'var(--mono)',fontSize:'0.68rem',fontWeight:600,color:'#6b3080',background:'#f0e8f5',borderRadius:3,padding:'0.1rem 0.35rem',border:'1px solid #c4a0d8'}}>
+                      {allW.length} rad.
+                    </span>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'0.25rem'}}>
+                    {allW.map(wId => (
+                      <span key={wId} className="worker-pill"><span className="role-dot"/>{wName(wId)}</span>
+                    ))}
+                  </div>
+                  {/* Vozila za ove otpreme */}
+                  {rows.map(row => {
+                    const v = vehicles?.find(x => x.id === row.vehicleId);
+                    if (!v) return null;
+                    const driver = workers.find(w => w.id === v.driverId);
+                    const wCount = (row.allWorkers || []).length;
+                    const cap = v.brojMjesta || 0;
+                    const over = wCount > cap;
+                    return (
+                      <div key={row.id} style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.3rem',fontSize:'0.75rem',color:'var(--text-muted)'}}>
+                        <span>🚗</span>
+                        <span style={{fontWeight:600}}>{v.registracija}</span>
+                        <span>{v.tipVozila} · {v.brojMjesta} mj.</span>
+                        {driver && <span style={{color:'#2a6478'}}>({driver.name})</span>}
+                        <span style={{
+                          fontWeight:700,fontSize:'0.65rem',
+                          color: over ? '#c53030' : '#2d5a27',
+                          background: over ? '#fde8e8' : '#e8f5e9',
+                          border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,
+                          borderRadius:3,padding:'0.1rem 0.3rem',
+                        }}>
+                          {over ? '⚠️' : '👥'} {wCount}/{cap}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {/* Napomena i akcije */}
+                  {rows.map(row => (
+                    <div key={row.id+'-act'} style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.25rem'}}>
+                      {row.note && <span style={{fontSize:'0.72rem',color:'var(--text-muted)',fontStyle:'italic',flex:1}}>📝 {row.note}</span>}
+                      <div className="no-print" style={{display:'flex',gap:'0.2rem',marginLeft:'auto'}}>
+                        <button className="btn btn-ghost btn-icon btn-sm" title="Historija" onClick={() => onHistory(row)}>📜</button>
+                        <button className="btn btn-ghost btn-icon btn-sm" title="Uredi" onClick={() => onEdit(row)}>✏️</button>
+                        <button className="btn btn-danger btn-icon btn-sm" title="Briši" onClick={() => onDelete(row.id)}>🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* MOBILE: Quick job type buttons (visible only on small screens via CSS) */}
