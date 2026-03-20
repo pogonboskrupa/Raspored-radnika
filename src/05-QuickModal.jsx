@@ -1,5 +1,5 @@
 // ─── QUICK ASSIGN MODAL ───────────────────────────────────────────────────────
-function QuickModal({ worker, workers, departments, setDepartments, selectedDate, schedules, checkConflict, onSave, onClose, wName, godisnji, setGodisnji }) {
+function QuickModal({ worker, workers, departments, setDepartments, selectedDate, schedules, checkConflict, vehicles, onSave, onClose, wName, godisnji, setGodisnji }) {
   const cat = getCatById(worker.category);
   const isPrimac = worker.category === 'primac_panj';
 
@@ -36,8 +36,16 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const [odsutnostType, setOdsType] = useState('Godišnji odmor');
   const [note, setNote]             = useState('');
   const [extraWorkers, setExtra]    = useState([]);
+  const [vehicleId, setVehicleId]   = useState('');
+  const [showOtherDriver, setShowOtherDriver] = useState(false);
+  const [otherDriverId, setOtherDriverId] = useState('');
   const [forceOverride, setForce]   = useState(false);
   const [conflicts, setConflicts]   = useState([]);
+
+  const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
+  const regularVozaci = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+  const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
 
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
 
@@ -92,13 +100,18 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
 
   const handleSaveRad = () => {
     if (!deptId) return alert('Odaberi odjel!');
+    const finalAllWorkers = otherDriverId && !allWorkers.includes(otherDriverId)
+      ? [...allWorkers, otherDriverId] : allWorkers;
     const entry = {
       id: uid(), date: selectedDate, deptId,
       jobType: quickStatus === 'kancelarija' ? 'Kancelarija' : quickStatus === 'teren' ? 'Teren' : jobType,
       primatWorker: isPrimac ? worker.id : null,
       helper1Worker: null, helper2Worker: null,
       extraWorkers: isPrimac ? extraWorkers : [],
-      allWorkers, note, overrides: [],
+      allWorkers: finalAllWorkers, note, overrides: [],
+      vehicleId: vehicleId || '',
+      vehicleIds: vehicleId ? [vehicleId] : [],
+      otherDriverId: otherDriverId || '',
     };
     const c = checkConflict(entry, null);
     if (c.length > 0 && !forceOverride) { setConflicts(c); return; }
@@ -280,6 +293,59 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                           </span>
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── VOZILO SEKCIJA ── */}
+              {availableVehicles.length > 0 && !quickStatus && (
+                <div className="form-group">
+                  <label className="form-label">🚗 Vozilo (prevoz ekipe)</label>
+                  <select className="form-select" value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={{marginBottom:'0.3rem'}}>
+                    <option value="">— Bez vozila —</option>
+                    {availableVehicles.map(v => {
+                      const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
+                      return <option key={v.id} value={v.id}>{v.registracija} — {v.tipVozila} ({v.brojMjesta} mj.){drv ? ` — ${drv.name}` : ''}</option>;
+                    })}
+                  </select>
+                  {vehicleId && (() => {
+                    const sv = availableVehicles.find(v => v.id === vehicleId);
+                    const totalWorkers = allWorkers.length + (otherDriverId ? 1 : 0);
+                    const isOver = sv && totalWorkers > sv.brojMjesta;
+                    return sv ? (
+                      <div style={{fontSize:'0.72rem',color: isOver ? '#c53030' : 'var(--green)',fontWeight:600}}>
+                        {isOver ? '⚠️' : '✅'} Popunjenost: {totalWorkers} / {sv.brojMjesta} mjesta
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Drugi vozač opcija */}
+                  {!showOtherDriver ? (
+                    <button type="button" onClick={() => setShowOtherDriver(true)}
+                      style={{marginTop:4,background:'none',border:'none',color:'var(--blue, #2a6478)',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
+                      + Drugi vozač (poslovođa, primač, otpremač)...
+                    </button>
+                  ) : (
+                    <div style={{marginTop:'0.4rem'}}>
+                      <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem',fontWeight:600}}>Drugi vozač</div>
+                      <select className="form-select" value={otherDriverId} onChange={e => setOtherDriverId(e.target.value)}>
+                        <option value="">— Odaberi —</option>
+                        {OTHER_DRIVER_CATS.map(catId => {
+                          const cat = getCatById(catId);
+                          const catW = otherPotentialDrivers.filter(w => w.category === catId);
+                          if (catW.length === 0) return null;
+                          return (
+                            <optgroup key={catId} label={cat ? cat.label : catId}>
+                              {catW.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </optgroup>
+                          );
+                        })}
+                      </select>
+                      <button type="button" onClick={() => { setShowOtherDriver(false); setOtherDriverId(''); }}
+                        style={{marginTop:4,background:'none',border:'none',color:'var(--blue, #2a6478)',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
+                        ← Ukloni drugog vozača
+                      </button>
                     </div>
                   )}
                 </div>

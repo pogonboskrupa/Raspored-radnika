@@ -2519,6 +2519,7 @@ function QuickModal(_ref14) {
     selectedDate,
     schedules,
     checkConflict,
+    vehicles,
     onSave,
     onClose,
     wName,
@@ -2593,8 +2594,15 @@ function QuickModal(_ref14) {
   const [odsutnostType, setOdsType] = useState('Godišnji odmor');
   const [note, setNote] = useState('');
   const [extraWorkers, setExtra] = useState([]);
+  const [vehicleId, setVehicleId] = useState('');
+  const [showOtherDriver, setShowOtherDriver] = useState(false);
+  const [otherDriverId, setOtherDriverId] = useState('');
   const [forceOverride, setForce] = useState(false);
   const [conflicts, setConflicts] = useState([]);
+  const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
+  const regularVozaci = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+  const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const companions = activeWorkers.filter(w => w.id !== worker.id && (w.category === 'radnik_primka' || w.category === 'pomocni' || w.category === 'primac_panj'));
   const companionGroups = [{
@@ -2661,6 +2669,7 @@ function QuickModal(_ref14) {
   };
   const handleSaveRad = () => {
     if (!deptId) return alert('Odaberi odjel!');
+    const finalAllWorkers = otherDriverId && !allWorkers.includes(otherDriverId) ? [...allWorkers, otherDriverId] : allWorkers;
     const entry = {
       id: uid(),
       date: selectedDate,
@@ -2670,9 +2679,12 @@ function QuickModal(_ref14) {
       helper1Worker: null,
       helper2Worker: null,
       extraWorkers: isPrimac ? extraWorkers : [],
-      allWorkers,
+      allWorkers: finalAllWorkers,
       note,
-      overrides: []
+      overrides: [],
+      vehicleId: vehicleId || '',
+      vehicleIds: vehicleId ? [vehicleId] : [],
+      otherDriverId: otherDriverId || ''
     };
     const c = checkConflict(entry, null);
     if (c.length > 0 && !forceOverride) {
@@ -3025,7 +3037,94 @@ function QuickModal(_ref14) {
         padding: '0 0.1rem'
       }
     }, "\u2715"));
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), availableVehicles.length > 0 && !quickStatus && /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "form-label"
+  }, "\uD83D\uDE97 Vozilo (prevoz ekipe)"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: vehicleId,
+    onChange: e => setVehicleId(e.target.value),
+    style: {
+      marginBottom: '0.3rem'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Bez vozila \u2014"), availableVehicles.map(v => {
+    const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
+    return /*#__PURE__*/React.createElement("option", {
+      key: v.id,
+      value: v.id
+    }, v.registracija, " \u2014 ", v.tipVozila, " (", v.brojMjesta, " mj.)", drv ? ` — ${drv.name}` : '');
+  })), vehicleId && (() => {
+    const sv = availableVehicles.find(v => v.id === vehicleId);
+    const totalWorkers = allWorkers.length + (otherDriverId ? 1 : 0);
+    const isOver = sv && totalWorkers > sv.brojMjesta;
+    return sv ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        color: isOver ? '#c53030' : 'var(--green)',
+        fontWeight: 600
+      }
+    }, isOver ? '⚠️' : '✅', " Popunjenost: ", totalWorkers, " / ", sv.brojMjesta, " mjesta") : null;
+  })(), !showOtherDriver ? /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowOtherDriver(true),
+    style: {
+      marginTop: 4,
+      background: 'none',
+      border: 'none',
+      color: 'var(--blue, #2a6478)',
+      cursor: 'pointer',
+      fontSize: '0.72rem',
+      padding: 0,
+      textDecoration: 'underline'
+    }
+  }, "+ Drugi voza\u010D (poslovo\u0111a, prima\u010D, otprema\u010D)...") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.4rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      color: 'var(--text-light)',
+      marginBottom: '0.2rem',
+      fontWeight: 600
+    }
+  }, "Drugi voza\u010D"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: otherDriverId,
+    onChange: e => setOtherDriverId(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi \u2014"), OTHER_DRIVER_CATS.map(catId => {
+    const cat = getCatById(catId);
+    const catW = otherPotentialDrivers.filter(w => w.category === catId);
+    if (catW.length === 0) return null;
+    return /*#__PURE__*/React.createElement("optgroup", {
+      key: catId,
+      label: cat ? cat.label : catId
+    }, catW.map(w => /*#__PURE__*/React.createElement("option", {
+      key: w.id,
+      value: w.id
+    }, w.name)));
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowOtherDriver(false);
+      setOtherDriverId('');
+    },
+    style: {
+      marginTop: 4,
+      background: 'none',
+      border: 'none',
+      color: 'var(--blue, #2a6478)',
+      cursor: 'pointer',
+      fontSize: '0.72rem',
+      padding: 0,
+      textDecoration: 'underline'
+    }
+  }, "\u2190 Ukloni drugog voza\u010Da"))), /*#__PURE__*/React.createElement("div", {
     className: "form-group",
     style: {
       marginBottom: 0
@@ -3109,9 +3208,9 @@ function EntryModal(_ref15) {
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
-
+  const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   // Auto-detect default vehicle from driver in selected workers
-  const driverInWorkers = form.allWorkers.map(wId => workers.find(w => w.id === wId)).find(w => w?.category === 'vozac');
+  const driverInWorkers = form.allWorkers.map(wId => workers.find(w => w.id === wId)).find(w => w && ENTRY_DRIVER_CATS.includes(w.category));
   const defaultVehicle = driverInWorkers ? (vehicles || []).find(v => v.driverId === driverInWorkers.id && v.status === 'vozno') : null;
   const effectiveVehicleId = defaultVehicle && !vehicleOverride ? defaultVehicle.id : form.vehicleId;
   const selectedVehicle = (vehicles || []).find(v => v.id === effectiveVehicleId);
@@ -8734,6 +8833,7 @@ function AppMain(_ref42) {
     selectedDate: selectedDate,
     schedules: schedules,
     checkConflict: checkConflict,
+    vehicles: vehicles,
     onSave: d => {
       saveSchedule(d, false);
       setQuickModal(null);

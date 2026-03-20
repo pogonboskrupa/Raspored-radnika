@@ -306,6 +306,7 @@ function AppMain({ onLogout }) {
           selectedDate={selectedDate}
           schedules={schedules}
           checkConflict={checkConflict}
+          vehicles={vehicles}
           onSave={(d) => { saveSchedule(d, false); setQuickModal(null); }}
           onClose={() => setQuickModal(null)}
           wName={wName}

@@ -23,8 +23,9 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const isPrimka = form.jobType === 'Primka';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
 
+  const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   // Auto-detect default vehicle from driver in selected workers
-  const driverInWorkers = form.allWorkers.map(wId => workers.find(w => w.id === wId)).find(w => w?.category === 'vozac');
+  const driverInWorkers = form.allWorkers.map(wId => workers.find(w => w.id === wId)).find(w => w && ENTRY_DRIVER_CATS.includes(w.category));
   const defaultVehicle = driverInWorkers ? (vehicles || []).find(v => v.driverId === driverInWorkers.id && v.status === 'vozno') : null;
   const effectiveVehicleId = defaultVehicle && !vehicleOverride ? defaultVehicle.id : form.vehicleId;
   const selectedVehicle = (vehicles || []).find(v => v.id === effectiveVehicleId);
