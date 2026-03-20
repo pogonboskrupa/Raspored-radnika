@@ -5802,7 +5802,8 @@ function VozaciView(_ref28) {
     brojMjesta: 5,
     status: 'vozno'
   });
-  const drivers = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+  const DRIVER_CATEGORIES = ['vozac', 'poslovoda_isk', 'poslovoda_uzg'];
+  const drivers = workers.filter(w => DRIVER_CATEGORIES.includes(w.category) && w.status === 'aktivan');
   const resetForm = () => {
     setForm({
       driverId: '',
@@ -5922,10 +5923,18 @@ function VozaciView(_ref28) {
     }))
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Odaberi voza\u010Da \u2014"), drivers.map(w => /*#__PURE__*/React.createElement("option", {
-    key: w.id,
-    value: w.id
-  }, w.name)))), /*#__PURE__*/React.createElement("div", {
+  }, "\u2014 Odaberi voza\u010Da \u2014"), DRIVER_CATEGORIES.map(catId => {
+    const cat = getCatById(catId);
+    const catWorkers = drivers.filter(w => w.category === catId);
+    if (catWorkers.length === 0) return null;
+    return /*#__PURE__*/React.createElement("optgroup", {
+      key: catId,
+      label: cat ? cat.label : catId
+    }, catWorkers.map(w => /*#__PURE__*/React.createElement("option", {
+      key: w.id,
+      value: w.id
+    }, w.name)));
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"

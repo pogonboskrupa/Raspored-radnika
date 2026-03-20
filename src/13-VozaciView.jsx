@@ -4,7 +4,8 @@ function VozaciView({ vehicles, setVehicles, workers }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ driverId: '', tipVozila: '', registracija: '', brojMjesta: 5, status: 'vozno' });
 
-  const drivers = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+  const DRIVER_CATEGORIES = ['vozac', 'poslovoda_isk', 'poslovoda_uzg'];
+  const drivers = workers.filter(w => DRIVER_CATEGORIES.includes(w.category) && w.status === 'aktivan');
 
   const resetForm = () => {
     setForm({ driverId: '', tipVozila: '', registracija: '', brojMjesta: 5, status: 'vozno' });
@@ -76,7 +77,16 @@ function VozaciView({ vehicles, setVehicles, workers }) {
               <label className="form-label">Vozač</label>
               <select className="form-select" value={form.driverId} onChange={e=>setForm(f=>({...f,driverId:e.target.value}))}>
                 <option value="">— Odaberi vozača —</option>
-                {drivers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                {DRIVER_CATEGORIES.map(catId => {
+                  const cat = getCatById(catId);
+                  const catWorkers = drivers.filter(w => w.category === catId);
+                  if (catWorkers.length === 0) return null;
+                  return (
+                    <optgroup key={catId} label={cat ? cat.label : catId}>
+                      {catWorkers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </optgroup>
+                  );
+                })}
               </select>
             </div>
             <div className="form-group">
