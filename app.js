@@ -1346,6 +1346,13 @@ function ScheduleView(_ref2) {
           fontSize: '0.75rem'
         }
       }, "+ Dodijeli vozilo");
+      const rowWorkerCount = (row.allWorkers || []).length;
+      const totalCap = vIds.reduce((s, vid) => {
+        const v = vehicles?.find(v => v.id === vid);
+        return s + (v?.brojMjesta || 0);
+      }, 0);
+      const bezMjesta = Math.max(0, rowWorkerCount - totalCap);
+      let remaining = rowWorkerCount;
       return /*#__PURE__*/React.createElement("div", {
         style: {
           display: 'flex',
@@ -1356,10 +1363,9 @@ function ScheduleView(_ref2) {
         const v = vehicles?.find(v => v.id === vid);
         if (!v) return null;
         const driver = workers.find(w => w.id === v.driverId);
-        const usage = vehicleUsageMap[v.id];
-        const totalInVehicle = usage?.total || 0;
         const cap = v.brojMjesta || 0;
-        const over = totalInVehicle > cap;
+        const fill = Math.min(remaining, cap);
+        remaining = Math.max(0, remaining - cap);
         return /*#__PURE__*/React.createElement("div", {
           key: vid,
           style: {
@@ -1407,21 +1413,26 @@ function ScheduleView(_ref2) {
             fontSize: '0.65rem',
             fontWeight: 700,
             marginTop: '1px',
-            color: over ? '#c53030' : totalInVehicle === cap ? '#b5620a' : '#2d5a27',
-            background: over ? '#fde8e8' : totalInVehicle === cap ? '#fdf0e0' : '#e8f5e9',
-            border: `1px solid ${over ? '#f5b5b5' : totalInVehicle === cap ? '#e8c17a' : '#a5d6a7'}`,
+            color: fill >= cap ? '#b5620a' : '#2d5a27',
+            background: fill >= cap ? '#fdf0e0' : '#e8f5e9',
+            border: `1px solid ${fill >= cap ? '#e8c17a' : '#a5d6a7'}`,
             borderRadius: 3,
             padding: '0.1rem 0.3rem',
             display: 'inline-block'
           }
-        }, over ? '⚠️' : '👥', " ", totalInVehicle, "/", cap, over && ` (+${totalInVehicle - cap})`), over && /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.6rem',
-            color: '#c53030',
-            fontWeight: 600
-          }
-        }, "Prekora\u010Den kapacitet!"));
-      }));
+        }, "\uD83D\uDC65 ", fill, "/", cap));
+      }), bezMjesta > 0 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '0.65rem',
+          fontWeight: 700,
+          color: '#c53030',
+          background: '#fde8e8',
+          border: '1px solid #f5b5b5',
+          borderRadius: 3,
+          padding: '0.15rem 0.3rem',
+          marginTop: '2px'
+        }
+      }, "\u26A0\uFE0F ", bezMjesta, " radnika nema mjesta!"));
     })())), /*#__PURE__*/React.createElement("td", {
       "data-label": "Napomena",
       style: {
@@ -1566,61 +1577,81 @@ function ScheduleView(_ref2) {
           fontWeight: 600,
           fontSize: '0.75rem'
         }
-      }, "+ Dodijeli vozilo") : /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.3rem'
-        }
-      }, vIds.map(vid => {
-        const v = vehicles?.find(x => x.id === vid);
-        if (!v) return null;
-        const driver = workers.find(w => w.id === v.driverId);
-        const usage = vehicleUsageMap[v.id];
-        const totalInVehicle = usage?.total || 0;
-        const cap = v.brojMjesta || 0;
-        const over = totalInVehicle > cap;
-        return /*#__PURE__*/React.createElement("span", {
-          key: vid,
+      }, "+ Dodijeli vozilo") : (() => {
+        const rowWC = (row.allWorkers || []).length;
+        const totalC = vIds.reduce((s, vid) => {
+          const v = vehicles?.find(x => x.id === vid);
+          return s + (v?.brojMjesta || 0);
+        }, 0);
+        const bezMj = Math.max(0, rowWC - totalC);
+        let rem = rowWC;
+        return /*#__PURE__*/React.createElement("div", {
           style: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.3rem',
-            fontSize: '0.75rem',
-            color: 'var(--text-muted)'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.2rem'
           }
-        }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE97"), /*#__PURE__*/React.createElement("span", {
+        }, /*#__PURE__*/React.createElement("div", {
           style: {
-            fontWeight: 600
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.3rem'
           }
-        }, v.registracija), /*#__PURE__*/React.createElement("span", null, v.tipVozila), row.otherDriverId ? (() => {
-          const od = workers.find(w => w.id === row.otherDriverId);
-          return od ? /*#__PURE__*/React.createElement("span", {
+        }, vIds.map(vid => {
+          const v = vehicles?.find(x => x.id === vid);
+          if (!v) return null;
+          const driver = workers.find(w => w.id === v.driverId);
+          const cap = v.brojMjesta || 0;
+          const fill = Math.min(rem, cap);
+          rem = Math.max(0, rem - cap);
+          return /*#__PURE__*/React.createElement("span", {
+            key: vid,
             style: {
-              color: '#b5620a',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              fontSize: '0.75rem',
+              color: 'var(--text-muted)'
+            }
+          }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE97"), /*#__PURE__*/React.createElement("span", {
+            style: {
               fontWeight: 600
             }
-          }, "(\uD83D\uDD04 ", od.name, ")") : driver && /*#__PURE__*/React.createElement("span", {
+          }, v.registracija), /*#__PURE__*/React.createElement("span", null, v.tipVozila), row.otherDriverId ? (() => {
+            const od = workers.find(w => w.id === row.otherDriverId);
+            return od ? /*#__PURE__*/React.createElement("span", {
+              style: {
+                color: '#b5620a',
+                fontWeight: 600
+              }
+            }, "(\uD83D\uDD04 ", od.name, ")") : driver && /*#__PURE__*/React.createElement("span", {
+              style: {
+                color: '#2a6478'
+              }
+            }, "(", driver.name, ")");
+          })() : driver && /*#__PURE__*/React.createElement("span", {
             style: {
               color: '#2a6478'
             }
-          }, "(", driver.name, ")");
-        })() : driver && /*#__PURE__*/React.createElement("span", {
+          }, "(", driver.name, ")"), /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontWeight: 700,
+              fontSize: '0.65rem',
+              color: fill >= cap ? '#b5620a' : '#2d5a27',
+              background: fill >= cap ? '#fdf0e0' : '#e8f5e9',
+              border: `1px solid ${fill >= cap ? '#e8c17a' : '#a5d6a7'}`,
+              borderRadius: 3,
+              padding: '0.1rem 0.3rem'
+            }
+          }, "\uD83D\uDC65 ", fill, "/", cap));
+        })), bezMj > 0 && /*#__PURE__*/React.createElement("span", {
           style: {
-            color: '#2a6478'
-          }
-        }, "(", driver.name, ")"), /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontWeight: 700,
             fontSize: '0.65rem',
-            color: over ? '#c53030' : '#2d5a27',
-            background: over ? '#fde8e8' : '#e8f5e9',
-            border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,
-            borderRadius: 3,
-            padding: '0.1rem 0.3rem'
+            fontWeight: 700,
+            color: '#c53030'
           }
-        }, over ? '⚠️' : '👥', " ", totalInVehicle, "/", cap));
-      }))));
+        }, "\u26A0\uFE0F ", bezMj, " radnika nema mjesta!"));
+      })()));
     }), rows.map(row => /*#__PURE__*/React.createElement("div", {
       key: row.id + '-act',
       style: {

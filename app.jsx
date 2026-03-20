@@ -676,16 +676,22 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                         {(() => {
                           const vIds = getVehicleIds(row);
                           if (vIds.length === 0) return <span style={{color:'var(--green)',fontWeight:600,fontSize:'0.75rem'}}>+ Dodijeli vozilo</span>;
+                          const rowWorkerCount = (row.allWorkers || []).length;
+                          const totalCap = vIds.reduce((s, vid) => {
+                            const v = vehicles?.find(v => v.id === vid);
+                            return s + (v?.brojMjesta || 0);
+                          }, 0);
+                          const bezMjesta = Math.max(0, rowWorkerCount - totalCap);
+                          let remaining = rowWorkerCount;
                           return (
                             <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
                               {vIds.map(vid => {
                                 const v = vehicles?.find(v => v.id === vid);
                                 if (!v) return null;
                                 const driver = workers.find(w => w.id === v.driverId);
-                                const usage = vehicleUsageMap[v.id];
-                                const totalInVehicle = usage?.total || 0;
                                 const cap = v.brojMjesta || 0;
-                                const over = totalInVehicle > cap;
+                                const fill = Math.min(remaining, cap);
+                                remaining = Math.max(0, remaining - cap);
                                 return (
                                   <div key={vid} style={{display:'flex',flexDirection:'column',gap:'1px',paddingBottom:'2px',borderBottom: vIds.length > 1 ? '1px dotted var(--border)' : 'none'}}>
                                     <span style={{fontWeight:600}}>🚗 {v.registracija}</span>
@@ -696,13 +702,17 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                                         <span style={{fontSize:'0.7rem',color:'#b5620a',fontWeight:600}}>🔄 {od.name} <span style={{fontWeight:400,fontSize:'0.62rem'}}>(danas)</span></span>
                                       ) : (driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>);
                                     })() : (driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>)}
-                                    <span style={{fontSize:'0.65rem',fontWeight:700,marginTop:'1px',color: over ? '#c53030' : totalInVehicle === cap ? '#b5620a' : '#2d5a27',background: over ? '#fde8e8' : totalInVehicle === cap ? '#fdf0e0' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : totalInVehicle === cap ? '#e8c17a' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem',display:'inline-block'}}>
-                                      {over ? '⚠️' : '👥'} {totalInVehicle}/{cap}{over && ` (+${totalInVehicle - cap})`}
+                                    <span style={{fontSize:'0.65rem',fontWeight:700,marginTop:'1px',color: fill >= cap ? '#b5620a' : '#2d5a27',background: fill >= cap ? '#fdf0e0' : '#e8f5e9',border: `1px solid ${fill >= cap ? '#e8c17a' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem',display:'inline-block'}}>
+                                      👥 {fill}/{cap}
                                     </span>
-                                    {over && <span style={{fontSize:'0.6rem',color:'#c53030',fontWeight:600}}>Prekoračen kapacitet!</span>}
                                   </div>
                                 );
                               })}
+                              {bezMjesta > 0 && (
+                                <div style={{fontSize:'0.65rem',fontWeight:700,color:'#c53030',background:'#fde8e8',border:'1px solid #f5b5b5',borderRadius:3,padding:'0.15rem 0.3rem',marginTop:'2px'}}>
+                                  ⚠️ {bezMjesta} radnika nema mjesta!
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
@@ -762,33 +772,43 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                         <div className="no-print" style={{cursor:'pointer'}} onClick={(e) => openVehiclePopup(row, e)}>
                           {vIds.length === 0 ? (
                             <span style={{color:'var(--green)',fontWeight:600,fontSize:'0.75rem'}}>+ Dodijeli vozilo</span>
-                          ) : (
-                            <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
-                              {vIds.map(vid => {
-                                const v = vehicles?.find(x => x.id === vid);
-                                if (!v) return null;
-                                const driver = workers.find(w => w.id === v.driverId);
-                                const usage = vehicleUsageMap[v.id];
-                                const totalInVehicle = usage?.total || 0;
-                                const cap = v.brojMjesta || 0;
-                                const over = totalInVehicle > cap;
-                                return (
-                                  <span key={vid} style={{display:'inline-flex',alignItems:'center',gap:'0.3rem',fontSize:'0.75rem',color:'var(--text-muted)'}}>
-                                    <span>🚗</span>
-                                    <span style={{fontWeight:600}}>{v.registracija}</span>
-                                    <span>{v.tipVozila}</span>
-                                    {row.otherDriverId ? (() => {
-                                      const od = workers.find(w => w.id === row.otherDriverId);
-                                      return od ? <span style={{color:'#b5620a',fontWeight:600}}>(🔄 {od.name})</span> : (driver && <span style={{color:'#2a6478'}}>({driver.name})</span>);
-                                    })() : (driver && <span style={{color:'#2a6478'}}>({driver.name})</span>)}
-                                    <span style={{fontWeight:700,fontSize:'0.65rem',color: over ? '#c53030' : '#2d5a27',background: over ? '#fde8e8' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem'}}>
-                                      {over ? '⚠️' : '👥'} {totalInVehicle}/{cap}
-                                    </span>
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
+                          ) : (() => {
+                            const rowWC = (row.allWorkers || []).length;
+                            const totalC = vIds.reduce((s, vid) => { const v = vehicles?.find(x => x.id === vid); return s + (v?.brojMjesta || 0); }, 0);
+                            const bezMj = Math.max(0, rowWC - totalC);
+                            let rem = rowWC;
+                            return (
+                              <div style={{display:'flex',flexDirection:'column',gap:'0.2rem'}}>
+                                <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
+                                  {vIds.map(vid => {
+                                    const v = vehicles?.find(x => x.id === vid);
+                                    if (!v) return null;
+                                    const driver = workers.find(w => w.id === v.driverId);
+                                    const cap = v.brojMjesta || 0;
+                                    const fill = Math.min(rem, cap);
+                                    rem = Math.max(0, rem - cap);
+                                    return (
+                                      <span key={vid} style={{display:'inline-flex',alignItems:'center',gap:'0.3rem',fontSize:'0.75rem',color:'var(--text-muted)'}}>
+                                        <span>🚗</span>
+                                        <span style={{fontWeight:600}}>{v.registracija}</span>
+                                        <span>{v.tipVozila}</span>
+                                        {row.otherDriverId ? (() => {
+                                          const od = workers.find(w => w.id === row.otherDriverId);
+                                          return od ? <span style={{color:'#b5620a',fontWeight:600}}>(🔄 {od.name})</span> : (driver && <span style={{color:'#2a6478'}}>({driver.name})</span>);
+                                        })() : (driver && <span style={{color:'#2a6478'}}>({driver.name})</span>)}
+                                        <span style={{fontWeight:700,fontSize:'0.65rem',color: fill >= cap ? '#b5620a' : '#2d5a27',background: fill >= cap ? '#fdf0e0' : '#e8f5e9',border: `1px solid ${fill >= cap ? '#e8c17a' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem'}}>
+                                          👥 {fill}/{cap}
+                                        </span>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                                {bezMj > 0 && (
+                                  <span style={{fontSize:'0.65rem',fontWeight:700,color:'#c53030'}}>⚠️ {bezMj} radnika nema mjesta!</span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
