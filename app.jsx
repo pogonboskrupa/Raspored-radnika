@@ -3011,19 +3011,29 @@ function VozaciView({ vehicles, setVehicles, workers }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ driverId: '', tipVozila: '', registracija: '', brojMjesta: 5, status: 'vozno' });
+  const [showOtherDrivers, setShowOtherDrivers] = useState(false);
 
-  const DRIVER_CATEGORIES = ['vozac', 'poslovoda_isk', 'poslovoda_uzg'];
-  const drivers = workers.filter(w => DRIVER_CATEGORIES.includes(w.category) && w.status === 'aktivan');
+  const OTHER_CATEGORIES = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const regularDrivers = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+  const otherDrivers = workers.filter(w => OTHER_CATEGORIES.includes(w.category) && w.status === 'aktivan');
+
+  const isOtherDriver = (driverId) => {
+    if (!driverId) return false;
+    const w = workers.find(w => w.id === driverId);
+    return w && OTHER_CATEGORIES.includes(w.category);
+  };
 
   const resetForm = () => {
     setForm({ driverId: '', tipVozila: '', registracija: '', brojMjesta: 5, status: 'vozno' });
     setAdding(false);
     setEditing(null);
+    setShowOtherDrivers(false);
   };
 
   const startEdit = (v) => {
     setEditing(v.id);
     setForm({ driverId: v.driverId || '', tipVozila: v.tipVozila || '', registracija: v.registracija || '', brojMjesta: v.brojMjesta || 5, status: v.status || 'vozno' });
+    setShowOtherDrivers(isOtherDriver(v.driverId));
   };
 
   const saveVehicle = () => {
@@ -3068,7 +3078,7 @@ function VozaciView({ vehicles, setVehicles, workers }) {
         </button>
       </div>
 
-      {drivers.length === 0 && (
+      {regularDrivers.length === 0 && (
         <div className="alert alert-warning" style={{marginBottom:'1rem'}}>
           Nemate vozača u Spisku. Prvo dodajte vozače u kategoriju "Vozači" na tabu Spisak.
         </div>
@@ -3083,19 +3093,38 @@ function VozaciView({ vehicles, setVehicles, workers }) {
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',gap:'0.75rem'}}>
             <div className="form-group">
               <label className="form-label">Vozač</label>
-              <select className="form-select" value={form.driverId} onChange={e=>setForm(f=>({...f,driverId:e.target.value}))}>
-                <option value="">— Odaberi vozača —</option>
-                {DRIVER_CATEGORIES.map(catId => {
-                  const cat = getCatById(catId);
-                  const catWorkers = drivers.filter(w => w.category === catId);
-                  if (catWorkers.length === 0) return null;
-                  return (
-                    <optgroup key={catId} label={cat ? cat.label : catId}>
-                      {catWorkers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </optgroup>
-                  );
-                })}
-              </select>
+              {!showOtherDrivers ? (
+                <>
+                  <select className="form-select" value={form.driverId} onChange={e => {
+                    if (e.target.value === '__other__') { setShowOtherDrivers(true); setForm(f => ({...f, driverId: ''})); }
+                    else setForm(f => ({...f, driverId: e.target.value}));
+                  }}>
+                    <option value="">— Odaberi vozača —</option>
+                    {regularDrivers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    {otherDrivers.length > 0 && <option value="__other__">Drugi vozač...</option>}
+                  </select>
+                </>
+              ) : (
+                <>
+                  <select className="form-select" value={form.driverId} onChange={e => setForm(f => ({...f, driverId: e.target.value}))}>
+                    <option value="">— Odaberi —</option>
+                    {OTHER_CATEGORIES.map(catId => {
+                      const cat = getCatById(catId);
+                      const catWorkers = otherDrivers.filter(w => w.category === catId);
+                      if (catWorkers.length === 0) return null;
+                      return (
+                        <optgroup key={catId} label={cat ? cat.label : catId}>
+                          {catWorkers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        </optgroup>
+                      );
+                    })}
+                  </select>
+                  <button type="button" onClick={() => { setShowOtherDrivers(false); setForm(f => ({...f, driverId: ''})); }}
+                    style={{marginTop:4,background:'none',border:'none',color:'var(--blue, #2a6478)',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
+                    ← Nazad na vozače
+                  </button>
+                </>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Tip vozila</label>
@@ -3152,7 +3181,12 @@ function VozaciView({ vehicles, setVehicles, workers }) {
                 return (
                   <tr key={v.id} style={{opacity: isPopravka ? 0.6 : 1}}>
                     <td style={{border:'1px solid #ccc',padding:'0.5rem 0.75rem',fontSize:'0.82rem'}}>
-                      {v.driverId ? <span>🚗 {driverName(v.driverId)}</span> : <span style={{color:'var(--text-muted)'}}>—</span>}
+                      {v.driverId ? (() => {
+                        const w = workers.find(x => x.id === v.driverId);
+                        const cat = w ? getCatById(w.category) : null;
+                        const isOther = w && OTHER_CATEGORIES.includes(w.category);
+                        return <span>{isOther && cat ? cat.icon + ' ' : '🚗 '}{driverName(v.driverId)}{isOther && cat ? <span style={{fontSize:'0.68rem',color:'var(--text-muted)',marginLeft:4}}>({cat.short})</span> : ''}</span>;
+                      })() : <span style={{color:'var(--text-muted)'}}>—</span>}
                     </td>
                     <td style={{border:'1px solid #ccc',padding:'0.5rem 0.75rem',fontSize:'0.82rem',fontWeight:600}}>{v.tipVozila}</td>
                     <td style={{border:'1px solid #ccc',padding:'0.5rem 0.75rem',fontSize:'0.82rem',fontFamily:'var(--mono)',fontWeight:700,letterSpacing:'0.05em'}}>{v.registracija}</td>

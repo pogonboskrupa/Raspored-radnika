@@ -5802,8 +5802,15 @@ function VozaciView(_ref28) {
     brojMjesta: 5,
     status: 'vozno'
   });
-  const DRIVER_CATEGORIES = ['vozac', 'poslovoda_isk', 'poslovoda_uzg'];
-  const drivers = workers.filter(w => DRIVER_CATEGORIES.includes(w.category) && w.status === 'aktivan');
+  const [showOtherDrivers, setShowOtherDrivers] = useState(false);
+  const OTHER_CATEGORIES = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const regularDrivers = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+  const otherDrivers = workers.filter(w => OTHER_CATEGORIES.includes(w.category) && w.status === 'aktivan');
+  const isOtherDriver = driverId => {
+    if (!driverId) return false;
+    const w = workers.find(w => w.id === driverId);
+    return w && OTHER_CATEGORIES.includes(w.category);
+  };
   const resetForm = () => {
     setForm({
       driverId: '',
@@ -5814,6 +5821,7 @@ function VozaciView(_ref28) {
     });
     setAdding(false);
     setEditing(null);
+    setShowOtherDrivers(false);
   };
   const startEdit = v => {
     setEditing(v.id);
@@ -5824,6 +5832,7 @@ function VozaciView(_ref28) {
       brojMjesta: v.brojMjesta || 5,
       status: v.status || 'vozno'
     });
+    setShowOtherDrivers(isOtherDriver(v.driverId));
   };
   const saveVehicle = () => {
     if (!form.registracija.trim()) return alert('Unesite registarske oznake!');
@@ -5887,7 +5896,7 @@ function VozaciView(_ref28) {
         status: 'vozno'
       });
     }
-  }, "+ Dodaj vozilo")), drivers.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, "+ Dodaj vozilo")), regularDrivers.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "alert alert-warning",
     style: {
       marginBottom: '1rem'
@@ -5914,7 +5923,29 @@ function VozaciView(_ref28) {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"
-  }, "Voza\u010D"), /*#__PURE__*/React.createElement("select", {
+  }, "Voza\u010D"), !showOtherDrivers ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.driverId,
+    onChange: e => {
+      if (e.target.value === '__other__') {
+        setShowOtherDrivers(true);
+        setForm(f => ({
+          ...f,
+          driverId: ''
+        }));
+      } else setForm(f => ({
+        ...f,
+        driverId: e.target.value
+      }));
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Odaberi voza\u010Da \u2014"), regularDrivers.map(w => /*#__PURE__*/React.createElement("option", {
+    key: w.id,
+    value: w.id
+  }, w.name)), otherDrivers.length > 0 && /*#__PURE__*/React.createElement("option", {
+    value: "__other__"
+  }, "Drugi voza\u010D..."))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: form.driverId,
     onChange: e => setForm(f => ({
@@ -5923,9 +5954,9 @@ function VozaciView(_ref28) {
     }))
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Odaberi voza\u010Da \u2014"), DRIVER_CATEGORIES.map(catId => {
+  }, "\u2014 Odaberi \u2014"), OTHER_CATEGORIES.map(catId => {
     const cat = getCatById(catId);
-    const catWorkers = drivers.filter(w => w.category === catId);
+    const catWorkers = otherDrivers.filter(w => w.category === catId);
     if (catWorkers.length === 0) return null;
     return /*#__PURE__*/React.createElement("optgroup", {
       key: catId,
@@ -5934,7 +5965,26 @@ function VozaciView(_ref28) {
       key: w.id,
       value: w.id
     }, w.name)));
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowOtherDrivers(false);
+      setForm(f => ({
+        ...f,
+        driverId: ''
+      }));
+    },
+    style: {
+      marginTop: 4,
+      background: 'none',
+      border: 'none',
+      color: 'var(--blue, #2a6478)',
+      cursor: 'pointer',
+      fontSize: '0.72rem',
+      padding: 0,
+      textDecoration: 'underline'
+    }
+  }, "\u2190 Nazad na voza\u010De"))), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"
@@ -6089,7 +6139,18 @@ function VozaciView(_ref28) {
         padding: '0.5rem 0.75rem',
         fontSize: '0.82rem'
       }
-    }, v.driverId ? /*#__PURE__*/React.createElement("span", null, "\uD83D\uDE97 ", driverName(v.driverId)) : /*#__PURE__*/React.createElement("span", {
+    }, v.driverId ? (() => {
+      const w = workers.find(x => x.id === v.driverId);
+      const cat = w ? getCatById(w.category) : null;
+      const isOther = w && OTHER_CATEGORIES.includes(w.category);
+      return /*#__PURE__*/React.createElement("span", null, isOther && cat ? cat.icon + ' ' : '🚗 ', driverName(v.driverId), isOther && cat ? /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          color: 'var(--text-muted)',
+          marginLeft: 4
+        }
+      }, "(", cat.short, ")") : '');
+    })() : /*#__PURE__*/React.createElement("span", {
       style: {
         color: 'var(--text-muted)'
       }
