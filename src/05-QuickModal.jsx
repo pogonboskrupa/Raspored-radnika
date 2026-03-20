@@ -36,7 +36,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const [odsutnostType, setOdsType] = useState('Godišnji odmor');
   const [note, setNote]             = useState('');
   const [extraWorkers, setExtra]    = useState([]);
-  const [vehicleId, setVehicleId]   = useState('');
+  const [vehicleIds, setVehicleIds] = useState([]);
   const [showOtherDriver, setShowOtherDriver] = useState(false);
   const [otherDriverId, setOtherDriverId] = useState('');
   const [forceOverride, setForce]   = useState(false);
@@ -109,8 +109,8 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
       helper1Worker: null, helper2Worker: null,
       extraWorkers: isPrimac ? extraWorkers : [],
       allWorkers: finalAllWorkers, note, overrides: [],
-      vehicleId: vehicleId || '',
-      vehicleIds: vehicleId ? [vehicleId] : [],
+      vehicleId: vehicleIds[0] || '',
+      vehicleIds: vehicleIds,
       otherDriverId: otherDriverId || '',
     };
     const c = checkConflict(entry, null);
@@ -298,55 +298,90 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                 </div>
               )}
 
-              {/* ── VOZILO SEKCIJA ── */}
+              {/* ── VOZILA SEKCIJA (više vozila) ── */}
               {availableVehicles.length > 0 && !quickStatus && (
                 <div className="form-group">
-                  <label className="form-label">🚗 Vozilo (prevoz ekipe)</label>
-                  <select className="form-select" value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={{marginBottom:'0.3rem'}}>
-                    <option value="">— Bez vozila —</option>
-                    {availableVehicles.map(v => {
+                  <label className="form-label">🚗 Vozila (prevoz ekipe)</label>
+
+                  {/* Odabrana vozila */}
+                  {vehicleIds.length > 0 && (
+                    <div style={{display:'flex',flexDirection:'column',gap:'0.3rem',marginBottom:'0.4rem'}}>
+                      {vehicleIds.map(vid => {
+                        const v = availableVehicles.find(x => x.id === vid);
+                        if (!v) return null;
+                        const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
+                        return (
+                          <div key={vid} style={{display:'flex',alignItems:'center',gap:'0.4rem',padding:'0.35rem 0.5rem',background:'#f0f7f0',border:'1px solid #a5d6a7',borderRadius:6,fontSize:'0.78rem'}}>
+                            <div style={{flex:1}}>
+                              <span style={{fontWeight:600}}>🚗 {v.registracija}</span>
+                              <span style={{color:'var(--text-muted)',marginLeft:'0.3rem'}}>{v.tipVozila} · {v.brojMjesta} mj.</span>
+                              {drv && <span style={{color:'#2a6478',marginLeft:'0.3rem'}}>({drv.name})</span>}
+                            </div>
+                            <button onClick={() => setVehicleIds(prev => prev.filter(id => id !== vid))}
+                              style={{background:'#c53030',color:'white',border:'none',borderRadius:4,cursor:'pointer',fontSize:'0.65rem',padding:'0.15rem 0.35rem',fontWeight:600}}>✕</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Dodaj vozilo dropdown */}
+                  <select className="form-select" value="" onChange={e => {
+                    if (e.target.value && !vehicleIds.includes(e.target.value)) {
+                      setVehicleIds(prev => [...prev, e.target.value]);
+                    }
+                  }} style={{marginBottom:'0.3rem'}}>
+                    <option value="">— Dodaj vozilo —</option>
+                    {availableVehicles.filter(v => !vehicleIds.includes(v.id)).map(v => {
                       const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
                       return <option key={v.id} value={v.id}>{v.registracija} — {v.tipVozila} ({v.brojMjesta} mj.){drv ? ` — ${drv.name}` : ''}</option>;
                     })}
                   </select>
-                  {vehicleId && (() => {
-                    const sv = availableVehicles.find(v => v.id === vehicleId);
+
+                  {/* Ukupna popunjenost */}
+                  {vehicleIds.length > 0 && (() => {
+                    const totalCap = vehicleIds.reduce((sum, vid) => {
+                      const v = availableVehicles.find(x => x.id === vid);
+                      return sum + (v?.brojMjesta || 0);
+                    }, 0);
                     const totalWorkers = allWorkers.length + (otherDriverId ? 1 : 0);
-                    const isOver = sv && totalWorkers > sv.brojMjesta;
-                    return sv ? (
+                    const isOver = totalWorkers > totalCap;
+                    return (
                       <div style={{fontSize:'0.72rem',color: isOver ? '#c53030' : 'var(--green)',fontWeight:600}}>
-                        {isOver ? '⚠️' : '✅'} Popunjenost: {totalWorkers} / {sv.brojMjesta} mjesta
+                        {isOver ? '⚠️' : '✅'} Ukupno: {totalWorkers} radnika / {totalCap} mjesta ({vehicleIds.length} vozila)
                       </div>
-                    ) : null;
+                    );
                   })()}
 
                   {/* Drugi vozač opcija */}
-                  {!showOtherDriver ? (
-                    <button type="button" onClick={() => setShowOtherDriver(true)}
-                      style={{marginTop:4,background:'none',border:'none',color:'var(--blue, #2a6478)',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
-                      + Drugi vozač (poslovođa, primač, otpremač)...
-                    </button>
-                  ) : (
-                    <div style={{marginTop:'0.4rem'}}>
-                      <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem',fontWeight:600}}>Drugi vozač</div>
-                      <select className="form-select" value={otherDriverId} onChange={e => setOtherDriverId(e.target.value)}>
-                        <option value="">— Odaberi —</option>
-                        {OTHER_DRIVER_CATS.map(catId => {
-                          const cat = getCatById(catId);
-                          const catW = otherPotentialDrivers.filter(w => w.category === catId);
-                          if (catW.length === 0) return null;
-                          return (
-                            <optgroup key={catId} label={cat ? cat.label : catId}>
-                              {catW.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                            </optgroup>
-                          );
-                        })}
-                      </select>
-                      <button type="button" onClick={() => { setShowOtherDriver(false); setOtherDriverId(''); }}
+                  {vehicleIds.length > 0 && (
+                    !showOtherDriver ? (
+                      <button type="button" onClick={() => setShowOtherDriver(true)}
                         style={{marginTop:4,background:'none',border:'none',color:'var(--blue, #2a6478)',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
-                        ← Ukloni drugog vozača
+                        + Drugi vozač za danas (poslovođa, primač, otpremač)...
                       </button>
-                    </div>
+                    ) : (
+                      <div style={{marginTop:'0.4rem',background:'#fff8e1',border:'1px solid #ffe082',borderRadius:'var(--radius)',padding:'0.4rem 0.5rem'}}>
+                        <div style={{fontSize:'0.7rem',color:'#b5620a',marginBottom:'0.2rem',fontWeight:600}}>🔄 Drugi šofer — samo za danas</div>
+                        <select className="form-select" value={otherDriverId} onChange={e => setOtherDriverId(e.target.value)}>
+                          <option value="">— Stalni šofer —</option>
+                          {OTHER_DRIVER_CATS.map(catId => {
+                            const catI = getCatById(catId);
+                            const catW = otherPotentialDrivers.filter(w => w.category === catId);
+                            if (catW.length === 0) return null;
+                            return (
+                              <optgroup key={catId} label={catI ? catI.label : catId}>
+                                {catW.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                              </optgroup>
+                            );
+                          })}
+                        </select>
+                        <button type="button" onClick={() => { setShowOtherDriver(false); setOtherDriverId(''); }}
+                          style={{marginTop:4,background:'none',border:'none',color:'#2a6478',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
+                          ← Ukloni drugog vozača
+                        </button>
+                      </div>
+                    )
                   )}
                 </div>
               )}

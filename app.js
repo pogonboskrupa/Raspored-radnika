@@ -2678,7 +2678,7 @@ function QuickModal(_ref14) {
   const [odsutnostType, setOdsType] = useState('Godišnji odmor');
   const [note, setNote] = useState('');
   const [extraWorkers, setExtra] = useState([]);
-  const [vehicleId, setVehicleId] = useState('');
+  const [vehicleIds, setVehicleIds] = useState([]);
   const [showOtherDriver, setShowOtherDriver] = useState(false);
   const [otherDriverId, setOtherDriverId] = useState('');
   const [forceOverride, setForce] = useState(false);
@@ -2766,8 +2766,8 @@ function QuickModal(_ref14) {
       allWorkers: finalAllWorkers,
       note,
       overrides: [],
-      vehicleId: vehicleId || '',
-      vehicleIds: vehicleId ? [vehicleId] : [],
+      vehicleId: vehicleIds[0] || '',
+      vehicleIds: vehicleIds,
       otherDriverId: otherDriverId || ''
     };
     const c = checkConflict(entry, null);
@@ -3125,33 +3125,94 @@ function QuickModal(_ref14) {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"
-  }, "\uD83D\uDE97 Vozilo (prevoz ekipe)"), /*#__PURE__*/React.createElement("select", {
+  }, "\uD83D\uDE97 Vozila (prevoz ekipe)"), vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.3rem',
+      marginBottom: '0.4rem'
+    }
+  }, vehicleIds.map(vid => {
+    const v = availableVehicles.find(x => x.id === vid);
+    if (!v) return null;
+    const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: vid,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.35rem 0.5rem',
+        background: '#f0f7f0',
+        border: '1px solid #a5d6a7',
+        borderRadius: 6,
+        fontSize: '0.78rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600
+      }
+    }, "\uD83D\uDE97 ", v.registracija), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)',
+        marginLeft: '0.3rem'
+      }
+    }, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), drv && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#2a6478',
+        marginLeft: '0.3rem'
+      }
+    }, "(", drv.name, ")")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setVehicleIds(prev => prev.filter(id => id !== vid)),
+      style: {
+        background: '#c53030',
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        fontSize: '0.65rem',
+        padding: '0.15rem 0.35rem',
+        fontWeight: 600
+      }
+    }, "\u2715"));
+  })), /*#__PURE__*/React.createElement("select", {
     className: "form-select",
-    value: vehicleId,
-    onChange: e => setVehicleId(e.target.value),
+    value: "",
+    onChange: e => {
+      if (e.target.value && !vehicleIds.includes(e.target.value)) {
+        setVehicleIds(prev => [...prev, e.target.value]);
+      }
+    },
     style: {
       marginBottom: '0.3rem'
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Bez vozila \u2014"), availableVehicles.map(v => {
+  }, "\u2014 Dodaj vozilo \u2014"), availableVehicles.filter(v => !vehicleIds.includes(v.id)).map(v => {
     const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
     return /*#__PURE__*/React.createElement("option", {
       key: v.id,
       value: v.id
     }, v.registracija, " \u2014 ", v.tipVozila, " (", v.brojMjesta, " mj.)", drv ? ` — ${drv.name}` : '');
-  })), vehicleId && (() => {
-    const sv = availableVehicles.find(v => v.id === vehicleId);
+  })), vehicleIds.length > 0 && (() => {
+    const totalCap = vehicleIds.reduce((sum, vid) => {
+      const v = availableVehicles.find(x => x.id === vid);
+      return sum + (v?.brojMjesta || 0);
+    }, 0);
     const totalWorkers = allWorkers.length + (otherDriverId ? 1 : 0);
-    const isOver = sv && totalWorkers > sv.brojMjesta;
-    return sv ? /*#__PURE__*/React.createElement("div", {
+    const isOver = totalWorkers > totalCap;
+    return /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: '0.72rem',
         color: isOver ? '#c53030' : 'var(--green)',
         fontWeight: 600
       }
-    }, isOver ? '⚠️' : '✅', " Popunjenost: ", totalWorkers, " / ", sv.brojMjesta, " mjesta") : null;
-  })(), !showOtherDriver ? /*#__PURE__*/React.createElement("button", {
+    }, isOver ? '⚠️' : '✅', " Ukupno: ", totalWorkers, " radnika / ", totalCap, " mjesta (", vehicleIds.length, " vozila)");
+  })(), vehicleIds.length > 0 && (!showOtherDriver ? /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setShowOtherDriver(true),
     style: {
@@ -3164,30 +3225,34 @@ function QuickModal(_ref14) {
       padding: 0,
       textDecoration: 'underline'
     }
-  }, "+ Drugi voza\u010D (poslovo\u0111a, prima\u010D, otprema\u010D)...") : /*#__PURE__*/React.createElement("div", {
+  }, "+ Drugi voza\u010D za danas (poslovo\u0111a, prima\u010D, otprema\u010D)...") : /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: '0.4rem'
+      marginTop: '0.4rem',
+      background: '#fff8e1',
+      border: '1px solid #ffe082',
+      borderRadius: 'var(--radius)',
+      padding: '0.4rem 0.5rem'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: '0.7rem',
-      color: 'var(--text-light)',
+      color: '#b5620a',
       marginBottom: '0.2rem',
       fontWeight: 600
     }
-  }, "Drugi voza\u010D"), /*#__PURE__*/React.createElement("select", {
+  }, "\uD83D\uDD04 Drugi \u0161ofer \u2014 samo za danas"), /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: otherDriverId,
     onChange: e => setOtherDriverId(e.target.value)
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Odaberi \u2014"), OTHER_DRIVER_CATS.map(catId => {
-    const cat = getCatById(catId);
+  }, "\u2014 Stalni \u0161ofer \u2014"), OTHER_DRIVER_CATS.map(catId => {
+    const catI = getCatById(catId);
     const catW = otherPotentialDrivers.filter(w => w.category === catId);
     if (catW.length === 0) return null;
     return /*#__PURE__*/React.createElement("optgroup", {
       key: catId,
-      label: cat ? cat.label : catId
+      label: catI ? catI.label : catId
     }, catW.map(w => /*#__PURE__*/React.createElement("option", {
       key: w.id,
       value: w.id
@@ -3202,13 +3267,13 @@ function QuickModal(_ref14) {
       marginTop: 4,
       background: 'none',
       border: 'none',
-      color: 'var(--blue, #2a6478)',
+      color: '#2a6478',
       cursor: 'pointer',
       fontSize: '0.72rem',
       padding: 0,
       textDecoration: 'underline'
     }
-  }, "\u2190 Ukloni drugog voza\u010Da"))), /*#__PURE__*/React.createElement("div", {
+  }, "\u2190 Ukloni drugog voza\u010Da")))), /*#__PURE__*/React.createElement("div", {
     className: "form-group",
     style: {
       marginBottom: 0
@@ -3289,7 +3354,6 @@ function EntryModal(_ref15) {
   });
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
-  const [vehicleOverride, setVehicleOverride] = useState(!!data.vehicleId || data.vehicleIds && data.vehicleIds.length > 0);
   const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
@@ -3300,11 +3364,14 @@ function EntryModal(_ref15) {
   // Auto-detect default vehicle from driver in selected workers
   const driverInWorkers = form.allWorkers.map(wId => workers.find(w => w.id === wId)).find(w => w && ENTRY_DRIVER_CATS.includes(w.category));
   const defaultVehicle = driverInWorkers ? (vehicles || []).find(v => v.driverId === driverInWorkers.id && v.status === 'vozno') : null;
-  const effectiveVehicleId = defaultVehicle && !vehicleOverride ? defaultVehicle.id : form.vehicleId;
-  const selectedVehicle = (vehicles || []).find(v => v.id === effectiveVehicleId);
+
+  // Multi-vehicle capacity
   const workerCount = form.allWorkers.length;
-  const vehicleCapacity = selectedVehicle?.brojMjesta || 0;
-  const isOverCapacity = selectedVehicle && workerCount > vehicleCapacity;
+  const totalVehicleCapacity = form.vehicleIds.reduce((sum, vid) => {
+    const v = availableVehicles.find(x => x.id === vid);
+    return sum + (v?.brojMjesta || 0);
+  }, 0);
+  const isOverCapacity = form.vehicleIds.length > 0 && workerCount > totalVehicleCapacity;
 
   // Radnici koji su već raspoređeni za isti datum u drugim unosima
   const alreadyScheduled = new Set(schedules.filter(s => s.date === form.date && (!isEdit || s.id !== form.id)).flatMap(s => s.allWorkers || []));
@@ -3344,13 +3411,12 @@ function EntryModal(_ref15) {
       setConflicts(c);
       return;
     }
-    const finalVehicleIds = form.vehicleIds.length > 0 ? form.vehicleIds : effectiveVehicleId ? [effectiveVehicleId] : [];
     const finalAllWorkers = form.otherDriverId && !form.allWorkers.includes(form.otherDriverId) ? [...form.allWorkers, form.otherDriverId] : form.allWorkers;
     onSave({
       ...form,
       allWorkers: finalAllWorkers,
-      vehicleId: finalVehicleIds[0] || '',
-      vehicleIds: finalVehicleIds,
+      vehicleId: form.vehicleIds[0] || '',
+      vehicleIds: form.vehicleIds,
       otherDriverId: form.otherDriverId || '',
       overrides: forceOverride ? c : []
     });
@@ -3735,93 +3801,108 @@ function EntryModal(_ref15) {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"
-  }, "\uD83D\uDE97 Vozilo (prevoz radnika)"), defaultVehicle && !vehicleOverride ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDE97 Vozila (prevoz radnika)"), defaultVehicle && !form.vehicleIds.includes(defaultVehicle.id) && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: '0.5rem',
-      padding: '0.5rem 0.75rem',
+      gap: '0.4rem',
+      padding: '0.4rem 0.6rem',
       background: '#e8f5e9',
       border: '1px solid #a5d6a7',
-      borderRadius: 'var(--radius)'
+      borderRadius: 6,
+      marginBottom: '0.4rem',
+      fontSize: '0.78rem'
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '0.85rem'
-    }
-  }, "\uD83D\uDFE2"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDFE2"), /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: '0.85rem'
-    }
-  }, defaultVehicle.registracija, " \u2014 ", defaultVehicle.tipVozila), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.7rem',
-      color: 'var(--text-muted)'
-    }
-  }, "Default vozilo za ", driverInWorkers.name, " \xB7 ", defaultVehicle.brojMjesta, " mj.")), /*#__PURE__*/React.createElement("button", {
+  }, "Default: ", /*#__PURE__*/React.createElement("strong", null, defaultVehicle.registracija), " (", driverInWorkers?.name, ")"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm",
-    onClick: () => {
-      setVehicleOverride(true);
-      setForm(f => ({
-        ...f,
-        vehicleId: defaultVehicle.id
-      }));
+    style: {
+      fontSize: '0.68rem'
     },
-    style: {
-      fontSize: '0.7rem',
-      whiteSpace: 'nowrap'
-    }
-  }, "\uD83D\uDD04 Promijeni za danas"))) : /*#__PURE__*/React.createElement("div", null, defaultVehicle && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: '0.4rem',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.4rem'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '0.7rem',
-      color: 'var(--text-muted)',
-      fontStyle: 'italic'
-    }
-  }, "\u26A0\uFE0F Ru\u010Dno odabrano vozilo (override za danas)"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setVehicleOverride(false);
-      setForm(f => ({
-        ...f,
-        vehicleId: ''
-      }));
-    },
-    style: {
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '0.7rem',
-      color: '#2a6478',
-      textDecoration: 'underline'
-    }
-  }, "Vrati default")), /*#__PURE__*/React.createElement("select", {
-    className: "form-select",
-    value: form.vehicleId,
-    onChange: e => setForm(f => ({
+    onClick: () => setForm(f => ({
       ...f,
-      vehicleId: e.target.value
+      vehicleIds: [...f.vehicleIds, defaultVehicle.id]
     }))
+  }, "+ Dodaj")), form.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.3rem',
+      marginBottom: '0.4rem'
+    }
+  }, form.vehicleIds.map(vid => {
+    const v = availableVehicles.find(x => x.id === vid);
+    if (!v) return null;
+    const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: vid,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.35rem 0.5rem',
+        background: '#f0f7f0',
+        border: '1px solid #a5d6a7',
+        borderRadius: 6,
+        fontSize: '0.78rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600
+      }
+    }, "\uD83D\uDE97 ", v.registracija), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)',
+        marginLeft: '0.3rem'
+      }
+    }, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), drv && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#2a6478',
+        marginLeft: '0.3rem'
+      }
+    }, "(", drv.name, ")")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setForm(f => ({
+        ...f,
+        vehicleIds: f.vehicleIds.filter(id => id !== vid)
+      })),
+      style: {
+        background: '#c53030',
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        fontSize: '0.65rem',
+        padding: '0.15rem 0.35rem',
+        fontWeight: 600
+      }
+    }, "\u2715"));
+  })), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: "",
+    onChange: e => {
+      if (e.target.value && !form.vehicleIds.includes(e.target.value)) {
+        setForm(f => ({
+          ...f,
+          vehicleIds: [...f.vehicleIds, e.target.value]
+        }));
+      }
+    }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Bez vozila \u2014"), availableVehicles.map(v => {
+  }, "\u2014 Dodaj vozilo \u2014"), availableVehicles.filter(v => !form.vehicleIds.includes(v.id)).map(v => {
     const driver = workers.find(w => w.id === v.driverId);
-    const isDefault = defaultVehicle && v.id === defaultVehicle.id;
     return /*#__PURE__*/React.createElement("option", {
       key: v.id,
       value: v.id
-    }, v.registracija, " \u2014 ", v.tipVozila, " (", v.brojMjesta, " mj.)", driver ? ` — ${driver.name}` : '', isDefault ? ' ⭐ default' : '');
-  }))), selectedVehicle && /*#__PURE__*/React.createElement("div", {
+    }, v.registracija, " \u2014 ", v.tipVozila, " (", v.brojMjesta, " mj.)", driver ? ` — ${driver.name}` : '');
+  })), form.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: '0.5rem'
     }
@@ -3838,7 +3919,7 @@ function EntryModal(_ref15) {
       fontWeight: 600,
       color: isOverCapacity ? 'var(--red)' : 'var(--green)'
     }
-  }, isOverCapacity ? '⚠️' : '✅', " Popunjenost: ", workerCount, " / ", vehicleCapacity, " mjesta")), /*#__PURE__*/React.createElement("div", {
+  }, isOverCapacity ? '⚠️' : '✅', " Ukupno: ", workerCount, " radnika / ", totalVehicleCapacity, " mjesta (", form.vehicleIds.length, " vozila)")), /*#__PURE__*/React.createElement("div", {
     style: {
       height: 8,
       background: '#eee',
@@ -3848,8 +3929,8 @@ function EntryModal(_ref15) {
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       height: '100%',
-      width: `${Math.min(100, workerCount / vehicleCapacity * 100)}%`,
-      background: isOverCapacity ? '#e53e3e' : workerCount === vehicleCapacity ? '#ed8936' : '#38a169',
+      width: `${Math.min(100, workerCount / totalVehicleCapacity * 100)}%`,
+      background: isOverCapacity ? '#e53e3e' : workerCount === totalVehicleCapacity ? '#ed8936' : '#38a169',
       borderRadius: 4,
       transition: 'width 0.3s'
     }
@@ -3864,7 +3945,7 @@ function EntryModal(_ref15) {
       color: '#c53030',
       fontWeight: 600
     }
-  }, "\u26A0\uFE0F UPOZORENJE: ", workerCount - vehicleCapacity, " radnik(a) vi\u0161e od kapaciteta vozila!")), effectiveVehicleId && /*#__PURE__*/React.createElement("div", {
+  }, "\u26A0\uFE0F UPOZORENJE: ", workerCount - totalVehicleCapacity, " radnik(a) vi\u0161e od ukupnog kapaciteta!")), form.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: '0.5rem'
     }

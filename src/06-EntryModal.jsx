@@ -19,7 +19,6 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
 
-  const [vehicleOverride, setVehicleOverride] = useState(!!data.vehicleId || (data.vehicleIds && data.vehicleIds.length > 0));
   const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
@@ -31,11 +30,14 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   // Auto-detect default vehicle from driver in selected workers
   const driverInWorkers = form.allWorkers.map(wId => workers.find(w => w.id === wId)).find(w => w && ENTRY_DRIVER_CATS.includes(w.category));
   const defaultVehicle = driverInWorkers ? (vehicles || []).find(v => v.driverId === driverInWorkers.id && v.status === 'vozno') : null;
-  const effectiveVehicleId = defaultVehicle && !vehicleOverride ? defaultVehicle.id : form.vehicleId;
-  const selectedVehicle = (vehicles || []).find(v => v.id === effectiveVehicleId);
+
+  // Multi-vehicle capacity
   const workerCount = form.allWorkers.length;
-  const vehicleCapacity = selectedVehicle?.brojMjesta || 0;
-  const isOverCapacity = selectedVehicle && workerCount > vehicleCapacity;
+  const totalVehicleCapacity = form.vehicleIds.reduce((sum, vid) => {
+    const v = availableVehicles.find(x => x.id === vid);
+    return sum + (v?.brojMjesta || 0);
+  }, 0);
+  const isOverCapacity = form.vehicleIds.length > 0 && workerCount > totalVehicleCapacity;
 
   // Radnici koji su već raspoređeni za isti datum u drugim unosima
   const alreadyScheduled = new Set(
@@ -74,10 +76,9 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
       setConflicts(c);
       return;
     }
-    const finalVehicleIds = form.vehicleIds.length > 0 ? form.vehicleIds : (effectiveVehicleId ? [effectiveVehicleId] : []);
     const finalAllWorkers = form.otherDriverId && !form.allWorkers.includes(form.otherDriverId)
       ? [...form.allWorkers, form.otherDriverId] : form.allWorkers;
-    onSave({...form, allWorkers: finalAllWorkers, vehicleId: finalVehicleIds[0] || '', vehicleIds: finalVehicleIds, otherDriverId: form.otherDriverId || '', overrides: forceOverride ? c : []});
+    onSave({...form, allWorkers: finalAllWorkers, vehicleId: form.vehicleIds[0] || '', vehicleIds: form.vehicleIds, otherDriverId: form.otherDriverId || '', overrides: forceOverride ? c : []});
   };
 
   return (
@@ -271,72 +272,84 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             </div>
           )}
 
-          {/* ─── VOZILO SEKCIJA ─── */}
+          {/* ─── VOZILA SEKCIJA (više vozila) ─── */}
           <div className="form-group">
-            <label className="form-label">🚗 Vozilo (prevoz radnika)</label>
-            {defaultVehicle && !vehicleOverride ? (
-              <div>
-                <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.5rem 0.75rem',background:'#e8f5e9',border:'1px solid #a5d6a7',borderRadius:'var(--radius)'}}>
-                  <span style={{fontSize:'0.85rem'}}>🟢</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:'0.85rem'}}>{defaultVehicle.registracija} — {defaultVehicle.tipVozila}</div>
-                    <div style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>Default vozilo za {driverInWorkers.name} · {defaultVehicle.brojMjesta} mj.</div>
-                  </div>
-                  <button className="btn btn-secondary btn-sm" onClick={() => { setVehicleOverride(true); setForm(f=>({...f,vehicleId:defaultVehicle.id})); }}
-                    style={{fontSize:'0.7rem',whiteSpace:'nowrap'}}>
-                    🔄 Promijeni za danas
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {defaultVehicle && (
-                  <div style={{marginBottom:'0.4rem',display:'flex',alignItems:'center',gap:'0.4rem'}}>
-                    <span style={{fontSize:'0.7rem',color:'var(--text-muted)',fontStyle:'italic'}}>⚠️ Ručno odabrano vozilo (override za danas)</span>
-                    <button onClick={() => { setVehicleOverride(false); setForm(f=>({...f,vehicleId:''})); }}
-                      style={{background:'none',border:'none',cursor:'pointer',fontSize:'0.7rem',color:'#2a6478',textDecoration:'underline'}}>
-                      Vrati default
-                    </button>
-                  </div>
-                )}
-                <select className="form-select" value={form.vehicleId} onChange={e=>setForm(f=>({...f,vehicleId:e.target.value}))}>
-                  <option value="">— Bez vozila —</option>
-                  {availableVehicles.map(v => {
-                    const driver = workers.find(w => w.id === v.driverId);
-                    const isDefault = defaultVehicle && v.id === defaultVehicle.id;
-                    return <option key={v.id} value={v.id}>{v.registracija} — {v.tipVozila} ({v.brojMjesta} mj.){driver ? ` — ${driver.name}` : ''}{isDefault ? ' ⭐ default' : ''}</option>;
-                  })}
-                </select>
+            <label className="form-label">🚗 Vozila (prevoz radnika)</label>
+
+            {/* Auto-detected default vehicle hint */}
+            {defaultVehicle && !form.vehicleIds.includes(defaultVehicle.id) && (
+              <div style={{display:'flex',alignItems:'center',gap:'0.4rem',padding:'0.4rem 0.6rem',background:'#e8f5e9',border:'1px solid #a5d6a7',borderRadius:6,marginBottom:'0.4rem',fontSize:'0.78rem'}}>
+                <span>🟢</span>
+                <span style={{flex:1}}>Default: <strong>{defaultVehicle.registracija}</strong> ({driverInWorkers?.name})</span>
+                <button className="btn btn-secondary btn-sm" style={{fontSize:'0.68rem'}}
+                  onClick={() => setForm(f=>({...f, vehicleIds: [...f.vehicleIds, defaultVehicle.id]}))}>
+                  + Dodaj
+                </button>
               </div>
             )}
 
+            {/* Odabrana vozila */}
+            {form.vehicleIds.length > 0 && (
+              <div style={{display:'flex',flexDirection:'column',gap:'0.3rem',marginBottom:'0.4rem'}}>
+                {form.vehicleIds.map(vid => {
+                  const v = availableVehicles.find(x => x.id === vid);
+                  if (!v) return null;
+                  const drv = v.driverId ? workers.find(w => w.id === v.driverId) : null;
+                  return (
+                    <div key={vid} style={{display:'flex',alignItems:'center',gap:'0.4rem',padding:'0.35rem 0.5rem',background:'#f0f7f0',border:'1px solid #a5d6a7',borderRadius:6,fontSize:'0.78rem'}}>
+                      <div style={{flex:1}}>
+                        <span style={{fontWeight:600}}>🚗 {v.registracija}</span>
+                        <span style={{color:'var(--text-muted)',marginLeft:'0.3rem'}}>{v.tipVozila} · {v.brojMjesta} mj.</span>
+                        {drv && <span style={{color:'#2a6478',marginLeft:'0.3rem'}}>({drv.name})</span>}
+                      </div>
+                      <button onClick={() => setForm(f=>({...f, vehicleIds: f.vehicleIds.filter(id => id !== vid)}))}
+                        style={{background:'#c53030',color:'white',border:'none',borderRadius:4,cursor:'pointer',fontSize:'0.65rem',padding:'0.15rem 0.35rem',fontWeight:600}}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Dodaj vozilo dropdown */}
+            <select className="form-select" value="" onChange={e => {
+              if (e.target.value && !form.vehicleIds.includes(e.target.value)) {
+                setForm(f=>({...f, vehicleIds: [...f.vehicleIds, e.target.value]}));
+              }
+            }}>
+              <option value="">— Dodaj vozilo —</option>
+              {availableVehicles.filter(v => !form.vehicleIds.includes(v.id)).map(v => {
+                const driver = workers.find(w => w.id === v.driverId);
+                return <option key={v.id} value={v.id}>{v.registracija} — {v.tipVozila} ({v.brojMjesta} mj.){driver ? ` — ${driver.name}` : ''}</option>;
+              })}
+            </select>
+
             {/* KAPACITET / POPUNJENOST */}
-            {selectedVehicle && (
+            {form.vehicleIds.length > 0 && (
               <div style={{marginTop:'0.5rem'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.3rem'}}>
                   <span style={{fontSize:'0.72rem',fontWeight:600,color: isOverCapacity ? 'var(--red)' : 'var(--green)'}}>
-                    {isOverCapacity ? '⚠️' : '✅'} Popunjenost: {workerCount} / {vehicleCapacity} mjesta
+                    {isOverCapacity ? '⚠️' : '✅'} Ukupno: {workerCount} radnika / {totalVehicleCapacity} mjesta ({form.vehicleIds.length} vozila)
                   </span>
                 </div>
                 <div style={{height:8,background:'#eee',borderRadius:4,overflow:'hidden'}}>
                   <div style={{
                     height:'100%',
-                    width: `${Math.min(100, (workerCount / vehicleCapacity) * 100)}%`,
-                    background: isOverCapacity ? '#e53e3e' : workerCount === vehicleCapacity ? '#ed8936' : '#38a169',
+                    width: `${Math.min(100, (workerCount / totalVehicleCapacity) * 100)}%`,
+                    background: isOverCapacity ? '#e53e3e' : workerCount === totalVehicleCapacity ? '#ed8936' : '#38a169',
                     borderRadius:4,
                     transition:'width 0.3s',
                   }} />
                 </div>
                 {isOverCapacity && (
                   <div style={{marginTop:'0.3rem',padding:'0.3rem 0.5rem',background:'#fde8e8',border:'1px solid #f5b5b5',borderRadius:4,fontSize:'0.72rem',color:'#c53030',fontWeight:600}}>
-                    ⚠️ UPOZORENJE: {workerCount - vehicleCapacity} radnik(a) više od kapaciteta vozila!
+                    ⚠️ UPOZORENJE: {workerCount - totalVehicleCapacity} radnik(a) više od ukupnog kapaciteta!
                   </div>
                 )}
               </div>
             )}
 
             {/* DRUGI ŠOFER ZA DANAS */}
-            {effectiveVehicleId && (
+            {form.vehicleIds.length > 0 && (
               <div style={{marginTop:'0.5rem'}}>
                 {!showOtherDriver ? (
                   <button type="button" onClick={() => setShowOtherDriver(true)}
