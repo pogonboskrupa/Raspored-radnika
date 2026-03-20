@@ -11,11 +11,10 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [holidayName, setHolidayName] = useState('');
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO' },
     'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B'  },
-    'Slobodan dan':   { bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a', short:'SD' },
     'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N'  },
   };
 
@@ -384,7 +383,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       cellText = <span style={{color:'#e65100',fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>P</span>;
                       title = '🎉 Praznik: ' + (entry.holidayName||'');
                     } else if (entry?.type === 'odsutnost') {
-                      const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
+                      const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Neplaćeno'];
                       cellBg = oc.bg;
                       cellBorderColor = oc.border;
                       cellText = (
@@ -446,7 +445,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                   } else if (entry?.type === 'praznik') {
                     bg = '#e65100'; color = 'white'; fontW = 700; label = 'P';
                   } else if (entry?.type === 'odsutnost') {
-                    const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan'];
+                    const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Neplaćeno'];
                     bg = oc.color; color = 'white'; fontW = 700; label = oc.short;
                   } else if (wknd) {
                     bg = '#d5d0c8'; color = '#fff';
@@ -584,7 +583,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                                 bg = '#fff3e0'; border = '#ffb74d';
                                 content = <span style={{color:'#e65100',fontWeight:700,fontSize:'0.58rem',fontFamily:'var(--mono)'}}>P</span>;
                               } else if (entry?.type==='odsutnost') {
-                                const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan'];
+                                const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Neplaćeno'];
                                 bg = oc.bg; border = oc.border;
                                 content = <span style={{color:oc.color,fontWeight:700,fontSize:'0.58rem',fontFamily:'var(--mono)'}}>{oc.short}</span>;
                               }
@@ -600,7 +599,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         let bg, color, label = String(d), fontW = 400;
                         if (entry?.type==='rad') { bg = cat?.color||'#2d5a27'; color = 'white'; fontW = 700; }
                         else if (entry?.type==='praznik') { bg = '#e65100'; color = 'white'; fontW = 700; label = 'P'; }
-                        else if (entry?.type==='odsutnost') { const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Slobodan dan']; bg = oc.color; color = 'white'; fontW = 700; label = oc.short; }
+                        else if (entry?.type==='odsutnost') { const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Neplaćeno']; bg = oc.color; color = 'white'; fontW = 700; label = oc.short; }
                         else if (wknd) { bg = '#d5d0c8'; color = '#fff'; }
                         else { bg = '#e8e4dc'; color = '#a09888'; }
                         return <div key={d} style={{height:22,background:bg,borderRadius:2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.42rem',fontWeight:fontW,fontFamily:'var(--mono)',color}}>{label}</div>;

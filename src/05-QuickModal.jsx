@@ -6,11 +6,10 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   // Two modes: 'rad' or 'odsutnost'
   const [mode, setMode] = useState('rad');
 
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO', icon:'🏖️' },
     'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B',  icon:'🏥' },
-    'Slobodan dan':   { bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a', short:'SD', icon:'☀️' },
     'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N',  icon:'📋' },
   };
 
@@ -34,6 +33,8 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const [jobType, setJobType]       = useState(defaultJob());
   const [quickStatus, setQuickStatus] = useState(null); // 'kancelarija' | 'teren' | null
   const [odsutnostType, setOdsType] = useState('Godišnji odmor');
+  const [odsDateOd, setOdsDateOd]   = useState(selectedDate);
+  const [odsDateDo, setOdsDateDo]   = useState('');
   const [note, setNote]             = useState('');
   const [extraWorkers, setExtra]    = useState([]);
   const [vehicleIds, setVehicleIds] = useState([]);
@@ -79,10 +80,20 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   };
 
   const handleSaveOdsutnost = () => {
+    if (!odsDateOd) return alert('Odaberi datum!');
+    const startDate = new Date(odsDateOd);
+    const endDate = odsDateDo ? new Date(odsDateDo) : startDate;
+    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    const dates = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
+      const dw = d.getDay();
+      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0,10));
+    }
+    if (dates.length === 0) return alert('Nema radnih dana u odabranom periodu!');
     setGodisnji(g => {
-      const prev = g[worker.id] || [];
-      const filtered = prev.filter(e => e.date !== selectedDate);
-      return { ...g, [worker.id]: [...filtered, { date: selectedDate, type: odsutnostType, note }] };
+      const prev = (g[worker.id] || []).filter(e => !dates.includes(e.date));
+      const newEntries = dates.map(dt => ({ date: dt, type: odsutnostType, note }));
+      return { ...g, [worker.id]: [...prev, ...newEntries] };
     });
     onClose();
   };
@@ -154,7 +165,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
           {/* ── ODSUTNOST MODE ── */}
           {mode === 'odsutnost' && (
             <div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem',marginBottom:'0.75rem'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'0.5rem',marginBottom:'0.75rem'}}>
                 {ODSUTNOST_TYPES.map(t => {
                   const o = ODSUTNOST_COLOR[t];
                   return (
@@ -172,6 +183,27 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                   );
                 })}
               </div>
+
+              {/* Period (Od - Do) */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem',marginBottom:'0.5rem'}}>
+                <div className="form-group" style={{marginBottom:0}}>
+                  <label className="form-label">Od *</label>
+                  <input type="date" className="form-input" value={odsDateOd}
+                    onChange={e => { setOdsDateOd(e.target.value); if (odsDateDo && odsDateDo < e.target.value) setOdsDateDo(e.target.value); }} />
+                </div>
+                <div className="form-group" style={{marginBottom:0}}>
+                  <label className="form-label">Do <span style={{color:'var(--text-light)',fontWeight:400}}>(opciono)</span></label>
+                  <input type="date" className="form-input" value={odsDateDo} min={odsDateOd || undefined}
+                    onChange={e => setOdsDateDo(e.target.value)} />
+                </div>
+              </div>
+              {odsDateOd && odsDateDo && odsDateDo >= odsDateOd && (() => {
+                const s = new Date(odsDateOd), e = new Date(odsDateDo);
+                let count = 0;
+                for (let d = new Date(s); d <= e; d.setDate(d.getDate()+1)) { const dw=d.getDay(); if(dw!==0&&dw!==6) count++; }
+                return <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:'0.4rem'}}>📅 {count} radni{count===1?'':count<5?'a':'h'} dan{count===1?'':count<5?'a':'a'} u periodu</div>;
+              })()}
+
               <div className="form-group" style={{marginBottom:0}}>
                 <label className="form-label">Napomena</label>
                 <input className="form-input" placeholder="Opcionalno..." value={note} onChange={e=>setNote(e.target.value)} />
