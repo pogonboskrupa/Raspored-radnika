@@ -107,7 +107,7 @@ function LoginScreen({ onLogin }) {
             Raspored Radnika
           </div>
           <div style={{fontFamily:'var(--mono)',fontSize:'0.7rem',color:'var(--text-muted)',marginTop:'0.25rem'}}>
-            Šumsko gospodarstvo
+            Šumarija Bos.Krupa
           </div>
         </div>
 

@@ -323,30 +323,34 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               })}
             </select>
 
-            {/* KAPACITET / POPUNJENOST */}
-            {form.vehicleIds.length > 0 && (
-              <div style={{marginTop:'0.5rem'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.3rem'}}>
-                  <span style={{fontSize:'0.72rem',fontWeight:600,color: isOverCapacity ? 'var(--red)' : 'var(--green)'}}>
-                    {isOverCapacity ? '⚠️' : '✅'} Ukupno: {workerCount} radnika / {totalVehicleCapacity} mjesta ({form.vehicleIds.length} vozila)
-                  </span>
-                </div>
-                <div style={{height:8,background:'#eee',borderRadius:4,overflow:'hidden'}}>
-                  <div style={{
-                    height:'100%',
-                    width: `${Math.min(100, (workerCount / totalVehicleCapacity) * 100)}%`,
-                    background: isOverCapacity ? '#e53e3e' : workerCount === totalVehicleCapacity ? '#ed8936' : '#38a169',
-                    borderRadius:4,
-                    transition:'width 0.3s',
-                  }} />
-                </div>
-                {isOverCapacity && (
-                  <div style={{marginTop:'0.3rem',padding:'0.3rem 0.5rem',background:'#fde8e8',border:'1px solid #f5b5b5',borderRadius:4,fontSize:'0.72rem',color:'#c53030',fontWeight:600}}>
-                    ⚠️ UPOZORENJE: {workerCount - totalVehicleCapacity} radnik(a) više od ukupnog kapaciteta!
+            {/* POPUNJENOST PO VOZILIMA */}
+            {form.vehicleIds.length > 0 && (() => {
+              let remaining = workerCount;
+              const perVehicle = form.vehicleIds.map(vid => {
+                const v = availableVehicles.find(x => x.id === vid);
+                const cap = v?.brojMjesta || 0;
+                const fill = Math.min(remaining, cap);
+                remaining = Math.max(0, remaining - cap);
+                return { vid, cap, fill, v };
+              });
+              return (
+                <div style={{marginTop:'0.5rem'}}>
+                  {perVehicle.map(pv => (
+                    <div key={pv.vid} style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.25rem',fontSize:'0.72rem'}}>
+                      <span style={{color:'var(--text-muted)',minWidth:100}}>{pv.v?.registracija || '?'}</span>
+                      <div style={{flex:1,height:8,background:'#eee',borderRadius:4,overflow:'hidden'}}>
+                        <div style={{height:'100%',width:`${pv.cap>0?Math.min(100,(pv.fill/pv.cap)*100):0}%`,background:pv.fill>=pv.cap?(pv.fill>pv.cap?'#e53e3e':'#ed8936'):'#38a169',borderRadius:4,transition:'width 0.3s'}} />
+                      </div>
+                      <span style={{fontWeight:600,color:pv.fill>=pv.cap?(pv.fill>pv.cap?'#c53030':'#b5620a'):'var(--green)',minWidth:45,textAlign:'right'}}>{pv.fill}/{pv.cap}</span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:'0.72rem',fontWeight:600,color: isOverCapacity ? '#c53030' : 'var(--green)',marginTop:'0.15rem'}}>
+                    {isOverCapacity ? '⚠️' : '✅'} Ukupno: {workerCount} radnika / {totalVehicleCapacity} mjesta ({form.vehicleIds.length} voz.)
+                    {remaining > 0 && <span style={{color:'#c53030'}}> — {remaining} bez mjesta!</span>}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              );
+            })()}
 
             {/* DRUGI ŠOFER ZA DANAS */}
             {form.vehicleIds.length > 0 && (

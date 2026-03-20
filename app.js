@@ -790,7 +790,7 @@ function LoginScreen(_ref) {
       color: 'var(--text-muted)',
       marginTop: '0.25rem'
     }
-  }, "\u0160umsko gospodarstvo")), mode === 'setup' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "\u0160umarija Bos.Krupa")), mode === 'setup' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
       marginBottom: '1rem'
@@ -3199,19 +3199,75 @@ function QuickModal(_ref14) {
       value: v.id
     }, v.registracija, " \u2014 ", v.tipVozila, " (", v.brojMjesta, " mj.)", drv ? ` — ${drv.name}` : '');
   })), vehicleIds.length > 0 && (() => {
-    const totalCap = vehicleIds.reduce((sum, vid) => {
-      const v = availableVehicles.find(x => x.id === vid);
-      return sum + (v?.brojMjesta || 0);
-    }, 0);
     const totalWorkers = allWorkers.length + (otherDriverId ? 1 : 0);
+    let remaining = totalWorkers;
+    const perVehicle = vehicleIds.map(vid => {
+      const v = availableVehicles.find(x => x.id === vid);
+      const cap = v?.brojMjesta || 0;
+      const fill = Math.min(remaining, cap);
+      remaining = Math.max(0, remaining - cap);
+      return {
+        vid,
+        cap,
+        fill,
+        v
+      };
+    });
+    const totalCap = perVehicle.reduce((s, p) => s + p.cap, 0);
     const isOver = totalWorkers > totalCap;
     return /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: '0.72rem',
-        color: isOver ? '#c53030' : 'var(--green)',
-        fontWeight: 600
+        marginTop: '0.3rem'
       }
-    }, isOver ? '⚠️' : '✅', " Ukupno: ", totalWorkers, " radnika / ", totalCap, " mjesta (", vehicleIds.length, " vozila)");
+    }, perVehicle.map((pv, idx) => /*#__PURE__*/React.createElement("div", {
+      key: pv.vid,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        marginBottom: '0.2rem',
+        fontSize: '0.72rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)',
+        minWidth: 90
+      }
+    }, pv.v?.registracija || '?'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        height: 7,
+        background: '#eee',
+        borderRadius: 4,
+        overflow: 'hidden'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: '100%',
+        width: `${pv.cap > 0 ? Math.min(100, pv.fill / pv.cap * 100) : 0}%`,
+        background: pv.fill >= pv.cap ? '#ed8936' : '#38a169',
+        borderRadius: 4,
+        transition: 'width 0.3s'
+      }
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        color: pv.fill >= pv.cap ? pv.fill > pv.cap ? '#c53030' : '#b5620a' : 'var(--green)',
+        minWidth: 40,
+        textAlign: 'right'
+      }
+    }, pv.fill, "/", pv.cap))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        color: isOver ? '#c53030' : 'var(--green)',
+        marginTop: '0.15rem'
+      }
+    }, isOver ? '⚠️' : '✅', " Ukupno: ", totalWorkers, " radnika / ", totalCap, " mjesta (", vehicleIds.length, " voz.)", remaining > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#c53030'
+      }
+    }, " \u2014 ", remaining, " bez mjesta!")));
   })(), vehicleIds.length > 0 && (!showOtherDriver ? /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setShowOtherDriver(true),
@@ -3902,50 +3958,74 @@ function EntryModal(_ref15) {
       key: v.id,
       value: v.id
     }, v.registracija, " \u2014 ", v.tipVozila, " (", v.brojMjesta, " mj.)", driver ? ` — ${driver.name}` : '');
-  })), form.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: '0.5rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      marginBottom: '0.3rem'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '0.72rem',
-      fontWeight: 600,
-      color: isOverCapacity ? 'var(--red)' : 'var(--green)'
-    }
-  }, isOverCapacity ? '⚠️' : '✅', " Ukupno: ", workerCount, " radnika / ", totalVehicleCapacity, " mjesta (", form.vehicleIds.length, " vozila)")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: 8,
-      background: '#eee',
-      borderRadius: 4,
-      overflow: 'hidden'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: '100%',
-      width: `${Math.min(100, workerCount / totalVehicleCapacity * 100)}%`,
-      background: isOverCapacity ? '#e53e3e' : workerCount === totalVehicleCapacity ? '#ed8936' : '#38a169',
-      borderRadius: 4,
-      transition: 'width 0.3s'
-    }
-  })), isOverCapacity && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: '0.3rem',
-      padding: '0.3rem 0.5rem',
-      background: '#fde8e8',
-      border: '1px solid #f5b5b5',
-      borderRadius: 4,
-      fontSize: '0.72rem',
-      color: '#c53030',
-      fontWeight: 600
-    }
-  }, "\u26A0\uFE0F UPOZORENJE: ", workerCount - totalVehicleCapacity, " radnik(a) vi\u0161e od ukupnog kapaciteta!")), form.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), form.vehicleIds.length > 0 && (() => {
+    let remaining = workerCount;
+    const perVehicle = form.vehicleIds.map(vid => {
+      const v = availableVehicles.find(x => x.id === vid);
+      const cap = v?.brojMjesta || 0;
+      const fill = Math.min(remaining, cap);
+      remaining = Math.max(0, remaining - cap);
+      return {
+        vid,
+        cap,
+        fill,
+        v
+      };
+    });
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '0.5rem'
+      }
+    }, perVehicle.map(pv => /*#__PURE__*/React.createElement("div", {
+      key: pv.vid,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        marginBottom: '0.25rem',
+        fontSize: '0.72rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)',
+        minWidth: 100
+      }
+    }, pv.v?.registracija || '?'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        height: 8,
+        background: '#eee',
+        borderRadius: 4,
+        overflow: 'hidden'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: '100%',
+        width: `${pv.cap > 0 ? Math.min(100, pv.fill / pv.cap * 100) : 0}%`,
+        background: pv.fill >= pv.cap ? pv.fill > pv.cap ? '#e53e3e' : '#ed8936' : '#38a169',
+        borderRadius: 4,
+        transition: 'width 0.3s'
+      }
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        color: pv.fill >= pv.cap ? pv.fill > pv.cap ? '#c53030' : '#b5620a' : 'var(--green)',
+        minWidth: 45,
+        textAlign: 'right'
+      }
+    }, pv.fill, "/", pv.cap))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        color: isOverCapacity ? '#c53030' : 'var(--green)',
+        marginTop: '0.15rem'
+      }
+    }, isOverCapacity ? '⚠️' : '✅', " Ukupno: ", workerCount, " radnika / ", totalVehicleCapacity, " mjesta (", form.vehicleIds.length, " voz.)", remaining > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#c53030'
+      }
+    }, " \u2014 ", remaining, " bez mjesta!")));
+  })(), form.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: '0.5rem'
     }

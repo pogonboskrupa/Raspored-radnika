@@ -338,17 +338,34 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                     })}
                   </select>
 
-                  {/* Ukupna popunjenost */}
+                  {/* Popunjenost po vozilima */}
                   {vehicleIds.length > 0 && (() => {
-                    const totalCap = vehicleIds.reduce((sum, vid) => {
-                      const v = availableVehicles.find(x => x.id === vid);
-                      return sum + (v?.brojMjesta || 0);
-                    }, 0);
                     const totalWorkers = allWorkers.length + (otherDriverId ? 1 : 0);
+                    let remaining = totalWorkers;
+                    const perVehicle = vehicleIds.map(vid => {
+                      const v = availableVehicles.find(x => x.id === vid);
+                      const cap = v?.brojMjesta || 0;
+                      const fill = Math.min(remaining, cap);
+                      remaining = Math.max(0, remaining - cap);
+                      return { vid, cap, fill, v };
+                    });
+                    const totalCap = perVehicle.reduce((s, p) => s + p.cap, 0);
                     const isOver = totalWorkers > totalCap;
                     return (
-                      <div style={{fontSize:'0.72rem',color: isOver ? '#c53030' : 'var(--green)',fontWeight:600}}>
-                        {isOver ? '⚠️' : '✅'} Ukupno: {totalWorkers} radnika / {totalCap} mjesta ({vehicleIds.length} vozila)
+                      <div style={{marginTop:'0.3rem'}}>
+                        {perVehicle.map((pv, idx) => (
+                          <div key={pv.vid} style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.2rem',fontSize:'0.72rem'}}>
+                            <span style={{color:'var(--text-muted)',minWidth:90}}>{pv.v?.registracija || '?'}</span>
+                            <div style={{flex:1,height:7,background:'#eee',borderRadius:4,overflow:'hidden'}}>
+                              <div style={{height:'100%',width:`${pv.cap>0?Math.min(100,(pv.fill/pv.cap)*100):0}%`,background:pv.fill>=pv.cap?'#ed8936':'#38a169',borderRadius:4,transition:'width 0.3s'}} />
+                            </div>
+                            <span style={{fontWeight:600,color:pv.fill>=pv.cap?(pv.fill>pv.cap?'#c53030':'#b5620a'):'var(--green)',minWidth:40,textAlign:'right'}}>{pv.fill}/{pv.cap}</span>
+                          </div>
+                        ))}
+                        <div style={{fontSize:'0.72rem',fontWeight:600,color: isOver ? '#c53030' : 'var(--green)',marginTop:'0.15rem'}}>
+                          {isOver ? '⚠️' : '✅'} Ukupno: {totalWorkers} radnika / {totalCap} mjesta ({vehicleIds.length} voz.)
+                          {remaining > 0 && <span style={{color:'#c53030'}}> — {remaining} bez mjesta!</span>}
+                        </div>
                       </div>
                     );
                   })()}
