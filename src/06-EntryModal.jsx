@@ -13,12 +13,16 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
     note: data.note || '',
     vehicleId: data.vehicleId || '',
     vehicleIds: data.vehicleIds || (data.vehicleId ? [data.vehicleId] : []),
+    otherDriverId: data.otherDriverId || '',
     overrides: data.overrides || [],
   });
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
 
   const [vehicleOverride, setVehicleOverride] = useState(!!data.vehicleId || (data.vehicleIds && data.vehicleIds.length > 0));
+  const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
+  const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
@@ -71,7 +75,9 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
       return;
     }
     const finalVehicleIds = form.vehicleIds.length > 0 ? form.vehicleIds : (effectiveVehicleId ? [effectiveVehicleId] : []);
-    onSave({...form, vehicleId: finalVehicleIds[0] || '', vehicleIds: finalVehicleIds, overrides: forceOverride ? c : []});
+    const finalAllWorkers = form.otherDriverId && !form.allWorkers.includes(form.otherDriverId)
+      ? [...form.allWorkers, form.otherDriverId] : form.allWorkers;
+    onSave({...form, allWorkers: finalAllWorkers, vehicleId: finalVehicleIds[0] || '', vehicleIds: finalVehicleIds, otherDriverId: form.otherDriverId || '', overrides: forceOverride ? c : []});
   };
 
   return (
@@ -324,6 +330,50 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                 {isOverCapacity && (
                   <div style={{marginTop:'0.3rem',padding:'0.3rem 0.5rem',background:'#fde8e8',border:'1px solid #f5b5b5',borderRadius:4,fontSize:'0.72rem',color:'#c53030',fontWeight:600}}>
                     ⚠️ UPOZORENJE: {workerCount - vehicleCapacity} radnik(a) više od kapaciteta vozila!
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* DRUGI ŠOFER ZA DANAS */}
+            {effectiveVehicleId && (
+              <div style={{marginTop:'0.5rem'}}>
+                {!showOtherDriver ? (
+                  <button type="button" onClick={() => setShowOtherDriver(true)}
+                    style={{background:'none',border:'none',color:'#2a6478',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
+                    + Drugi šofer za danas (poslovođa, primač, otpremač)...
+                  </button>
+                ) : (
+                  <div style={{background:'#fff8e1',border:'1px solid #ffe082',borderRadius:'var(--radius)',padding:'0.5rem 0.6rem',marginTop:'0.3rem'}}>
+                    <div style={{fontSize:'0.7rem',color:'#b5620a',marginBottom:'0.3rem',fontWeight:600}}>
+                      🔄 Drugi šofer — samo za ovaj dan
+                    </div>
+                    <select className="form-select" value={form.otherDriverId} onChange={e => setForm(f=>({...f,otherDriverId:e.target.value}))}>
+                      <option value="">— Stalni šofer —</option>
+                      {OTHER_DRIVER_CATS.map(catId => {
+                        const catInfo = getCatById(catId);
+                        const catW = otherPotentialDrivers.filter(w => w.category === catId);
+                        if (catW.length === 0) return null;
+                        return (
+                          <optgroup key={catId} label={catInfo ? catInfo.label : catId}>
+                            {catW.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                          </optgroup>
+                        );
+                      })}
+                    </select>
+                    {form.otherDriverId && (() => {
+                      const dw = workers.find(w => w.id === form.otherDriverId);
+                      const dc = getCatById(dw?.category);
+                      return dw ? (
+                        <div style={{marginTop:'0.3rem',fontSize:'0.72rem',color:'#b5620a',fontWeight:600}}>
+                          🚗 {dw.name} ({dc?.label}) vozi danas umjesto stalnog šofera
+                        </div>
+                      ) : null;
+                    })()}
+                    <button type="button" onClick={() => { setShowOtherDriver(false); setForm(f=>({...f,otherDriverId:''})); }}
+                      style={{marginTop:4,background:'none',border:'none',color:'#2a6478',cursor:'pointer',fontSize:'0.72rem',padding:0,textDecoration:'underline'}}>
+                      ← Ukloni drugog šofera
+                    </button>
                   </div>
                 )}
               </div>

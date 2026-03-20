@@ -1030,7 +1030,9 @@ function ScheduleView(_ref2) {
   }, [selectedDate]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
-  const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleId, rect }
+  const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleIds, otherDriverId, rect }
+  const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const otherPotentialDrivers = useMemo(() => workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan'), [workers]);
   const vehiclePopupRef = useRef(null);
 
   // Close popup on outside click
@@ -1077,6 +1079,7 @@ function ScheduleView(_ref2) {
     setVehiclePopup(vehiclePopup?.rowId === row.id ? null : {
       rowId: row.id,
       vehicleIds: getVehicleIds(row),
+      otherDriverId: row.otherDriverId || '',
       rect
     });
   };
@@ -1375,7 +1378,26 @@ function ScheduleView(_ref2) {
             fontSize: '0.7rem',
             color: 'var(--text-muted)'
           }
-        }, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), driver && /*#__PURE__*/React.createElement("span", {
+        }, v.tipVozila, " \xB7 ", v.brojMjesta, " mj."), row.otherDriverId ? (() => {
+          const od = workers.find(w => w.id === row.otherDriverId);
+          return od ? /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: '0.7rem',
+              color: '#b5620a',
+              fontWeight: 600
+            }
+          }, "\uD83D\uDD04 ", od.name, " ", /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontWeight: 400,
+              fontSize: '0.62rem'
+            }
+          }, "(danas)")) : driver && /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: '0.7rem',
+              color: '#2a6478'
+            }
+          }, "\uD83E\uDDD1\u200D\u2708\uFE0F ", driver.name);
+        })() : driver && /*#__PURE__*/React.createElement("span", {
           style: {
             fontSize: '0.7rem',
             color: '#2a6478'
@@ -1571,7 +1593,19 @@ function ScheduleView(_ref2) {
           style: {
             fontWeight: 600
           }
-        }, v.registracija), /*#__PURE__*/React.createElement("span", null, v.tipVozila), driver && /*#__PURE__*/React.createElement("span", {
+        }, v.registracija), /*#__PURE__*/React.createElement("span", null, v.tipVozila), row.otherDriverId ? (() => {
+          const od = workers.find(w => w.id === row.otherDriverId);
+          return od ? /*#__PURE__*/React.createElement("span", {
+            style: {
+              color: '#b5620a',
+              fontWeight: 600
+            }
+          }, "(\uD83D\uDD04 ", od.name, ")") : driver && /*#__PURE__*/React.createElement("span", {
+            style: {
+              color: '#2a6478'
+            }
+          }, "(", driver.name, ")");
+        })() : driver && /*#__PURE__*/React.createElement("span", {
           style: {
             color: '#2a6478'
           }
@@ -2137,7 +2171,57 @@ function ScheduleView(_ref2) {
       value: v.id,
       disabled: already
     }, v.registracija, " \u2014 ", v.tipVozila, " \xB7 ", v.brojMjesta, " mj.", dr ? ` (${dr.name})` : '', " (", totalUsed, "/", cap, ")", already ? ' ✓' : '');
-  })))), /*#__PURE__*/React.createElement("div", {
+  })))), vehiclePopup.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: '1px solid var(--border)',
+      paddingTop: '0.5rem',
+      marginTop: '0.3rem'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.7rem',
+      fontWeight: 600,
+      color: '#b5620a',
+      display: 'block',
+      marginBottom: '0.3rem'
+    }
+  }, "\uD83D\uDD04 Drugi \u0161ofer za danas"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    style: {
+      width: '100%',
+      fontSize: '0.82rem',
+      padding: '0.35rem'
+    },
+    value: vehiclePopup.otherDriverId || '',
+    onChange: e => setVehiclePopup(p => ({
+      ...p,
+      otherDriverId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Stalni \u0161ofer \u2014"), OTHER_DRIVER_CATS.map(catId => {
+    const catInfo = getCatById(catId);
+    const catW = otherPotentialDrivers.filter(w => w.category === catId);
+    if (catW.length === 0) return null;
+    return /*#__PURE__*/React.createElement("optgroup", {
+      key: catId,
+      label: catInfo ? catInfo.label : catId
+    }, catW.map(w => /*#__PURE__*/React.createElement("option", {
+      key: w.id,
+      value: w.id
+    }, w.name)));
+  })), vehiclePopup.otherDriverId && (() => {
+    const od = workers.find(w => w.id === vehiclePopup.otherDriverId);
+    const oc = getCatById(od?.category);
+    return od ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '0.25rem',
+        fontSize: '0.68rem',
+        color: '#b5620a',
+        fontWeight: 600
+      }
+    }, "\uD83D\uDE97 ", od.name, " (", oc?.label, ") vozi danas") : null;
+  })()), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '0.4rem',
@@ -2149,7 +2233,7 @@ function ScheduleView(_ref2) {
       flex: 1
     },
     onClick: () => {
-      onAssignVehicle(vehiclePopup.rowId, vehiclePopup.vehicleIds);
+      onAssignVehicle(vehiclePopup.rowId, vehiclePopup.vehicleIds, vehiclePopup.otherDriverId || '');
       setVehiclePopup(null);
     }
   }, "Spremi"), vehiclePopup.vehicleIds.length > 0 && /*#__PURE__*/React.createElement("button", {
@@ -2160,7 +2244,7 @@ function ScheduleView(_ref2) {
       border: 'none'
     },
     onClick: () => {
-      onAssignVehicle(vehiclePopup.rowId, []);
+      onAssignVehicle(vehiclePopup.rowId, [], '');
       setVehiclePopup(null);
     }
   }, "Ukloni sve"), /*#__PURE__*/React.createElement("button", {
@@ -3200,11 +3284,15 @@ function EntryModal(_ref15) {
     note: data.note || '',
     vehicleId: data.vehicleId || '',
     vehicleIds: data.vehicleIds || (data.vehicleId ? [data.vehicleId] : []),
+    otherDriverId: data.otherDriverId || '',
     overrides: data.overrides || []
   });
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
   const [vehicleOverride, setVehicleOverride] = useState(!!data.vehicleId || data.vehicleIds && data.vehicleIds.length > 0);
+  const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
+  const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
@@ -3257,10 +3345,13 @@ function EntryModal(_ref15) {
       return;
     }
     const finalVehicleIds = form.vehicleIds.length > 0 ? form.vehicleIds : effectiveVehicleId ? [effectiveVehicleId] : [];
+    const finalAllWorkers = form.otherDriverId && !form.allWorkers.includes(form.otherDriverId) ? [...form.allWorkers, form.otherDriverId] : form.allWorkers;
     onSave({
       ...form,
+      allWorkers: finalAllWorkers,
       vehicleId: finalVehicleIds[0] || '',
       vehicleIds: finalVehicleIds,
+      otherDriverId: form.otherDriverId || '',
       overrides: forceOverride ? c : []
     });
   };
@@ -3773,7 +3864,88 @@ function EntryModal(_ref15) {
       color: '#c53030',
       fontWeight: 600
     }
-  }, "\u26A0\uFE0F UPOZORENJE: ", workerCount - vehicleCapacity, " radnik(a) vi\u0161e od kapaciteta vozila!"))), /*#__PURE__*/React.createElement("div", {
+  }, "\u26A0\uFE0F UPOZORENJE: ", workerCount - vehicleCapacity, " radnik(a) vi\u0161e od kapaciteta vozila!")), effectiveVehicleId && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '0.5rem'
+    }
+  }, !showOtherDriver ? /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowOtherDriver(true),
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#2a6478',
+      cursor: 'pointer',
+      fontSize: '0.72rem',
+      padding: 0,
+      textDecoration: 'underline'
+    }
+  }, "+ Drugi \u0161ofer za danas (poslovo\u0111a, prima\u010D, otprema\u010D)...") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#fff8e1',
+      border: '1px solid #ffe082',
+      borderRadius: 'var(--radius)',
+      padding: '0.5rem 0.6rem',
+      marginTop: '0.3rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.7rem',
+      color: '#b5620a',
+      marginBottom: '0.3rem',
+      fontWeight: 600
+    }
+  }, "\uD83D\uDD04 Drugi \u0161ofer \u2014 samo za ovaj dan"), /*#__PURE__*/React.createElement("select", {
+    className: "form-select",
+    value: form.otherDriverId,
+    onChange: e => setForm(f => ({
+      ...f,
+      otherDriverId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Stalni \u0161ofer \u2014"), OTHER_DRIVER_CATS.map(catId => {
+    const catInfo = getCatById(catId);
+    const catW = otherPotentialDrivers.filter(w => w.category === catId);
+    if (catW.length === 0) return null;
+    return /*#__PURE__*/React.createElement("optgroup", {
+      key: catId,
+      label: catInfo ? catInfo.label : catId
+    }, catW.map(w => /*#__PURE__*/React.createElement("option", {
+      key: w.id,
+      value: w.id
+    }, w.name)));
+  })), form.otherDriverId && (() => {
+    const dw = workers.find(w => w.id === form.otherDriverId);
+    const dc = getCatById(dw?.category);
+    return dw ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '0.3rem',
+        fontSize: '0.72rem',
+        color: '#b5620a',
+        fontWeight: 600
+      }
+    }, "\uD83D\uDE97 ", dw.name, " (", dc?.label, ") vozi danas umjesto stalnog \u0161ofera") : null;
+  })(), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setShowOtherDriver(false);
+      setForm(f => ({
+        ...f,
+        otherDriverId: ''
+      }));
+    },
+    style: {
+      marginTop: 4,
+      background: 'none',
+      border: 'none',
+      color: '#2a6478',
+      cursor: 'pointer',
+      fontSize: '0.72rem',
+      padding: 0,
+      textDecoration: 'underline'
+    }
+  }, "\u2190 Ukloni drugog \u0161ofera")))), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"
@@ -8732,11 +8904,12 @@ function AppMain(_ref42) {
       if (confirm('Obrisati ovaj zapis?')) deleteSchedule(id);
     },
     onHistory: s => setHistoryModal(s),
-    onAssignVehicle: (rowId, vehicleIds) => {
+    onAssignVehicle: (rowId, vehicleIds, otherDriverId) => {
       setSchedules(prev => prev.map(s => s.id === rowId ? {
         ...s,
         vehicleIds,
-        vehicleId: vehicleIds[0] || ''
+        vehicleId: vehicleIds[0] || '',
+        otherDriverId: otherDriverId !== undefined ? otherDriverId : s.otherDriverId || ''
       } : s));
     },
     copyFromDate: copyFromDate,

@@ -225,8 +225,8 @@ function AppMain({ onLogout }) {
               onEdit={s => setModal({type:'entry', data:s, isEdit:true})}
               onDelete={id => { if (confirm('Obrisati ovaj zapis?')) deleteSchedule(id); }}
               onHistory={s => setHistoryModal(s)}
-              onAssignVehicle={(rowId, vehicleIds) => {
-                setSchedules(prev => prev.map(s => s.id === rowId ? {...s, vehicleIds, vehicleId: vehicleIds[0] || ''} : s));
+              onAssignVehicle={(rowId, vehicleIds, otherDriverId) => {
+                setSchedules(prev => prev.map(s => s.id === rowId ? {...s, vehicleIds, vehicleId: vehicleIds[0] || '', otherDriverId: otherDriverId !== undefined ? otherDriverId : (s.otherDriverId || '')} : s));
               }}
               copyFromDate={copyFromDate}
               handlePrint={handlePrint}

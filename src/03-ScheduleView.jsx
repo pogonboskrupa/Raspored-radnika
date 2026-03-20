@@ -12,7 +12,9 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   useEffect(() => { setSaturdayWorkMode(false); }, [selectedDate]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
-  const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleId, rect }
+  const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleIds, otherDriverId, rect }
+  const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
+  const otherPotentialDrivers = useMemo(() => workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan'), [workers]);
   const vehiclePopupRef = useRef(null);
 
   // Close popup on outside click
@@ -54,7 +56,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
 
   const openVehiclePopup = (row, e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    setVehiclePopup(vehiclePopup?.rowId === row.id ? null : { rowId: row.id, vehicleIds: getVehicleIds(row), rect });
+    setVehiclePopup(vehiclePopup?.rowId === row.id ? null : { rowId: row.id, vehicleIds: getVehicleIds(row), otherDriverId: row.otherDriverId || '', rect });
   };
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
@@ -224,7 +226,12 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                                   <div key={vid} style={{display:'flex',flexDirection:'column',gap:'1px',paddingBottom:'2px',borderBottom: vIds.length > 1 ? '1px dotted var(--border)' : 'none'}}>
                                     <span style={{fontWeight:600}}>🚗 {v.registracija}</span>
                                     <span style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>{v.tipVozila} · {v.brojMjesta} mj.</span>
-                                    {driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>}
+                                    {row.otherDriverId ? (() => {
+                                      const od = workers.find(w => w.id === row.otherDriverId);
+                                      return od ? (
+                                        <span style={{fontSize:'0.7rem',color:'#b5620a',fontWeight:600}}>🔄 {od.name} <span style={{fontWeight:400,fontSize:'0.62rem'}}>(danas)</span></span>
+                                      ) : (driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>);
+                                    })() : (driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>)}
                                     <span style={{fontSize:'0.65rem',fontWeight:700,marginTop:'1px',color: over ? '#c53030' : totalInVehicle === cap ? '#b5620a' : '#2d5a27',background: over ? '#fde8e8' : totalInVehicle === cap ? '#fdf0e0' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : totalInVehicle === cap ? '#e8c17a' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem',display:'inline-block'}}>
                                       {over ? '⚠️' : '👥'} {totalInVehicle}/{cap}{over && ` (+${totalInVehicle - cap})`}
                                     </span>
@@ -306,7 +313,10 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                                     <span>🚗</span>
                                     <span style={{fontWeight:600}}>{v.registracija}</span>
                                     <span>{v.tipVozila}</span>
-                                    {driver && <span style={{color:'#2a6478'}}>({driver.name})</span>}
+                                    {row.otherDriverId ? (() => {
+                                      const od = workers.find(w => w.id === row.otherDriverId);
+                                      return od ? <span style={{color:'#b5620a',fontWeight:600}}>(🔄 {od.name})</span> : (driver && <span style={{color:'#2a6478'}}>({driver.name})</span>);
+                                    })() : (driver && <span style={{color:'#2a6478'}}>({driver.name})</span>)}
                                     <span style={{fontWeight:700,fontSize:'0.65rem',color: over ? '#c53030' : '#2d5a27',background: over ? '#fde8e8' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem'}}>
                                       {over ? '⚠️' : '👥'} {totalInVehicle}/{cap}
                                     </span>
@@ -573,14 +583,47 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               </div>
             </div>
 
+            {/* Drugi šofer za danas */}
+            {vehiclePopup.vehicleIds.length > 0 && (
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:'0.5rem',marginTop:'0.3rem'}}>
+                <label style={{fontSize:'0.7rem',fontWeight:600,color:'#b5620a',display:'block',marginBottom:'0.3rem'}}>
+                  🔄 Drugi šofer za danas
+                </label>
+                <select className="form-select" style={{width:'100%',fontSize:'0.82rem',padding:'0.35rem'}}
+                  value={vehiclePopup.otherDriverId || ''}
+                  onChange={e => setVehiclePopup(p => ({...p, otherDriverId: e.target.value}))}>
+                  <option value="">— Stalni šofer —</option>
+                  {OTHER_DRIVER_CATS.map(catId => {
+                    const catInfo = getCatById(catId);
+                    const catW = otherPotentialDrivers.filter(w => w.category === catId);
+                    if (catW.length === 0) return null;
+                    return (
+                      <optgroup key={catId} label={catInfo ? catInfo.label : catId}>
+                        {catW.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+                {vehiclePopup.otherDriverId && (() => {
+                  const od = workers.find(w => w.id === vehiclePopup.otherDriverId);
+                  const oc = getCatById(od?.category);
+                  return od ? (
+                    <div style={{marginTop:'0.25rem',fontSize:'0.68rem',color:'#b5620a',fontWeight:600}}>
+                      🚗 {od.name} ({oc?.label}) vozi danas
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
+
             {/* Action buttons */}
             <div style={{display:'flex',gap:'0.4rem',marginTop:'0.3rem'}}>
               <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={() => {
-                onAssignVehicle(vehiclePopup.rowId, vehiclePopup.vehicleIds);
+                onAssignVehicle(vehiclePopup.rowId, vehiclePopup.vehicleIds, vehiclePopup.otherDriverId || '');
                 setVehiclePopup(null);
               }}>Spremi</button>
               {vehiclePopup.vehicleIds.length > 0 && <button className="btn btn-sm" style={{background:'#c53030',color:'white',border:'none'}} onClick={() => {
-                onAssignVehicle(vehiclePopup.rowId, []);
+                onAssignVehicle(vehiclePopup.rowId, [], '');
                 setVehiclePopup(null);
               }}>Ukloni sve</button>}
               <button className="btn btn-secondary btn-sm" onClick={()=>setVehiclePopup(null)}>Odustani</button>
