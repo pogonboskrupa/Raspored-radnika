@@ -1066,8 +1066,13 @@ function ScheduleView(_ref2) {
   // Available vehicles: only 'vozno' status
   const availableVehicles = useMemo(() => (vehicles || []).filter(v => v.status === 'vozno'), [vehicles]);
 
-  // Vozači (drivers) from workers
-  const drivers = useMemo(() => workers.filter(w => w.category === 'vozac' && w.status === 'aktivan'), [workers]);
+  // Vozači (drivers) from workers — uključi i poslovođe koji imaju vozilo
+  const drivers = useMemo(() => {
+    const regularDrivers = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+    const otherDriverIds = new Set((vehicles || []).filter(v => v.status === 'vozno' && v.driverId).map(v => v.driverId));
+    const otherDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan' && otherDriverIds.has(w.id));
+    return [...regularDrivers, ...otherDrivers];
+  }, [workers, vehicles]);
 
   // Vehicle usage across today's schedules: vehicleId -> total workers assigned
   const vehicleUsageMap = useMemo(() => {
@@ -2265,11 +2270,12 @@ function ScheduleView(_ref2) {
   }, "\u2014 Odaberi \u0161ofera \u2014"), drivers.map(d => {
     const dv = availableVehicles.find(v => v.driverId === d.id);
     const already = dv && vehiclePopup.vehicleIds.includes(dv.id);
+    const cat = OTHER_DRIVER_CATS.includes(d.category) ? getCatById(d.category) : null;
     return /*#__PURE__*/React.createElement("option", {
       key: d.id,
       value: d.id,
       disabled: already || !dv
-    }, d.name, dv ? ` (${dv.registracija})` : ' (bez vozila)', already ? ' ✓' : '');
+    }, d.name, cat ? ` [${cat.short}]` : '', dv ? ` (${dv.registracija})` : ' (bez vozila)', already ? ' ✓' : '');
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: '0.5rem'

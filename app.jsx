@@ -504,8 +504,13 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   // Available vehicles: only 'vozno' status
   const availableVehicles = useMemo(() => (vehicles || []).filter(v => v.status === 'vozno'), [vehicles]);
 
-  // Vozači (drivers) from workers
-  const drivers = useMemo(() => workers.filter(w => w.category === 'vozac' && w.status === 'aktivan'), [workers]);
+  // Vozači (drivers) from workers — uključi i poslovođe koji imaju vozilo
+  const drivers = useMemo(() => {
+    const regularDrivers = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
+    const otherDriverIds = new Set((vehicles || []).filter(v => v.status === 'vozno' && v.driverId).map(v => v.driverId));
+    const otherDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan' && otherDriverIds.has(w.id));
+    return [...regularDrivers, ...otherDrivers];
+  }, [workers, vehicles]);
 
   // Vehicle usage across today's schedules: vehicleId -> total workers assigned
   const vehicleUsageMap = useMemo(() => {
@@ -1084,7 +1089,8 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                   {drivers.map(d => {
                     const dv = availableVehicles.find(v => v.driverId === d.id);
                     const already = dv && vehiclePopup.vehicleIds.includes(dv.id);
-                    return <option key={d.id} value={d.id} disabled={already || !dv}>{d.name}{dv ? ` (${dv.registracija})` : ' (bez vozila)'}{already ? ' ✓' : ''}</option>;
+                    const cat = OTHER_DRIVER_CATS.includes(d.category) ? getCatById(d.category) : null;
+                    return <option key={d.id} value={d.id} disabled={already || !dv}>{d.name}{cat ? ` [${cat.short}]` : ''}{dv ? ` (${dv.registracija})` : ' (bez vozila)'}{already ? ' ✓' : ''}</option>;
                   })}
                 </select>
               </div>
