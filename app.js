@@ -389,7 +389,7 @@ const INITIAL_WORKERS = [
 }];
 const GOSPODARSKE_JEDINICE = ['RISOVAC KRUPA', 'GRMEČ JASENICA', 'VOJSKOVA', 'BAŠTRA ĆORKOVAČA', 'GOMILA'];
 const INITIAL_DEPARTMENTS = [];
-const JOB_TYPES = ['Primka', 'Priprema proizvodnje', 'Pošumljavanje', 'Prerada', 'Otprema', 'Sektor ekologije', 'Kancelarija', 'Teren', 'Ostalo'];
+const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Ostalo'];
 const today = () => new Date().toISOString().split('T')[0];
 const yesterday = () => {
   const d = new Date();
@@ -485,7 +485,8 @@ function useStorage(key, init) {
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const jobBadgeClass = t => {
   if (t === 'Primka') return 'badge badge-primka';
-  if (t === 'Priprema proizvodnje') return 'badge badge-priprema';
+  if (t === 'Doznaka stabala') return 'badge badge-priprema';
+  if (t === 'Priprema proizvodnje') return 'badge badge-priprema'; // backward compat
   if (t === 'Pošumljavanje') return 'badge badge-posumljavanje';
   if (t === 'Prerada') return 'badge badge-prerada';
   if (t === 'Otprema') return 'badge badge-otprema';
@@ -1018,7 +1019,10 @@ function ScheduleView(_ref2) {
     handlePrint,
     yesterday,
     holidays,
-    onWorkerClick
+    onWorkerClick,
+    allJobTypes,
+    customJobTypes,
+    setCustomJobTypes
   } = _ref2;
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const currentHoliday = holidays?.[selectedDate] || null;
@@ -1028,6 +1032,8 @@ function ScheduleView(_ref2) {
   useEffect(() => {
     setSaturdayWorkMode(false);
   }, [selectedDate]);
+  const [newJobName, setNewJobName] = useState('');
+  const [showAddJob, setShowAddJob] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
   const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleIds, otherDriverId, rect }
@@ -1254,7 +1260,7 @@ function ScheduleView(_ref2) {
     }, ws.size), /*#__PURE__*/React.createElement("div", {
       className: "stat-label"
     }, jt));
-  }), JOB_TYPES.filter(jt => !statsByJob[jt]).map(jt => /*#__PURE__*/React.createElement("div", {
+  }), allJobTypes.filter(jt => !statsByJob[jt]).map(jt => /*#__PURE__*/React.createElement("div", {
     className: "stat-card",
     key: jt,
     style: {
@@ -1270,7 +1276,84 @@ function ScheduleView(_ref2) {
     }
   }, "0"), /*#__PURE__*/React.createElement("div", {
     className: "stat-label"
-  }, jt))))), /*#__PURE__*/React.createElement("div", {
+  }, jt))), !showAddJob ? /*#__PURE__*/React.createElement("div", {
+    className: "stat-card",
+    style: {
+      cursor: 'pointer',
+      opacity: 0.4,
+      border: '2px dashed var(--border)'
+    },
+    onClick: () => setShowAddJob(true),
+    title: "Dodaj novu vrstu posla"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value",
+    style: {
+      fontSize: '1.2rem'
+    }
+  }, "+"), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, "Novi posao")) : /*#__PURE__*/React.createElement("div", {
+    className: "stat-card",
+    style: {
+      padding: '0.3rem',
+      minWidth: 120
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "Naziv posla...",
+    value: newJobName,
+    onChange: e => setNewJobName(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter' && newJobName.trim()) {
+        const name = newJobName.trim();
+        if (!allJobTypes.includes(name)) {
+          setCustomJobTypes(prev => [...prev, name]);
+        }
+        setNewJobName('');
+        setShowAddJob(false);
+      }
+      if (e.key === 'Escape') {
+        setNewJobName('');
+        setShowAddJob(false);
+      }
+    },
+    autoFocus: true,
+    style: {
+      fontSize: '0.72rem',
+      padding: '0.25rem 0.4rem',
+      marginBottom: '0.2rem'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '0.2rem'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    style: {
+      fontSize: '0.6rem',
+      padding: '0.15rem 0.3rem',
+      flex: 1
+    },
+    onClick: () => {
+      const name = newJobName.trim();
+      if (name && !allJobTypes.includes(name)) {
+        setCustomJobTypes(prev => [...prev, name]);
+      }
+      setNewJobName('');
+      setShowAddJob(false);
+    }
+  }, "Dodaj"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    style: {
+      fontSize: '0.6rem',
+      padding: '0.15rem 0.3rem'
+    },
+    onClick: () => {
+      setNewJobName('');
+      setShowAddJob(false);
+    }
+  }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
     className: "section-header"
   }, /*#__PURE__*/React.createElement("div", {
     className: "section-title"
@@ -1725,7 +1808,7 @@ function ScheduleView(_ref2) {
       flexWrap: 'wrap',
       gap: '0.3rem'
     }
-  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+  }, allJobTypes.map(jt => /*#__PURE__*/React.createElement("button", {
     key: jt,
     className: jobBadgeClass(jt),
     onClick: () => onAddWithJob(jt),
@@ -2646,6 +2729,7 @@ function QuickModal(_ref14) {
     schedules,
     checkConflict,
     vehicles,
+    allJobTypes,
     onSave,
     onClose,
     wName,
@@ -2701,7 +2785,7 @@ function QuickModal(_ref14) {
   const defaultJob = () => {
     if (worker.category === 'primac_panj') return 'Primka';
     if (worker.category === 'otpremac') return 'Otprema';
-    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Priprema proizvodnje';
+    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Doznaka stabala';
     if (worker.category === 'vlastita_rezija') return 'Ostalo';
     return 'Ostalo';
   };
@@ -3061,7 +3145,7 @@ function QuickModal(_ref14) {
       flexWrap: 'wrap',
       gap: '0.3rem'
     }
-  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+  }, (allJobTypes || JOB_TYPES).map(jt => /*#__PURE__*/React.createElement("button", {
     key: jt,
     type: "button",
     onClick: () => setJobType(jt),
@@ -3490,6 +3574,7 @@ function EntryModal(_ref15) {
     schedules,
     checkConflict,
     vehicles,
+    allJobTypes,
     onSave,
     onClose,
     wName
@@ -3498,7 +3583,7 @@ function EntryModal(_ref15) {
     id: data.id || uid(),
     date: data.date || today(),
     deptId: data.deptId || departments[0]?.id || '',
-    jobType: data.jobType || JOB_TYPES[0],
+    jobType: data.jobType || (allJobTypes || JOB_TYPES)[0],
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
     helper2Worker: data.helper2Worker || '',
@@ -3750,7 +3835,7 @@ function EntryModal(_ref15) {
       helper2Worker: '',
       extraWorkers: []
     }))
-  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("option", {
+  }, (allJobTypes || JOB_TYPES).map(jt => /*#__PURE__*/React.createElement("option", {
     key: jt
   }, jt)))), isPrimka ? /*#__PURE__*/React.createElement("div", {
     className: "primka-section"
@@ -8887,6 +8972,8 @@ function AppMain(_ref42) {
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
   // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
   const [holidays, setHolidays] = useStorage('sumarija_holidays', {});
+  const [customJobTypes, setCustomJobTypes] = useStorage('sumarija_custom_jobs', []);
+  const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes, 'Ostalo'];
   const addHistory = (action, scheduleId, oldData, newData) => {
     setHistory(h => [{
       id: uid(),
@@ -8916,8 +9003,9 @@ function AppMain(_ref42) {
   const statsByJob = useMemo(() => {
     const m = {};
     daySchedules.forEach(s => {
-      if (!m[s.jobType]) m[s.jobType] = new Set();
-      s.allWorkers.forEach(w => m[s.jobType].add(w));
+      const jt = s.jobType === 'Priprema proizvodnje' ? 'Doznaka stabala' : s.jobType;
+      if (!m[jt]) m[jt] = new Set();
+      s.allWorkers.forEach(w => m[jt].add(w));
     });
     return m;
   }, [daySchedules]);
@@ -9103,7 +9191,7 @@ function AppMain(_ref42) {
       fontSize: '0.5rem',
       fontWeight: 400
     }
-  }, "klikni za brzi unos")), JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+  }, "klikni za brzi unos")), allJobTypes.map(jt => /*#__PURE__*/React.createElement("button", {
     key: jt,
     className: "sidebar-item",
     onClick: () => setModal({
@@ -9174,7 +9262,10 @@ function AppMain(_ref42) {
     yesterday: yesterday(),
     godisnji: godisnji,
     holidays: holidays,
-    onWorkerClick: onWorkerClick
+    onWorkerClick: onWorkerClick,
+    allJobTypes: allJobTypes,
+    customJobTypes: customJobTypes,
+    setCustomJobTypes: setCustomJobTypes
   }), activeTab === 'radnici' && /*#__PURE__*/React.createElement(WorkersView, {
     workers: workers,
     setWorkers: setWorkers,
@@ -9264,6 +9355,7 @@ function AppMain(_ref42) {
     schedules: schedules,
     checkConflict: checkConflict,
     vehicles: vehicles,
+    allJobTypes: allJobTypes,
     onSave: d => {
       saveSchedule(d, false);
       setQuickModal(null);
@@ -9281,6 +9373,7 @@ function AppMain(_ref42) {
     schedules: schedules,
     checkConflict: checkConflict,
     vehicles: vehicles,
+    allJobTypes: allJobTypes,
     onSave: d => {
       saveSchedule(d, modal.isEdit);
       setModal(null);

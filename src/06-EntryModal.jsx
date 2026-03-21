@@ -1,10 +1,10 @@
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
-function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, onSave, onClose, wName }) {
+function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName }) {
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
     deptId: data.deptId || departments[0]?.id || '',
-    jobType: data.jobType || JOB_TYPES[0],
+    jobType: data.jobType || (allJobTypes || JOB_TYPES)[0],
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
     helper2Worker: data.helper2Worker || '',
@@ -154,7 +154,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
           <div className="form-group">
             <label className="form-label">Vrsta posla</label>
             <select className="form-select" value={form.jobType} onChange={e=>setForm(f=>({...f,jobType:e.target.value,allWorkers:[],primatWorker:'',helper1Worker:'',helper2Worker:'',extraWorkers:[]}))}>
-              {JOB_TYPES.map(jt => <option key={jt}>{jt}</option>)}
+              {(allJobTypes || JOB_TYPES).map(jt => <option key={jt}>{jt}</option>)}
             </select>
           </div>
 

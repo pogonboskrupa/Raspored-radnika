@@ -1,5 +1,5 @@
 // ─── QUICK ASSIGN MODAL ───────────────────────────────────────────────────────
-function QuickModal({ worker, workers, departments, setDepartments, selectedDate, schedules, checkConflict, vehicles, onSave, onClose, wName, godisnji, setGodisnji }) {
+function QuickModal({ worker, workers, departments, setDepartments, selectedDate, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName, godisnji, setGodisnji }) {
   const cat = getCatById(worker.category);
   const isPrimac = worker.category === 'primac_panj';
 
@@ -22,7 +22,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const defaultJob = () => {
     if (worker.category === 'primac_panj') return 'Primka';
     if (worker.category === 'otpremac')    return 'Otprema';
-    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Priprema proizvodnje';
+    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Doznaka stabala';
     if (worker.category === 'vlastita_rezija') return 'Ostalo';
     return 'Ostalo';
   };
@@ -244,7 +244,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                 <div className="form-group">
                   <label className="form-label">Vrsta posla</label>
                   <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
-                    {JOB_TYPES.map(jt => (
+                    {(allJobTypes || JOB_TYPES).map(jt => (
                       <button key={jt} type="button"
                         onClick={() => setJobType(jt)}
                         className={jobBadgeClass(jt)}

@@ -2,7 +2,7 @@
 function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, workers, departments, vehicles,
   wName, dName, totalToday, statsByJob, statsByDept,
   sidebarFilter, setSidebarFilter, godisnji,
-  prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, onAssignVehicle, copyFromDate, handlePrint, yesterday, holidays, onWorkerClick }) {
+  prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, onAssignVehicle, copyFromDate, handlePrint, yesterday, holidays, onWorkerClick, allJobTypes, customJobTypes, setCustomJobTypes }) {
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const currentHoliday = holidays?.[selectedDate] || null;
@@ -10,6 +10,8 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   const hasSaturdayEntries = isSaturday && daySchedules.length > 0;
   const [saturdayWorkMode, setSaturdayWorkMode] = useState(false);
   useEffect(() => { setSaturdayWorkMode(false); }, [selectedDate]);
+  const [newJobName, setNewJobName] = useState('');
+  const [showAddJob, setShowAddJob] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
   const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleIds, otherDriverId, rect }
@@ -151,12 +153,41 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               <div className="stat-label">{jt}</div>
             </div>
           ))}
-          {JOB_TYPES.filter(jt => !statsByJob[jt]).map(jt => (
+          {allJobTypes.filter(jt => !statsByJob[jt]).map(jt => (
             <div className="stat-card" key={jt} style={{cursor:'pointer',opacity:0.5}} onClick={() => onAddWithJob(jt)} title={`+ Dodaj ${jt}`}>
               <div className="stat-value" style={{fontSize:'1.2rem'}}>0</div>
               <div className="stat-label">{jt}</div>
             </div>
           ))}
+          {/* + Dodaj posao */}
+          {!showAddJob ? (
+            <div className="stat-card" style={{cursor:'pointer',opacity:0.4,border:'2px dashed var(--border)'}} onClick={() => setShowAddJob(true)} title="Dodaj novu vrstu posla">
+              <div className="stat-value" style={{fontSize:'1.2rem'}}>+</div>
+              <div className="stat-label">Novi posao</div>
+            </div>
+          ) : (
+            <div className="stat-card" style={{padding:'0.3rem',minWidth:120}}>
+              <input className="form-input" placeholder="Naziv posla..." value={newJobName}
+                onChange={e => setNewJobName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newJobName.trim()) {
+                    const name = newJobName.trim();
+                    if (!allJobTypes.includes(name)) { setCustomJobTypes(prev => [...prev, name]); }
+                    setNewJobName(''); setShowAddJob(false);
+                  }
+                  if (e.key === 'Escape') { setNewJobName(''); setShowAddJob(false); }
+                }}
+                autoFocus style={{fontSize:'0.72rem',padding:'0.25rem 0.4rem',marginBottom:'0.2rem'}} />
+              <div style={{display:'flex',gap:'0.2rem'}}>
+                <button className="btn btn-primary btn-sm" style={{fontSize:'0.6rem',padding:'0.15rem 0.3rem',flex:1}} onClick={() => {
+                  const name = newJobName.trim();
+                  if (name && !allJobTypes.includes(name)) { setCustomJobTypes(prev => [...prev, name]); }
+                  setNewJobName(''); setShowAddJob(false);
+                }}>Dodaj</button>
+                <button className="btn btn-secondary btn-sm" style={{fontSize:'0.6rem',padding:'0.15rem 0.3rem'}} onClick={() => { setNewJobName(''); setShowAddJob(false); }}>✕</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -376,7 +407,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </span>
         </div>
         <div style={{padding:'0.5rem 0.75rem',display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
-          {JOB_TYPES.map(jt => (
+          {allJobTypes.map(jt => (
             <button key={jt} className={jobBadgeClass(jt)} onClick={() => onAddWithJob(jt)}
               style={{cursor:'pointer',fontSize:'0.68rem',padding:'0.3rem 0.5rem',borderRadius:4,border:'1px solid var(--border)'}}>
               + {jt}

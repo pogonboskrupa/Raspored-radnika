@@ -119,7 +119,7 @@ const GOSPODARSKE_JEDINICE = [
 
 const INITIAL_DEPARTMENTS = [];
 
-const JOB_TYPES = ['Primka', 'Priprema proizvodnje', 'Pošumljavanje', 'Prerada', 'Otprema', 'Sektor ekologije', 'Kancelarija', 'Teren', 'Ostalo'];
+const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Ostalo'];
 
 const today = () => new Date().toISOString().split('T')[0];
 const yesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; };
@@ -215,7 +215,8 @@ function useStorage(key, init) {
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const jobBadgeClass = t => {
   if (t === 'Primka') return 'badge badge-primka';
-  if (t === 'Priprema proizvodnje') return 'badge badge-priprema';
+  if (t === 'Doznaka stabala') return 'badge badge-priprema';
+  if (t === 'Priprema proizvodnje') return 'badge badge-priprema'; // backward compat
   if (t === 'Pošumljavanje') return 'badge badge-posumljavanje';
   if (t === 'Prerada') return 'badge badge-prerada';
   if (t === 'Otprema') return 'badge badge-otprema';
@@ -466,7 +467,7 @@ function LoginScreen({ onLogin }) {
 function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, workers, departments, vehicles,
   wName, dName, totalToday, statsByJob, statsByDept,
   sidebarFilter, setSidebarFilter, godisnji,
-  prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, onAssignVehicle, copyFromDate, handlePrint, yesterday, holidays, onWorkerClick }) {
+  prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, onAssignVehicle, copyFromDate, handlePrint, yesterday, holidays, onWorkerClick, allJobTypes, customJobTypes, setCustomJobTypes }) {
 
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const currentHoliday = holidays?.[selectedDate] || null;
@@ -474,6 +475,8 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   const hasSaturdayEntries = isSaturday && daySchedules.length > 0;
   const [saturdayWorkMode, setSaturdayWorkMode] = useState(false);
   useEffect(() => { setSaturdayWorkMode(false); }, [selectedDate]);
+  const [newJobName, setNewJobName] = useState('');
+  const [showAddJob, setShowAddJob] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
   const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleIds, otherDriverId, rect }
@@ -615,12 +618,41 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               <div className="stat-label">{jt}</div>
             </div>
           ))}
-          {JOB_TYPES.filter(jt => !statsByJob[jt]).map(jt => (
+          {allJobTypes.filter(jt => !statsByJob[jt]).map(jt => (
             <div className="stat-card" key={jt} style={{cursor:'pointer',opacity:0.5}} onClick={() => onAddWithJob(jt)} title={`+ Dodaj ${jt}`}>
               <div className="stat-value" style={{fontSize:'1.2rem'}}>0</div>
               <div className="stat-label">{jt}</div>
             </div>
           ))}
+          {/* + Dodaj posao */}
+          {!showAddJob ? (
+            <div className="stat-card" style={{cursor:'pointer',opacity:0.4,border:'2px dashed var(--border)'}} onClick={() => setShowAddJob(true)} title="Dodaj novu vrstu posla">
+              <div className="stat-value" style={{fontSize:'1.2rem'}}>+</div>
+              <div className="stat-label">Novi posao</div>
+            </div>
+          ) : (
+            <div className="stat-card" style={{padding:'0.3rem',minWidth:120}}>
+              <input className="form-input" placeholder="Naziv posla..." value={newJobName}
+                onChange={e => setNewJobName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newJobName.trim()) {
+                    const name = newJobName.trim();
+                    if (!allJobTypes.includes(name)) { setCustomJobTypes(prev => [...prev, name]); }
+                    setNewJobName(''); setShowAddJob(false);
+                  }
+                  if (e.key === 'Escape') { setNewJobName(''); setShowAddJob(false); }
+                }}
+                autoFocus style={{fontSize:'0.72rem',padding:'0.25rem 0.4rem',marginBottom:'0.2rem'}} />
+              <div style={{display:'flex',gap:'0.2rem'}}>
+                <button className="btn btn-primary btn-sm" style={{fontSize:'0.6rem',padding:'0.15rem 0.3rem',flex:1}} onClick={() => {
+                  const name = newJobName.trim();
+                  if (name && !allJobTypes.includes(name)) { setCustomJobTypes(prev => [...prev, name]); }
+                  setNewJobName(''); setShowAddJob(false);
+                }}>Dodaj</button>
+                <button className="btn btn-secondary btn-sm" style={{fontSize:'0.6rem',padding:'0.15rem 0.3rem'}} onClick={() => { setNewJobName(''); setShowAddJob(false); }}>✕</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -840,7 +872,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </span>
         </div>
         <div style={{padding:'0.5rem 0.75rem',display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
-          {JOB_TYPES.map(jt => (
+          {allJobTypes.map(jt => (
             <button key={jt} className={jobBadgeClass(jt)} onClick={() => onAddWithJob(jt)}
               style={{cursor:'pointer',fontSize:'0.68rem',padding:'0.3rem 0.5rem',borderRadius:4,border:'1px solid var(--border)'}}>
               + {jt}
@@ -1271,7 +1303,7 @@ function RightPanel({ selectedDate, daySchedules, schedules, workers, department
 
 
 // ─── QUICK ASSIGN MODAL ───────────────────────────────────────────────────────
-function QuickModal({ worker, workers, departments, setDepartments, selectedDate, schedules, checkConflict, vehicles, onSave, onClose, wName, godisnji, setGodisnji }) {
+function QuickModal({ worker, workers, departments, setDepartments, selectedDate, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName, godisnji, setGodisnji }) {
   const cat = getCatById(worker.category);
   const isPrimac = worker.category === 'primac_panj';
 
@@ -1294,7 +1326,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const defaultJob = () => {
     if (worker.category === 'primac_panj') return 'Primka';
     if (worker.category === 'otpremac')    return 'Otprema';
-    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Priprema proizvodnje';
+    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Doznaka stabala';
     if (worker.category === 'vlastita_rezija') return 'Ostalo';
     return 'Ostalo';
   };
@@ -1516,7 +1548,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                 <div className="form-group">
                   <label className="form-label">Vrsta posla</label>
                   <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
-                    {JOB_TYPES.map(jt => (
+                    {(allJobTypes || JOB_TYPES).map(jt => (
                       <button key={jt} type="button"
                         onClick={() => setJobType(jt)}
                         className={jobBadgeClass(jt)}
@@ -1741,12 +1773,12 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
 }
 
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
-function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, onSave, onClose, wName }) {
+function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName }) {
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
     deptId: data.deptId || departments[0]?.id || '',
-    jobType: data.jobType || JOB_TYPES[0],
+    jobType: data.jobType || (allJobTypes || JOB_TYPES)[0],
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
     helper2Worker: data.helper2Worker || '',
@@ -1896,7 +1928,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
           <div className="form-group">
             <label className="form-label">Vrsta posla</label>
             <select className="form-select" value={form.jobType} onChange={e=>setForm(f=>({...f,jobType:e.target.value,allWorkers:[],primatWorker:'',helper1Worker:'',helper2Worker:'',extraWorkers:[]}))}>
-              {JOB_TYPES.map(jt => <option key={jt}>{jt}</option>)}
+              {(allJobTypes || JOB_TYPES).map(jt => <option key={jt}>{jt}</option>)}
             </select>
           </div>
 
@@ -4376,6 +4408,8 @@ function AppMain({ onLogout }) {
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
   // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
   const [holidays, setHolidays] = useStorage('sumarija_holidays', {});
+  const [customJobTypes, setCustomJobTypes] = useStorage('sumarija_custom_jobs', []);
+  const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes, 'Ostalo'];
 
   const addHistory = (action, scheduleId, oldData, newData) => {
     setHistory(h => [{
@@ -4407,8 +4441,9 @@ function AppMain({ onLogout }) {
   const statsByJob = useMemo(() => {
     const m = {};
     daySchedules.forEach(s => {
-      if (!m[s.jobType]) m[s.jobType] = new Set();
-      s.allWorkers.forEach(w => m[s.jobType].add(w));
+      const jt = s.jobType === 'Priprema proizvodnje' ? 'Doznaka stabala' : s.jobType;
+      if (!m[jt]) m[jt] = new Set();
+      s.allWorkers.forEach(w => m[jt].add(w));
     });
     return m;
   }, [daySchedules]);
@@ -4543,7 +4578,7 @@ function AppMain({ onLogout }) {
             </div>
             <div className="sidebar-section">
               <div className="sidebar-label">Vrste posla <span style={{opacity:0.5,fontSize:'0.5rem',fontWeight:400}}>klikni za brzi unos</span></div>
-              {JOB_TYPES.map(jt => (
+              {allJobTypes.map(jt => (
                 <button key={jt} className="sidebar-item" onClick={() => setModal({type:'entry', data:{date:selectedDate, jobType:jt}})}>
                   <span className={jobBadgeClass(jt)} style={{fontSize:'0.65rem'}}>{jt}</span>
                   <span className="count">{statsByJob[jt]?.size || 0}</span>
@@ -4579,6 +4614,9 @@ function AppMain({ onLogout }) {
               godisnji={godisnji}
               holidays={holidays}
               onWorkerClick={onWorkerClick}
+              allJobTypes={allJobTypes}
+              customJobTypes={customJobTypes}
+              setCustomJobTypes={setCustomJobTypes}
             />
           )}
           {activeTab === 'radnici' && (
@@ -4652,6 +4690,7 @@ function AppMain({ onLogout }) {
           schedules={schedules}
           checkConflict={checkConflict}
           vehicles={vehicles}
+          allJobTypes={allJobTypes}
           onSave={(d) => { saveSchedule(d, false); setQuickModal(null); }}
           onClose={() => setQuickModal(null)}
           wName={wName}
@@ -4669,6 +4708,7 @@ function AppMain({ onLogout }) {
           schedules={schedules}
           checkConflict={checkConflict}
           vehicles={vehicles}
+          allJobTypes={allJobTypes}
           onSave={(d) => { saveSchedule(d, modal.isEdit); setModal(null); }}
           onClose={() => setModal(null)}
           wName={wName}

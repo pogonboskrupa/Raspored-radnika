@@ -31,6 +31,8 @@ function AppMain({ onLogout }) {
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
   // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
   const [holidays, setHolidays] = useStorage('sumarija_holidays', {});
+  const [customJobTypes, setCustomJobTypes] = useStorage('sumarija_custom_jobs', []);
+  const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes, 'Ostalo'];
 
   const addHistory = (action, scheduleId, oldData, newData) => {
     setHistory(h => [{
@@ -62,8 +64,9 @@ function AppMain({ onLogout }) {
   const statsByJob = useMemo(() => {
     const m = {};
     daySchedules.forEach(s => {
-      if (!m[s.jobType]) m[s.jobType] = new Set();
-      s.allWorkers.forEach(w => m[s.jobType].add(w));
+      const jt = s.jobType === 'Priprema proizvodnje' ? 'Doznaka stabala' : s.jobType;
+      if (!m[jt]) m[jt] = new Set();
+      s.allWorkers.forEach(w => m[jt].add(w));
     });
     return m;
   }, [daySchedules]);
@@ -198,7 +201,7 @@ function AppMain({ onLogout }) {
             </div>
             <div className="sidebar-section">
               <div className="sidebar-label">Vrste posla <span style={{opacity:0.5,fontSize:'0.5rem',fontWeight:400}}>klikni za brzi unos</span></div>
-              {JOB_TYPES.map(jt => (
+              {allJobTypes.map(jt => (
                 <button key={jt} className="sidebar-item" onClick={() => setModal({type:'entry', data:{date:selectedDate, jobType:jt}})}>
                   <span className={jobBadgeClass(jt)} style={{fontSize:'0.65rem'}}>{jt}</span>
                   <span className="count">{statsByJob[jt]?.size || 0}</span>
@@ -234,6 +237,9 @@ function AppMain({ onLogout }) {
               godisnji={godisnji}
               holidays={holidays}
               onWorkerClick={onWorkerClick}
+              allJobTypes={allJobTypes}
+              customJobTypes={customJobTypes}
+              setCustomJobTypes={setCustomJobTypes}
             />
           )}
           {activeTab === 'radnici' && (
@@ -307,6 +313,7 @@ function AppMain({ onLogout }) {
           schedules={schedules}
           checkConflict={checkConflict}
           vehicles={vehicles}
+          allJobTypes={allJobTypes}
           onSave={(d) => { saveSchedule(d, false); setQuickModal(null); }}
           onClose={() => setQuickModal(null)}
           wName={wName}
@@ -324,6 +331,7 @@ function AppMain({ onLogout }) {
           schedules={schedules}
           checkConflict={checkConflict}
           vehicles={vehicles}
+          allJobTypes={allJobTypes}
           onSave={(d) => { saveSchedule(d, modal.isEdit); setModal(null); }}
           onClose={() => setModal(null)}
           wName={wName}
