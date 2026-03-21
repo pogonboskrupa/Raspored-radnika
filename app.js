@@ -1878,24 +1878,15 @@ function ScheduleView(_ref2) {
     className: "count"
   }, statsByDept[d.id]?.size || 0))))), (() => {
     const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-    const absentWorkerIds = new Set(Object.entries(godisnji || {}).filter(_ref6 => {
+    const absentMap = {};
+    Object.entries(godisnji || {}).forEach(_ref6 => {
       let [wId, entries] = _ref6;
-      return entries.some(e => e.date === selectedDate);
-    }).map(_ref7 => {
-      let [wId] = _ref7;
-      return wId;
-    }));
+      const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
+      if (entry) absentMap[wId] = entry;
+    });
     const activeWorkers = workers.filter(w => w.status === 'aktivan');
-    const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkerIds.has(w.id));
-    const absentList = [...absentWorkerIds].map(wId => {
-      const w = workers.find(x => x.id === wId);
-      const entry = ((godisnji || {})[wId] || []).find(e => e.date === selectedDate);
-      return w && entry ? {
-        worker: w,
-        entry
-      } : null;
-    }).filter(Boolean);
-    const ODSUTNOST_SHORT = {
+    const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentMap[w.id]);
+    const ODSUTNOST_STYLE = {
       'Godišnji odmor': {
         short: 'GO',
         icon: '🏖️',
@@ -1925,6 +1916,18 @@ function ScheduleView(_ref2) {
         border: '#ccc'
       }
     };
+    const SHOWN_LEAVE_TYPES = ['Bolovanje', 'Godišnji odmor', 'Neplaćeno'];
+    const absentByType = {};
+    Object.entries(absentMap).forEach(_ref7 => {
+      let [wId, entry] = _ref7;
+      if (!SHOWN_LEAVE_TYPES.includes(entry.type)) return;
+      const w = workers.find(x => x.id === wId);
+      if (!w || assignedWorkers.has(w.id)) return;
+      if (!absentByType[entry.type]) absentByType[entry.type] = [];
+      absentByType[entry.type].push(w);
+    });
+    const hasAbsent = Object.keys(absentByType).length > 0;
+    const absentCount = Object.values(absentByType).reduce((s, arr) => s + arr.length, 0);
     const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
       cat,
       workers: unassigned.filter(w => w.category === cat.id)
@@ -1954,7 +1957,7 @@ function ScheduleView(_ref2) {
         textTransform: 'uppercase',
         color: 'var(--text-muted)'
       }
-    }, "\uD83D\uDC77 Neraspore\u0111eni (", unassigned.length, ") ", absentList.length > 0 && `· Odsutni (${absentList.length})`), /*#__PURE__*/React.createElement("span", {
+    }, "\uD83D\uDC77 Neraspore\u0111eni (", unassigned.length, ") ", hasAbsent && `· Odsutni (${absentCount})`), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '0.7rem',
         color: 'var(--text-light)'
@@ -2024,7 +2027,7 @@ function ScheduleView(_ref2) {
           opacity: 0.6
         }
       }, "\u2192"))));
-    }), absentList.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    }), hasAbsent && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         height: 1,
         background: 'var(--border)',
@@ -2039,19 +2042,26 @@ function ScheduleView(_ref2) {
         textTransform: 'uppercase',
         marginBottom: '0.4rem'
       }
-    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref9 => {
-      let {
-        worker: w,
-        entry
-      } = _ref9;
-      const s = ODSUTNOST_SHORT[entry.type] || {
-        short: '?',
-        icon: '❓',
-        bg: '#f0f0f0',
-        color: '#555',
-        border: '#ccc'
-      };
+    }, "Odsutni (", absentCount, ")"), SHOWN_LEAVE_TYPES.filter(t => absentByType[t]).map(type => {
+      const s = ODSUTNOST_STYLE[type];
       return /*#__PURE__*/React.createElement("div", {
+        key: type,
+        style: {
+          marginBottom: '0.5rem'
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '0.62rem',
+          fontWeight: 700,
+          color: s.color,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          marginBottom: '0.2rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", null, s.icon), type), absentByType[type].map(w => /*#__PURE__*/React.createElement("div", {
         key: w.id,
         style: {
           display: 'flex',
@@ -2066,7 +2076,7 @@ function ScheduleView(_ref2) {
           borderLeft: `3px solid ${s.color}`,
           borderRadius: 4,
           color: s.color,
-          opacity: 0.85
+          opacity: 0.7
         }
       }, /*#__PURE__*/React.createElement("span", {
         style: {
@@ -2082,7 +2092,7 @@ function ScheduleView(_ref2) {
           fontWeight: 700,
           fontFamily: 'var(--mono)'
         }
-      }, s.short));
+      }, s.short))));
     }))));
   })()), vehiclePopup && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
     style: {
@@ -2379,7 +2389,7 @@ function ScheduleView(_ref2) {
 }
 
 // ─── RIGHT PANEL ──────────────────────────────────────────────────────────────
-function RightPanel(_ref0) {
+function RightPanel(_ref9) {
   let {
     selectedDate,
     daySchedules,
@@ -2396,18 +2406,60 @@ function RightPanel(_ref0) {
     copyFromDate,
     yesterday,
     onWorkerClick
-  } = _ref0;
+  } = _ref9;
   const [copyDate, setCopyDate] = useState('');
   const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-  const absentWorkers = new Set(Object.entries(godisnji || {}).filter(_ref1 => {
-    let [wId, entries] = _ref1;
-    return entries.some(e => e.date === selectedDate);
-  }).map(_ref10 => {
-    let [wId] = _ref10;
-    return wId;
-  }));
+  const absentMap = {};
+  Object.entries(godisnji || {}).forEach(_ref0 => {
+    let [wId, entries] = _ref0;
+    const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
+    if (entry) absentMap[wId] = entry;
+  });
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
-  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkers.has(w.id));
+  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentMap[w.id]);
+  const ODSUTNOST_STYLE = {
+    'Godišnji odmor': {
+      short: 'GO',
+      icon: '🏖️',
+      bg: '#e4edf5',
+      color: '#1a3d5c',
+      border: '#9bbfd9'
+    },
+    'Bolovanje': {
+      short: 'B',
+      icon: '🏥',
+      bg: '#fde8e8',
+      color: '#8b2020',
+      border: '#e0a0a0'
+    },
+    'Slobodan dan': {
+      short: 'SD',
+      icon: '☀️',
+      bg: '#fdf0e0',
+      color: '#b5620a',
+      border: '#e8c17a'
+    },
+    'Neplaćeno': {
+      short: 'N',
+      icon: '📋',
+      bg: '#f0f0f0',
+      color: '#555',
+      border: '#ccc'
+    }
+  };
+
+  // Absent workers grouped by leave type (only Bolovanje, Godišnji odmor, Neplaćeno)
+  const SHOWN_LEAVE_TYPES = ['Bolovanje', 'Godišnji odmor', 'Neplaćeno'];
+  const absentByType = {};
+  Object.entries(absentMap).forEach(_ref1 => {
+    let [wId, entry] = _ref1;
+    if (!SHOWN_LEAVE_TYPES.includes(entry.type)) return;
+    const w = workers.find(x => x.id === wId);
+    if (!w || assignedWorkers.has(w.id)) return;
+    if (!absentByType[entry.type]) absentByType[entry.type] = [];
+    absentByType[entry.type].push(w);
+  });
+  const hasAbsent = Object.keys(absentByType).length > 0;
 
   // Group unassigned by category
   const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
@@ -2517,8 +2569,8 @@ function RightPanel(_ref0) {
       fontSize: '0.8rem',
       color: 'var(--text-light)'
     }
-  }, "Nema podataka"), Object.entries(statsByDept).map(_ref11 => {
-    let [dId, ws] = _ref11;
+  }, "Nema podataka"), Object.entries(statsByDept).map(_ref10 => {
+    let [dId, ws] = _ref10;
     return /*#__PURE__*/React.createElement("div", {
       key: dId,
       style: {
@@ -2563,11 +2615,11 @@ function RightPanel(_ref0) {
       color: 'var(--green)',
       fontWeight: 500
     }
-  }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref12 => {
+  }, "\u2713 Svi raspore\u0111eni") : unassignedByCat.map(_ref11 => {
     let {
       cat,
       workers: ws
-    } = _ref12;
+    } = _ref11;
     return /*#__PURE__*/React.createElement("div", {
       key: cat.id,
       style: {
@@ -2620,106 +2672,73 @@ function RightPanel(_ref0) {
         opacity: 0.6
       }
     }, "\u2192"))));
-  })), absentWorkers.size > 0 && (() => {
-    const ODSUTNOST_SHORT = {
-      'Godišnji odmor': {
-        short: 'GO',
-        icon: '🏖️',
-        bg: '#e4edf5',
-        color: '#1a3d5c',
-        border: '#9bbfd9'
-      },
-      'Bolovanje': {
-        short: 'B',
-        icon: '🏥',
-        bg: '#fde8e8',
-        color: '#8b2020',
-        border: '#e0a0a0'
-      },
-      'Slobodan dan': {
-        short: 'SD',
-        icon: '☀️',
-        bg: '#fdf0e0',
-        color: '#b5620a',
-        border: '#e8c17a'
-      },
-      'Neplaćeno': {
-        short: 'N',
-        icon: '📋',
-        bg: '#f0f0f0',
-        color: '#555',
-        border: '#ccc'
-      }
-    };
-    const absentList = [...absentWorkers].map(wId => {
-      const w = workers.find(x => x.id === wId);
-      const entry = (godisnji[wId] || []).find(e => e.date === selectedDate);
-      return w && entry ? {
-        worker: w,
-        entry
-      } : null;
-    }).filter(Boolean);
-    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-      className: "divider"
-    }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  })), hasAbsent && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "divider"
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.65rem',
+      letterSpacing: '0.1em',
+      color: 'var(--text-light)',
+      textTransform: 'uppercase',
+      marginBottom: '0.6rem'
+    }
+  }, "Odsutni (", Object.values(absentByType).reduce((s, arr) => s + arr.length, 0), ")"), SHOWN_LEAVE_TYPES.filter(t => absentByType[t]).map(type => {
+    const s = ODSUTNOST_STYLE[type];
+    return /*#__PURE__*/React.createElement("div", {
+      key: type,
       style: {
-        fontFamily: 'var(--mono)',
-        fontSize: '0.65rem',
-        letterSpacing: '0.1em',
-        color: 'var(--text-light)',
-        textTransform: 'uppercase',
-        marginBottom: '0.6rem'
+        marginBottom: '0.5rem'
       }
-    }, "Odsutni (", absentList.length, ")"), absentList.map(_ref13 => {
-      let {
-        worker: w,
-        entry
-      } = _ref13;
-      const s = ODSUTNOST_SHORT[entry.type] || {
-        short: '?',
-        icon: '❓',
-        bg: '#f0f0f0',
-        color: '#555',
-        border: '#ccc'
-      };
-      return /*#__PURE__*/React.createElement("div", {
-        key: w.id,
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          padding: '0.3rem 0.5rem',
-          marginBottom: '0.15rem',
-          fontSize: '0.8rem',
-          fontWeight: 500,
-          background: s.bg,
-          border: `1px solid ${s.border}`,
-          borderLeft: `3px solid ${s.color}`,
-          borderRadius: 4,
-          color: s.color,
-          opacity: 0.85
-        }
-      }, /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.85rem'
-        }
-      }, s.icon), /*#__PURE__*/React.createElement("span", {
-        style: {
-          flex: 1
-        }
-      }, w.name), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.6rem',
-          fontWeight: 700,
-          fontFamily: 'var(--mono)'
-        }
-      }, s.short));
-    })));
-  })());
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.62rem',
+        fontWeight: 700,
+        color: s.color,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        marginBottom: '0.2rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.25rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", null, s.icon), type), absentByType[type].map(w => /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.3rem 0.5rem',
+        marginBottom: '0.15rem',
+        fontSize: '0.8rem',
+        fontWeight: 500,
+        background: s.bg,
+        border: `1px solid ${s.border}`,
+        borderLeft: `3px solid ${s.color}`,
+        borderRadius: 4,
+        color: s.color,
+        opacity: 0.7
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.85rem'
+      }
+    }, s.icon), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }, w.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.6rem',
+        fontWeight: 700,
+        fontFamily: 'var(--mono)'
+      }
+    }, s.short))));
+  }))));
 }
 
 // ─── QUICK ASSIGN MODAL ───────────────────────────────────────────────────────
-function QuickModal(_ref14) {
+function QuickModal(_ref12) {
   let {
     worker,
     workers,
@@ -2735,7 +2754,7 @@ function QuickModal(_ref14) {
     wName,
     godisnji,
     setGodisnji
-  } = _ref14;
+  } = _ref12;
   const cat = getCatById(worker.category);
   const isPrimac = worker.category === 'primac_panj';
 
@@ -2809,7 +2828,14 @@ function QuickModal(_ref14) {
   const regularVozaci = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
-  const companions = activeWorkers.filter(w => w.id !== worker.id && (w.category === 'radnik_primka' || w.category === 'pomocni' || w.category === 'primac_panj'));
+  const absentWorkerIds = new Set(Object.entries(godisnji || {}).filter(_ref13 => {
+    let [wId, entries] = _ref13;
+    return entries.some(e => e.date === selectedDate || e.open && e.dateOd && e.dateOd <= selectedDate);
+  }).map(_ref14 => {
+    let [wId] = _ref14;
+    return wId;
+  }));
+  const companions = activeWorkers.filter(w => w.id !== worker.id && !absentWorkerIds.has(w.id) && (w.category === 'radnik_primka' || w.category === 'pomocni' || w.category === 'primac_panj'));
   const companionGroups = [{
     label: 'Radnici u primci',
     workers: companions.filter(w => w.category === 'radnik_primka')
@@ -2843,9 +2869,26 @@ function QuickModal(_ref14) {
   };
   const handleSaveOdsutnost = () => {
     if (!odsDateOd) return alert('Odaberi datum!');
+    if (odsDateDo && odsDateDo < odsDateOd) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    if (!odsDateDo) {
+      // Open-ended leave — no end date known yet
+      setGodisnji(g => {
+        const prev = (g[worker.id] || []).filter(e => !(e.open && e.dateOd === odsDateOd && e.type === odsutnostType));
+        return {
+          ...g,
+          [worker.id]: [...prev, {
+            dateOd: odsDateOd,
+            type: odsutnostType,
+            note,
+            open: true
+          }]
+        };
+      });
+      onClose();
+      return;
+    }
     const startDate = new Date(odsDateOd);
-    const endDate = odsDateDo ? new Date(odsDateDo) : startDate;
-    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    const endDate = new Date(odsDateDo);
     const dates = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dw = d.getDay();
@@ -3067,7 +3110,14 @@ function QuickModal(_ref14) {
     value: odsDateDo,
     min: odsDateOd || undefined,
     onChange: e => setOdsDateDo(e.target.value)
-  }))), odsDateOd && odsDateDo && odsDateDo >= odsDateOd && (() => {
+  }))), odsDateOd && !odsDateDo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.75rem',
+      color: '#b5620a',
+      marginBottom: '0.4rem',
+      fontStyle: 'italic'
+    }
+  }, "Bez krajnjeg datuma \u2014 odsutnost ostaje otvorena dok se ne zaklju\u010Di"), odsDateOd && odsDateDo && odsDateDo >= odsDateOd && (() => {
     const s = new Date(odsDateOd),
       e = new Date(odsDateDo);
     let count = 0;
@@ -3577,7 +3627,9 @@ function EntryModal(_ref15) {
     allJobTypes,
     onSave,
     onClose,
-    wName
+    wName,
+    godisnji,
+    selectedDate
   } = _ref15;
   const [form, setForm] = useState({
     id: data.id || uid(),
@@ -3618,7 +3670,15 @@ function EntryModal(_ref15) {
 
   // Radnici koji su već raspoređeni za isti datum u drugim unosima
   const alreadyScheduled = new Set(schedules.filter(s => s.date === form.date && (!isEdit || s.id !== form.id)).flatMap(s => s.allWorkers || []));
-  const availableWorkers = activeWorkers.filter(w => !alreadyScheduled.has(w.id));
+  const checkDate = form.date || selectedDate;
+  const absentWorkerIds = new Set(Object.entries(godisnji || {}).filter(_ref16 => {
+    let [wId, entries] = _ref16;
+    return entries.some(e => e.date === checkDate || e.open && e.dateOd && e.dateOd <= checkDate);
+  }).map(_ref17 => {
+    let [wId] = _ref17;
+    return wId;
+  }));
+  const availableWorkers = activeWorkers.filter(w => !alreadyScheduled.has(w.id) && !absentWorkerIds.has(w.id));
   useEffect(() => {
     if (isPrimka) {
       const ws = [form.primatWorker, ...(form.extraWorkers || [])].filter(Boolean);
@@ -4321,7 +4381,7 @@ function EntryModal(_ref15) {
 }
 
 // ─── HISTORY DETAIL MODAL ─────────────────────────────────────────────────────
-function HistoryDetailModal(_ref16) {
+function HistoryDetailModal(_ref18) {
   let {
     schedule,
     history,
@@ -4330,7 +4390,7 @@ function HistoryDetailModal(_ref16) {
     dName,
     restoreVersion,
     onClose
-  } = _ref16;
+  } = _ref18;
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => e.target === e.currentTarget && onClose()
@@ -4386,11 +4446,11 @@ function HistoryDetailModal(_ref16) {
 }
 
 // ─── WORKER CATEGORY BADGE ────────────────────────────────────────────────────
-function CatBadge(_ref17) {
+function CatBadge(_ref19) {
   let {
     catId,
     size = 'normal'
-  } = _ref17;
+  } = _ref19;
   const cat = getCatById(catId);
   if (!cat) return null;
   const small = size === 'small';
@@ -4413,12 +4473,12 @@ function CatBadge(_ref17) {
 }
 
 // ─── WORKERS VIEW ─────────────────────────────────────────────────────────────
-function WorkersView(_ref18) {
+function WorkersView(_ref20) {
   let {
     workers,
     setWorkers,
     schedules
-  } = _ref18;
+  } = _ref20;
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState('');
   const [activeCat, setActiveCat] = useState('sve'); // 'sve' | catId
@@ -4467,11 +4527,11 @@ function WorkersView(_ref18) {
   };
 
   // ── WORKER MODAL ──
-  const WorkerModal = _ref19 => {
+  const WorkerModal = _ref21 => {
     let {
       worker,
       onClose
-    } = _ref19;
+    } = _ref21;
     const blank = {
       id: uid(),
       name: '',
@@ -4679,11 +4739,11 @@ function WorkersView(_ref18) {
   };
 
   // ── DETAIL MODAL ──
-  const DetailModal = _ref20 => {
+  const DetailModal = _ref22 => {
     let {
       worker,
       onClose
-    } = _ref20;
+    } = _ref22;
     const cat = getCatById(worker.category);
     const sc = workerSchedCount[worker.id] || 0;
     const ls = workerLastSeen[worker.id];
@@ -5275,19 +5335,19 @@ function WorkersView(_ref18) {
 }
 
 // ─── DEPARTMENTS VIEW ─────────────────────────────────────────────────────────
-function DepartmentsView(_ref21) {
+function DepartmentsView(_ref23) {
   let {
     departments,
     setDepartments,
     schedules,
     dName
-  } = _ref21;
+  } = _ref23;
   const [modal, setModal] = useState(null);
-  const DeptModal = _ref22 => {
+  const DeptModal = _ref24 => {
     let {
       dept,
       onClose
-    } = _ref22;
+    } = _ref24;
     const [form, setForm] = useState(dept || {
       id: uid(),
       gospodarskaJedinica: '',
@@ -5420,7 +5480,7 @@ function DepartmentsView(_ref21) {
 }
 
 // ─── PREGLED VIEW ─────────────────────────────────────────────────────────────
-function PregledView(_ref23) {
+function PregledView(_ref25) {
   let {
     schedules,
     workers,
@@ -5433,7 +5493,7 @@ function PregledView(_ref23) {
     setFilterDept,
     filterJob,
     setFilterJob
-  } = _ref23;
+  } = _ref25;
   const [tab, setTab] = useState('radnik');
   const filtered = useMemo(() => schedules.filter(s => (!filterWorker || s.allWorkers.includes(filterWorker)) && (!filterDept || s.deptId === filterDept) && (!filterJob || s.jobType === filterJob)).sort((a, b) => b.date.localeCompare(a.date)), [schedules, filterWorker, filterDept, filterJob]);
 
@@ -5533,8 +5593,8 @@ function PregledView(_ref23) {
     className: "stat-value"
   }, filtered.length), /*#__PURE__*/React.createElement("div", {
     className: "stat-label"
-  }, "Ukupno smjena")), Object.entries(workerStats).map(_ref24 => {
-    let [jt, cnt] = _ref24;
+  }, "Ukupno smjena")), Object.entries(workerStats).map(_ref26 => {
+    let [jt, cnt] = _ref26;
     return /*#__PURE__*/React.createElement("div", {
       className: "stat-card",
       key: jt
@@ -5593,14 +5653,14 @@ function PregledView(_ref23) {
 }
 
 // ─── HISTORIJA VIEW ───────────────────────────────────────────────────────────
-function HistorijaView(_ref25) {
+function HistorijaView(_ref27) {
   let {
     history,
     wName,
     dName,
     restoreVersion,
     schedules
-  } = _ref25;
+  } = _ref27;
   const grouped = useMemo(() => {
     const m = {};
     history.forEach(h => {
@@ -5620,8 +5680,8 @@ function HistorijaView(_ref25) {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
-  }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("p", null, "Historija je prazna.")) : grouped.map(_ref26 => {
-    let [date, items] = _ref26;
+  }, "\uD83D\uDCDC"), /*#__PURE__*/React.createElement("p", null, "Historija je prazna.")) : grouped.map(_ref28 => {
+    let [date, items] = _ref28;
     return /*#__PURE__*/React.createElement("div", {
       key: date,
       style: {
@@ -5680,12 +5740,12 @@ function HistorijaView(_ref25) {
 }
 
 // ─── SPISAK VIEW ──────────────────────────────────────────────────────────────
-function SpisakView(_ref27) {
+function SpisakView(_ref29) {
   let {
     workers,
     setWorkers,
     vehicles
-  } = _ref27;
+  } = _ref29;
   // editing: { workerId, field } | null
   const [editing, setEditing] = useState(null);
   const [editVal, setEditVal] = useState('');
@@ -6406,12 +6466,12 @@ function SpisakView(_ref27) {
 }
 
 // ─── VOZAČI VIEW ────────────────────────────────────────────────────────────
-function VozaciView(_ref28) {
+function VozaciView(_ref30) {
   let {
     vehicles,
     setVehicles,
     workers
-  } = _ref28;
+  } = _ref30;
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
@@ -6841,18 +6901,20 @@ function VozaciView(_ref28) {
 }
 
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView(_ref29) {
+function SihtaricaView(_ref31) {
   let {
     schedules,
     workers,
     departments,
     godisnji,
     setGodisnji,
+    goKvota,
+    setGoKvota,
     holidays,
     setHolidays,
     wName,
     dName
-  } = _ref29;
+  } = _ref31;
   const now = new Date();
   const [selYear, setSelYear] = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
@@ -6864,10 +6926,38 @@ function SihtaricaView(_ref29) {
     type: 'Godišnji odmor',
     note: ''
   });
+  const [closingLeave, setClosingLeave] = useState(null); // { wId, entry } for closing open leave
+  const [closeDateDo, setCloseDateDo] = useState('');
   const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji' | 'praznici'
   const [holidayInput, setHolidayInput] = useState(false);
   const [holidayName, setHolidayName] = useState('');
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Helper: normalize goKvota entry (backward compat with old number format)
+  const getKvota = wId => {
+    const raw = goKvota[wId];
+    if (!raw) return {
+      dana: 0,
+      datumOd: ''
+    };
+    if (typeof raw === 'number') return {
+      dana: raw,
+      datumOd: `${selYear}-01-01`
+    };
+    return {
+      dana: raw.dana || 0,
+      datumOd: raw.datumOd || ''
+    };
+  };
+  const setWorkerKvota = (wId, dana, datumOd) => {
+    setGoKvota(prev => ({
+      ...prev,
+      [wId]: {
+        dana,
+        datumOd
+      }
+    }));
+  };
   const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': {
@@ -6917,21 +7007,37 @@ function SihtaricaView(_ref29) {
       });
     });
     // Odsutnost
-    Object.entries(godisnji).forEach(_ref30 => {
-      let [wId, entries] = _ref30;
+    Object.entries(godisnji).forEach(_ref32 => {
+      let [wId, entries] = _ref32;
       if (!m[wId]) return;
       entries.forEach(e => {
-        m[wId][e.date] = {
-          type: 'odsutnost',
-          oType: e.type,
-          note: e.note
-        };
+        if (e.open && e.dateOd) {
+          // Open-ended leave: fill from dateOd through end of displayed month
+          days.forEach(d => {
+            const date = isoDate(d);
+            if (date >= e.dateOd && !isWeekend(d)) {
+              m[wId][date] = {
+                type: 'odsutnost',
+                oType: e.type,
+                note: e.note,
+                open: true,
+                dateOd: e.dateOd
+              };
+            }
+          });
+        } else if (e.date) {
+          m[wId][e.date] = {
+            type: 'odsutnost',
+            oType: e.type,
+            note: e.note
+          };
+        }
       });
     });
     // Praznici — override za sve radnike (ako nemaju raspored, upisi praznik)
     if (holidays) {
-      Object.entries(holidays).forEach(_ref31 => {
-        let [date, name] = _ref31;
+      Object.entries(holidays).forEach(_ref33 => {
+        let [date, name] = _ref33;
         workers.forEach(w => {
           if (m[w.id] && !m[w.id][date]) {
             m[w.id][date] = {
@@ -6982,21 +7088,40 @@ function SihtaricaView(_ref29) {
     });
   }, [workerDayMap, days, selYear, selMonth]);
 
-  // Add odsutnost (supports date range)
+  // Add odsutnost (supports date range or open-ended)
   const saveGodisnji = () => {
     if (!goForm.date) return alert('Odaberi datum!');
     const wId = goModal.workerId;
+    if (goForm.dateDo && goForm.dateDo < goForm.date) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    if (!goForm.dateDo) {
+      // Open-ended leave
+      setGodisnji(g => {
+        const prev = (g[wId] || []).filter(e => !(e.open && e.dateOd === goForm.date && e.type === goForm.type));
+        return {
+          ...g,
+          [wId]: [...prev, {
+            dateOd: goForm.date,
+            type: goForm.type,
+            note: goForm.note,
+            open: true
+          }]
+        };
+      });
+      setGoModal(null);
+      setGoForm({
+        date: '',
+        dateDo: '',
+        type: 'Godišnji odmor',
+        note: ''
+      });
+      return;
+    }
     const startDate = new Date(goForm.date);
-    const endDate = goForm.dateDo ? new Date(goForm.dateDo) : startDate;
-    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
-    // Collect all dates in range
+    const endDate = new Date(goForm.dateDo);
     const dates = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dw = d.getDay();
-      if (dw !== 0 && dw !== 6) {
-        // skip weekends
-        dates.push(d.toISOString().slice(0, 10));
-      }
+      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0, 10));
     }
     if (dates.length === 0) return alert('Nema radnih dana u odabranom periodu!');
     setGodisnji(g => {
@@ -7019,10 +7144,40 @@ function SihtaricaView(_ref29) {
       note: ''
     });
   };
+
+  // Close an open-ended leave by setting end date and expanding into individual date entries
+  const closeOpenLeave = (wId, openEntry, dateDo) => {
+    const startDate = new Date(openEntry.dateOd);
+    const endDate = new Date(dateDo);
+    if (endDate < startDate) return alert('Datum završetka mora biti nakon početka!');
+    const dates = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dw = d.getDay();
+      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0, 10));
+    }
+    setGodisnji(g => {
+      const prev = (g[wId] || []).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type) && !dates.includes(e.date));
+      const newEntries = dates.map(dt => ({
+        date: dt,
+        type: openEntry.type,
+        note: openEntry.note
+      }));
+      return {
+        ...g,
+        [wId]: [...prev, ...newEntries]
+      };
+    });
+  };
   const deleteGodisnji = (wId, date) => {
     setGodisnji(g => ({
       ...g,
       [wId]: (g[wId] || []).filter(e => e.date !== date)
+    }));
+  };
+  const deleteOpenLeave = (wId, openEntry) => {
+    setGodisnji(g => ({
+      ...g,
+      [wId]: (g[wId] || []).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type))
     }));
   };
   const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
@@ -7080,13 +7235,21 @@ function SihtaricaView(_ref29) {
         praznih: 0,
         praznika: 0
       });
+      // Count GO days used from datumOd onwards
+      const kv = getKvota(w.id);
+      const goUsed = (godisnji[w.id] || []).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+      const goRemaining = kv.dana - goUsed;
       return {
         ...w,
         months,
-        total
+        total,
+        goUsed,
+        kvota: kv.dana,
+        kvotaDatumOd: kv.datumOd,
+        goRemaining
       };
     });
-  }, [sihtView, selYear, workerDayMap, workers]);
+  }, [sihtView, selYear, workerDayMap, workers, goKvota, godisnji]);
 
   // ── Per-worker monthly detail ──
   const singleWorkerData = useMemo(() => {
@@ -7169,8 +7332,8 @@ function SihtaricaView(_ref29) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['praznici', '🎉 Praznici']].map(_ref32 => {
-    let [k, l] = _ref32;
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['praznici', '🎉 Praznici']].map(_ref34 => {
+    let [k, l] = _ref34;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       onClick: () => setSihtView(k),
@@ -7361,12 +7524,12 @@ function SihtaricaView(_ref29) {
       padding: '0.5rem 0.75rem',
       width: 80
     }
-  }))), /*#__PURE__*/React.createElement("tbody", null, Object.entries(holidays).sort((_ref33, _ref34) => {
-    let [a] = _ref33;
-    let [b] = _ref34;
+  }))), /*#__PURE__*/React.createElement("tbody", null, Object.entries(holidays).sort((_ref35, _ref36) => {
+    let [a] = _ref35;
+    let [b] = _ref36;
     return a.localeCompare(b);
-  }).map(_ref35 => {
-    let [date, name] = _ref35;
+  }).map(_ref37 => {
+    let [date, name] = _ref37;
     const d = new Date(date + 'T00:00:00');
     const dayNames = ['Nedjelja', 'Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota'];
     return /*#__PURE__*/React.createElement("tr", {
@@ -7447,8 +7610,8 @@ function SihtaricaView(_ref29) {
       color: 'var(--text-muted)',
       fontWeight: 700
     }
-  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref36 => {
-    let [k, v] = _ref36;
+  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref38 => {
+    let [k, v] = _ref38;
     return /*#__PURE__*/React.createElement("span", {
       key: k,
       style: {
@@ -7696,10 +7859,14 @@ function SihtaricaView(_ref29) {
             fontFamily: 'var(--mono)',
             cursor: 'pointer'
           },
-          onClick: () => deleteGodisnji(w.id, date),
-          title: 'Klikni za brisanje: ' + entry.oType
+          onClick: () => entry.open ? deleteOpenLeave(w.id, {
+            dateOd: entry.dateOd,
+            type: entry.oType,
+            note: entry.note
+          }) : deleteGodisnji(w.id, date),
+          title: entry.open ? 'Otvoreno od ' + entry.dateOd + ' · klikni za brisanje' : 'Klikni za brisanje: ' + entry.oType
         }, oc.short);
-        title = entry.oType + (entry.note ? ' — ' + entry.note : '');
+        title = entry.oType + (entry.open ? ' (otvoreno od ' + entry.dateOd + ')' : '') + (entry.note ? ' — ' + entry.note : '');
       }
       return /*#__PURE__*/React.createElement("td", {
         key: d,
@@ -7888,7 +8055,13 @@ function SihtaricaView(_ref29) {
           cursor: entry?.type === 'odsutnost' ? 'pointer' : 'default'
         },
         onClick: () => {
-          if (entry?.type === 'odsutnost') deleteGodisnji(w.id, date);
+          if (entry?.type === 'odsutnost') {
+            entry.open ? deleteOpenLeave(w.id, {
+              dateOd: entry.dateOd,
+              type: entry.oType,
+              note: entry.note
+            }) : deleteGodisnji(w.id, date);
+          }
         }
       }, label);
     })));
@@ -7917,7 +8090,8 @@ function SihtaricaView(_ref29) {
       odsutnih: 0,
       praznih: 0
     };
-    const goUpcoming = (godisnji[w.id] || []).filter(e => e.date >= today()).sort((a, b) => a.date.localeCompare(b.date));
+    const goUpcoming = (godisnji[w.id] || []).filter(e => e.date && e.date >= today()).sort((a, b) => a.date.localeCompare(b.date));
+    const openLeaves = (godisnji[w.id] || []).filter(e => e.open);
     return /*#__PURE__*/React.createElement("div", {
       key: w.id,
       style: {
@@ -7953,8 +8127,25 @@ function SihtaricaView(_ref29) {
         borderRadius: 3,
         padding: '0.1rem 0.4rem'
       }
-    }, stats.radnih, " rad"), Object.entries(stats.odsutTypes || {}).map(_ref37 => {
-      let [k, v] = _ref37;
+    }, stats.radnih, " rad"), (() => {
+      const kv = getKvota(w.id);
+      if (!kv.dana) return null;
+      const goUsed = (godisnji[w.id] || []).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+      const rem = kv.dana - goUsed;
+      return /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          fontSize: '0.75rem',
+          borderRadius: 3,
+          padding: '0.1rem 0.4rem',
+          fontWeight: 700,
+          background: rem < 0 ? '#fde8e8' : rem < 7 ? '#fff3e0' : '#e4edf5',
+          color: rem < 0 ? '#8b2020' : rem < 7 ? '#e65100' : '#1a3d5c',
+          border: `1px solid ${rem < 0 ? '#e0a0a0' : rem < 7 ? '#f0c060' : '#9bbfd9'}`
+        }
+      }, "GO: ", rem, "/", kv.dana);
+    })(), Object.entries(stats.odsutTypes || {}).map(_ref39 => {
+      let [k, v] = _ref39;
       const oc = ODSUTNOST_COLOR[k] || {
         bg: '#f0f0f0',
         color: '#555',
@@ -7972,6 +8163,62 @@ function SihtaricaView(_ref29) {
           padding: '0.1rem 0.4rem'
         }
       }, v, " ", k.split(' ')[0].toLowerCase());
+    })), openLeaves.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '0.3rem'
+      }
+    }, openLeaves.map(e => {
+      const oc = ODSUTNOST_COLOR[e.type] || {
+        bg: '#f0f0f0',
+        color: '#555',
+        border: '#ccc'
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        key: e.dateOd + e.type,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.3rem',
+          fontSize: '0.72rem',
+          marginBottom: '0.15rem'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          color: oc.color,
+          background: oc.bg,
+          border: `1px solid ${oc.border}`,
+          borderRadius: 3,
+          padding: '0.05rem 0.3rem',
+          fontSize: '0.65rem',
+          fontWeight: 700
+        }
+      }, ODSUTNOST_COLOR[e.type]?.short), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: 'var(--mono)',
+          color: '#b5620a',
+          fontWeight: 600
+        }
+      }, fmtDate(e.dateOd), " \u2192 ?"), e.note && /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: 'var(--text-light)',
+          fontStyle: 'italic',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }
+      }, e.note), /*#__PURE__*/React.createElement("button", {
+        onClick: () => deleteOpenLeave(w.id, e),
+        style: {
+          marginLeft: 'auto',
+          background: 'none',
+          border: 'none',
+          color: 'var(--text-light)',
+          cursor: 'pointer',
+          fontSize: '0.7rem',
+          padding: 0
+        }
+      }, "\u2715"));
     })), goUpcoming.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: '0.3rem'
@@ -8161,12 +8408,12 @@ function SihtaricaView(_ref29) {
           fontSize: '0.75rem',
           width: '100%'
         }
-      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref38 => {
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref40 => {
         let {
           d,
           dw,
           wknd
-        } = _ref38;
+        } = _ref40;
         return /*#__PURE__*/React.createElement("th", {
           key: d,
           style: {
@@ -8185,13 +8432,13 @@ function SihtaricaView(_ref29) {
             opacity: 0.7
           }
         }, 'NPUSČPS'[dw]));
-      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref39 => {
+      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref41 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref39;
+        } = _ref41;
         let bg = wknd ? '#f0ede6' : 'white';
         let content = wknd ? /*#__PURE__*/React.createElement("span", {
           style: {
@@ -8253,13 +8500,13 @@ function SihtaricaView(_ref29) {
           gridTemplateColumns: `repeat(${mo.days.length}, 1fr)`,
           gap: '1.5px'
         }
-      }, mo.days.map(_ref40 => {
+      }, mo.days.map(_ref42 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref40;
+        } = _ref42;
         let bg,
           color,
           label = String(d),
@@ -8320,8 +8567,8 @@ function SihtaricaView(_ref29) {
           padding: '0.1rem 0.4rem',
           fontWeight: 700
         }
-      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref41 => {
-        let [k, v] = _ref41;
+      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref43 => {
+        let [k, v] = _ref43;
         const oc = ODSUTNOST_COLOR[k] || {
           bg: '#f0f0f0',
           color: '#555',
@@ -8474,7 +8721,51 @@ function SihtaricaView(_ref29) {
       textAlign: 'center',
       minWidth: 48
     }
-  }, "UKUP"))), /*#__PURE__*/React.createElement("tbody", null, yearlyStats.map(w => {
+  }, "UKUP"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4edf5',
+      color: '#1a3d5c',
+      padding: '0.35rem 0.4rem',
+      border: '1px solid #9bbfd9',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.6rem',
+      textAlign: 'center',
+      minWidth: 48
+    }
+  }, "GO DANA"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4edf5',
+      color: '#1a3d5c',
+      padding: '0.35rem 0.4rem',
+      border: '1px solid #9bbfd9',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.6rem',
+      textAlign: 'center',
+      minWidth: 80
+    }
+  }, "OD DATUMA"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4edf5',
+      color: '#1a3d5c',
+      padding: '0.35rem 0.4rem',
+      border: '1px solid #9bbfd9',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.6rem',
+      textAlign: 'center',
+      minWidth: 48
+    }
+  }, "ISKOR."), /*#__PURE__*/React.createElement("th", {
+    style: {
+      background: '#e4edf5',
+      color: '#1a3d5c',
+      padding: '0.35rem 0.4rem',
+      border: '1px solid #9bbfd9',
+      fontFamily: 'var(--mono)',
+      fontSize: '0.6rem',
+      textAlign: 'center',
+      minWidth: 52
+    }
+  }, "PREOST."))), /*#__PURE__*/React.createElement("tbody", null, yearlyStats.map(w => {
     const cat = getCatById(w.category);
     return /*#__PURE__*/React.createElement("tr", {
       key: w.id
@@ -8581,7 +8872,89 @@ function SihtaricaView(_ref29) {
         color: '#8b2020',
         fontWeight: 600
       }
-    }, w.total.odsutnih, " ods")));
+    }, w.total.odsutnih, " ods")), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: '1px solid #9bbfd9',
+        background: '#f8fbff',
+        padding: '0.15rem'
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      max: "60",
+      value: w.kvota || '',
+      placeholder: "\u2014",
+      onChange: e => setWorkerKvota(w.id, parseInt(e.target.value) || 0, w.kvotaDatumOd || ''),
+      style: {
+        width: 38,
+        textAlign: 'center',
+        border: '1px solid #c0d4e8',
+        borderRadius: 3,
+        padding: '0.15rem',
+        fontSize: '0.75rem',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        color: '#1a3d5c',
+        background: 'white'
+      }
+    })), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: '1px solid #9bbfd9',
+        background: '#f8fbff',
+        padding: '0.15rem'
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      value: w.kvotaDatumOd || '',
+      onChange: e => setWorkerKvota(w.id, w.kvota || 0, e.target.value),
+      style: {
+        width: 90,
+        textAlign: 'center',
+        border: '1px solid #c0d4e8',
+        borderRadius: 3,
+        padding: '0.15rem',
+        fontSize: '0.65rem',
+        fontFamily: 'var(--mono)',
+        color: '#1a3d5c',
+        background: 'white'
+      }
+    })), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: '1px solid #9bbfd9',
+        background: '#f8fbff',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        fontSize: '0.78rem',
+        color: '#1a3d5c',
+        padding: '0.3rem 0.3rem'
+      }
+    }, w.goUsed || '—'), /*#__PURE__*/React.createElement("td", {
+      style: {
+        textAlign: 'center',
+        border: '1px solid #9bbfd9',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        fontSize: '0.78rem',
+        padding: '0.3rem 0.3rem',
+        background: !w.kvota ? '#f8fbff' : w.goRemaining < 0 ? '#fde8e8' : w.goRemaining < 7 ? '#fff3e0' : '#e8f5e9',
+        color: !w.kvota ? '#ccc' : w.goRemaining < 0 ? '#8b2020' : w.goRemaining < 7 ? '#e65100' : '#2e7d32'
+      }
+    }, w.kvota ? w.goRemaining : '—', w.kvota > 0 && w.goRemaining >= 0 && w.goRemaining < 7 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.45rem',
+        fontWeight: 600,
+        color: '#e65100'
+      }
+    }, "MALO!"), w.kvota > 0 && w.goRemaining < 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.45rem',
+        fontWeight: 600,
+        color: '#8b2020'
+      }
+    }, "PREKORA\u010CENO")));
   })), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
     style: {
       background: 'var(--green)',
@@ -8622,7 +8995,47 @@ function SihtaricaView(_ref29) {
       fontSize: '0.85rem',
       padding: '0.3rem 0.4rem'
     }
-  }, yearlyStats.reduce((a, w) => a + w.total.radnih, 0)))))), /*#__PURE__*/React.createElement("div", {
+  }, yearlyStats.reduce((a, w) => a + w.total.radnih, 0)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'center',
+      border: '1px solid #9bbfd9',
+      background: '#e4edf5',
+      fontFamily: 'var(--mono)',
+      fontWeight: 700,
+      fontSize: '0.72rem',
+      color: '#1a3d5c',
+      padding: '0.3rem 0.2rem'
+    }
+  }, yearlyStats.reduce((a, w) => a + w.kvota, 0) || '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'center',
+      border: '1px solid #9bbfd9',
+      background: '#e4edf5',
+      padding: '0.3rem 0.2rem'
+    }
+  }), /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'center',
+      border: '1px solid #9bbfd9',
+      background: '#e4edf5',
+      fontFamily: 'var(--mono)',
+      fontWeight: 700,
+      fontSize: '0.72rem',
+      color: '#1a3d5c',
+      padding: '0.3rem 0.2rem'
+    }
+  }, yearlyStats.reduce((a, w) => a + w.goUsed, 0) || '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'center',
+      border: '1px solid #9bbfd9',
+      background: '#e4edf5',
+      fontFamily: 'var(--mono)',
+      fontWeight: 700,
+      fontSize: '0.72rem',
+      color: '#1a3d5c',
+      padding: '0.3rem 0.2rem'
+    }
+  }, yearlyStats.some(w => w.kvota > 0) ? yearlyStats.reduce((a, w) => a + w.goRemaining, 0) : '—'))))), /*#__PURE__*/React.createElement("div", {
     className: "siht-godisnji-mobile"
   }, yearlyStats.map(w => {
     const cat = getCatById(w.category);
@@ -8683,7 +9096,17 @@ function SihtaricaView(_ref29) {
         borderRadius: 3,
         padding: '0.1rem 0.2rem'
       }
-    }, w.total.odsutnih, "O")), /*#__PURE__*/React.createElement("div", {
+    }, w.total.odsutnih, "O"), w.kvota > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.58rem',
+        fontWeight: 700,
+        borderRadius: 3,
+        padding: '0.1rem 0.25rem',
+        background: w.goRemaining < 0 ? '#fde8e8' : w.goRemaining < 7 ? '#fff3e0' : '#e4edf5',
+        color: w.goRemaining < 0 ? '#8b2020' : w.goRemaining < 7 ? '#e65100' : '#1a3d5c'
+      }
+    }, "GO: ", w.goRemaining, "/", w.kvota)), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: '0.2rem 0.35rem 0.25rem',
         display: 'grid',
@@ -8746,7 +9169,90 @@ function SihtaricaView(_ref29) {
     onClick: () => setGoModal(null)
   }, "\u2715")), /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, (() => {
+    const wId = goModal.workerId;
+    const kv = getKvota(wId);
+    const goUsed = (godisnji[wId] || []).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+    const goRemaining = kv.dana - goUsed;
+    return kv.dana > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: '0.6rem',
+        padding: '0.4rem 0.6rem',
+        borderRadius: 6,
+        background: goRemaining < 0 ? '#fde8e8' : goRemaining < 7 ? '#fff3e0' : '#e4edf5',
+        border: `1px solid ${goRemaining < 0 ? '#e0a0a0' : goRemaining < 7 ? '#f0c060' : '#9bbfd9'}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.8rem'
+      }
+    }, "\uD83C\uDFD6\uFE0F"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.78rem',
+        fontWeight: 700,
+        color: goRemaining < 0 ? '#8b2020' : goRemaining < 7 ? '#e65100' : '#1a3d5c'
+      }
+    }, "GO: ", goRemaining, "/", kv.dana, " preostalo"), goRemaining < 7 && goRemaining >= 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.7rem',
+        color: '#e65100',
+        fontWeight: 600,
+        marginLeft: 'auto'
+      }
+    }, "Malo preostalo!"), goRemaining < 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.7rem',
+        color: '#8b2020',
+        fontWeight: 600,
+        marginLeft: 'auto'
+      }
+    }, "Prekora\u010Deno!")), kv.datumOd && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.65rem',
+        color: 'var(--text-muted)',
+        marginTop: '0.15rem',
+        fontFamily: 'var(--mono)'
+      }
+    }, "Ra\u010Duna se od: ", fmtDate(kv.datumOd))) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        marginBottom: '0.6rem',
+        padding: '0.3rem 0.6rem',
+        borderRadius: 6,
+        background: '#f8f8f6',
+        border: '1px solid var(--border)'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-light)'
+      }
+    }, "GO kvota nije postavljena \u2014"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        const v = prompt('Unesite broj dana GO po ugovoru:');
+        if (v) setWorkerKvota(wId, parseInt(v) || 0, new Date().toISOString().slice(0, 10));
+      },
+      style: {
+        fontSize: '0.7rem',
+        color: '#1a3d5c',
+        background: '#e4edf5',
+        border: '1px solid #9bbfd9',
+        borderRadius: 4,
+        padding: '0.15rem 0.4rem',
+        cursor: 'pointer',
+        fontWeight: 600
+      }
+    }, "Postavi"));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
@@ -8783,7 +9289,15 @@ function SihtaricaView(_ref29) {
       ...f,
       dateDo: e.target.value
     }))
-  }))), goForm.date && goForm.dateDo && goForm.dateDo >= goForm.date && (() => {
+  }))), goForm.date && !goForm.dateDo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.75rem',
+      color: '#b5620a',
+      marginTop: '-0.3rem',
+      marginBottom: '0.3rem',
+      fontStyle: 'italic'
+    }
+  }, "Bez krajnjeg datuma \u2014 odsutnost ostaje otvorena dok se ne zaklju\u010Di"), goForm.date && goForm.dateDo && goForm.dateDo >= goForm.date && (() => {
     const s = new Date(goForm.date),
       e = new Date(goForm.dateDo);
     let count = 0;
@@ -8855,7 +9369,157 @@ function SihtaricaView(_ref29) {
       ...f,
       note: e.target.value
     }))
-  })), (godisnji[goModal.workerId] || []).filter(e => e.date >= today()).length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), (godisnji[goModal.workerId] || []).filter(e => e.open).length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#fef3e0',
+      border: '1px solid #f0c060',
+      borderRadius: 6,
+      padding: '0.6rem 0.75rem',
+      marginBottom: '0.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.62rem',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: '#b5620a',
+      marginBottom: '0.4rem'
+    }
+  }, "Otvorene odsutnosti"), (godisnji[goModal.workerId] || []).filter(e => e.open).map(e => {
+    const oc = ODSUTNOST_COLOR[e.type] || {
+      bg: '#f0f0f0',
+      color: '#555',
+      border: '#ccc',
+      short: '?'
+    };
+    const isClosing = closingLeave && closingLeave.entry.dateOd === e.dateOd && closingLeave.entry.type === e.type;
+    return /*#__PURE__*/React.createElement("div", {
+      key: e.dateOd + e.type,
+      style: {
+        marginBottom: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        fontSize: '0.78rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        color: oc.color,
+        background: oc.bg,
+        border: `1px solid ${oc.border}`,
+        borderRadius: 3,
+        padding: '0.05rem 0.3rem',
+        fontSize: '0.65rem',
+        fontWeight: 700
+      }
+    }, oc.short), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontWeight: 600
+      }
+    }, fmtDate(e.dateOd)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#b5620a',
+        fontWeight: 600
+      }
+    }, "\u2192 ?"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, e.type), e.note && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-light)',
+        fontStyle: 'italic'
+      }
+    }, e.note), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setClosingLeave({
+          wId: goModal.workerId,
+          entry: e
+        });
+        setCloseDateDo('');
+      },
+      style: {
+        marginLeft: 'auto',
+        background: '#fff',
+        border: '1px solid #f0c060',
+        color: '#b5620a',
+        cursor: 'pointer',
+        fontSize: '0.65rem',
+        borderRadius: 4,
+        padding: '0.15rem 0.4rem',
+        fontWeight: 600
+      }
+    }, "Zaklju\u010Di"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => deleteOpenLeave(goModal.workerId, e),
+      style: {
+        background: 'none',
+        border: 'none',
+        color: 'var(--red)',
+        cursor: 'pointer',
+        fontSize: '0.8rem'
+      }
+    }, "\u2715")), isClosing && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        marginTop: '0.3rem',
+        padding: '0.3rem 0.5rem',
+        background: '#fff',
+        borderRadius: 4,
+        border: '1px solid #f0c060'
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)',
+        whiteSpace: 'nowrap'
+      }
+    }, "Do:"), /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      className: "form-input",
+      value: closeDateDo,
+      min: e.dateOd,
+      onChange: ev => setCloseDateDo(ev.target.value),
+      style: {
+        fontSize: '0.75rem',
+        padding: '0.2rem 0.4rem',
+        flex: 1
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      disabled: !closeDateDo,
+      onClick: () => {
+        closeOpenLeave(goModal.workerId, e, closeDateDo);
+        setClosingLeave(null);
+      },
+      style: {
+        background: '#2e7d32',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 4,
+        padding: '0.2rem 0.5rem',
+        fontSize: '0.7rem',
+        fontWeight: 600,
+        cursor: closeDateDo ? 'pointer' : 'default',
+        opacity: closeDateDo ? 1 : 0.5
+      }
+    }, "OK"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setClosingLeave(null),
+      style: {
+        background: 'none',
+        border: 'none',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+        fontSize: '0.75rem'
+      }
+    }, "\u2715")));
+  })), (godisnji[goModal.workerId] || []).filter(e => e.date && e.date >= today()).length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'var(--bg)',
       border: '1px solid var(--border)',
@@ -8871,7 +9535,7 @@ function SihtaricaView(_ref29) {
       color: 'var(--text-light)',
       marginBottom: '0.4rem'
     }
-  }, "Planirane odsutnosti"), (godisnji[goModal.workerId] || []).filter(e => e.date >= today()).sort((a, b) => a.date.localeCompare(b.date)).map(e => {
+  }, "Planirane odsutnosti"), (godisnji[goModal.workerId] || []).filter(e => e.date && e.date >= today()).sort((a, b) => a.date.localeCompare(b.date)).map(e => {
     const oc = ODSUTNOST_COLOR[e.type] || {
       bg: '#f0f0f0',
       color: '#555',
@@ -8948,10 +9612,10 @@ function App() {
     }
   });
 }
-function AppMain(_ref42) {
+function AppMain(_ref44) {
   let {
     onLogout
-  } = _ref42;
+  } = _ref44;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -8968,6 +9632,8 @@ function AppMain(_ref42) {
   const [filterJob, setFilterJob] = useState('');
   // godisnji: { workerId: [ { date, type, note } ] }
   const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
+  // goKvota: { workerId: { dana: number, datumOd: 'YYYY-MM-DD' } } — GO po ugovoru
+  const [goKvota, setGoKvota] = useStorage('sumarija_go_kvota', {});
   // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
   // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
@@ -9140,8 +9806,8 @@ function AppMain(_ref42) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref43 => {
-    let [k, l] = _ref43;
+  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['sihtarica', '📄 Šihtarica'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref45 => {
+    let [k, l] = _ref45;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,
@@ -9289,6 +9955,8 @@ function AppMain(_ref42) {
     departments: departments,
     godisnji: godisnji,
     setGodisnji: setGodisnji,
+    goKvota: goKvota,
+    setGoKvota: setGoKvota,
     holidays: holidays,
     setHolidays: setHolidays,
     wName: wName,
@@ -9379,7 +10047,9 @@ function AppMain(_ref42) {
       setModal(null);
     },
     onClose: () => setModal(null),
-    wName: wName
+    wName: wName,
+    godisnji: godisnji,
+    selectedDate: selectedDate
   }), historyModal && /*#__PURE__*/React.createElement(HistoryDetailModal, {
     schedule: historyModal,
     history: history.filter(h => h.scheduleId === historyModal.id),
