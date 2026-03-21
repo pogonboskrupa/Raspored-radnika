@@ -7332,7 +7332,7 @@ function SihtaricaView(_ref31) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['praznici', '🎉 Praznici']].map(_ref34 => {
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['gokvota', 'GO Kvota'], ['praznici', '🎉 Praznici']].map(_ref34 => {
     let [k, l] = _ref34;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
@@ -7347,7 +7347,7 @@ function SihtaricaView(_ref31) {
         color: sihtView === k ? 'white' : 'var(--text-muted)'
       }
     }, l);
-  }))), sihtView !== 'praznici' && /*#__PURE__*/React.createElement("div", {
+  }))), sihtView !== 'praznici' && sihtView !== 'gokvota' && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -8730,42 +8730,9 @@ function SihtaricaView(_ref31) {
       fontFamily: 'var(--mono)',
       fontSize: '0.6rem',
       textAlign: 'center',
-      minWidth: 48
-    }
-  }, "GO DANA"), /*#__PURE__*/React.createElement("th", {
-    style: {
-      background: '#e4edf5',
-      color: '#1a3d5c',
-      padding: '0.35rem 0.4rem',
-      border: '1px solid #9bbfd9',
-      fontFamily: 'var(--mono)',
-      fontSize: '0.6rem',
-      textAlign: 'center',
-      minWidth: 80
-    }
-  }, "OD DATUMA"), /*#__PURE__*/React.createElement("th", {
-    style: {
-      background: '#e4edf5',
-      color: '#1a3d5c',
-      padding: '0.35rem 0.4rem',
-      border: '1px solid #9bbfd9',
-      fontFamily: 'var(--mono)',
-      fontSize: '0.6rem',
-      textAlign: 'center',
-      minWidth: 48
-    }
-  }, "ISKOR."), /*#__PURE__*/React.createElement("th", {
-    style: {
-      background: '#e4edf5',
-      color: '#1a3d5c',
-      padding: '0.35rem 0.4rem',
-      border: '1px solid #9bbfd9',
-      fontFamily: 'var(--mono)',
-      fontSize: '0.6rem',
-      textAlign: 'center',
       minWidth: 52
     }
-  }, "PREOST."))), /*#__PURE__*/React.createElement("tbody", null, yearlyStats.map(w => {
+  }, "GO"))), /*#__PURE__*/React.createElement("tbody", null, yearlyStats.map(w => {
     const cat = getCatById(w.category);
     return /*#__PURE__*/React.createElement("tr", {
       key: w.id
@@ -8876,81 +8843,25 @@ function SihtaricaView(_ref31) {
       style: {
         textAlign: 'center',
         border: '1px solid #9bbfd9',
-        background: '#f8fbff',
-        padding: '0.15rem'
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      min: "0",
-      max: "60",
-      value: w.kvota || '',
-      placeholder: "\u2014",
-      onChange: e => setWorkerKvota(w.id, parseInt(e.target.value) || 0, w.kvotaDatumOd || ''),
-      style: {
-        width: 38,
-        textAlign: 'center',
-        border: '1px solid #c0d4e8',
-        borderRadius: 3,
-        padding: '0.15rem',
-        fontSize: '0.75rem',
         fontFamily: 'var(--mono)',
         fontWeight: 700,
-        color: '#1a3d5c',
-        background: 'white'
-      }
-    })), /*#__PURE__*/React.createElement("td", {
-      style: {
-        textAlign: 'center',
-        border: '1px solid #9bbfd9',
-        background: '#f8fbff',
-        padding: '0.15rem'
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "date",
-      value: w.kvotaDatumOd || '',
-      onChange: e => setWorkerKvota(w.id, w.kvota || 0, e.target.value),
-      style: {
-        width: 90,
-        textAlign: 'center',
-        border: '1px solid #c0d4e8',
-        borderRadius: 3,
-        padding: '0.15rem',
-        fontSize: '0.65rem',
-        fontFamily: 'var(--mono)',
-        color: '#1a3d5c',
-        background: 'white'
-      }
-    })), /*#__PURE__*/React.createElement("td", {
-      style: {
-        textAlign: 'center',
-        border: '1px solid #9bbfd9',
-        background: '#f8fbff',
-        fontFamily: 'var(--mono)',
-        fontWeight: 700,
-        fontSize: '0.78rem',
-        color: '#1a3d5c',
-        padding: '0.3rem 0.3rem'
-      }
-    }, w.goUsed || '—'), /*#__PURE__*/React.createElement("td", {
-      style: {
-        textAlign: 'center',
-        border: '1px solid #9bbfd9',
-        fontFamily: 'var(--mono)',
-        fontWeight: 700,
-        fontSize: '0.78rem',
-        padding: '0.3rem 0.3rem',
+        fontSize: '0.72rem',
+        padding: '0.2rem 0.3rem',
         background: !w.kvota ? '#f8fbff' : w.goRemaining < 0 ? '#fde8e8' : w.goRemaining < 7 ? '#fff3e0' : '#e8f5e9',
-        color: !w.kvota ? '#ccc' : w.goRemaining < 0 ? '#8b2020' : w.goRemaining < 7 ? '#e65100' : '#2e7d32'
-      }
-    }, w.kvota ? w.goRemaining : '—', w.kvota > 0 && w.goRemaining >= 0 && w.goRemaining < 7 && /*#__PURE__*/React.createElement("div", {
+        color: !w.kvota ? '#ccc' : w.goRemaining < 0 ? '#8b2020' : w.goRemaining < 7 ? '#e65100' : '#2e7d32',
+        cursor: 'pointer'
+      },
+      onClick: () => setSihtView('gokvota'),
+      title: "Otvori GO Kvota"
+    }, w.kvota ? /*#__PURE__*/React.createElement(React.Fragment, null, w.goRemaining, "/", w.kvota) : '—', w.kvota > 0 && w.goRemaining >= 0 && w.goRemaining < 7 && /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: '0.45rem',
+        fontSize: '0.42rem',
         fontWeight: 600,
         color: '#e65100'
       }
     }, "MALO!"), w.kvota > 0 && w.goRemaining < 0 && /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: '0.45rem',
+        fontSize: '0.42rem',
         fontWeight: 600,
         color: '#8b2020'
       }
@@ -9006,36 +8917,7 @@ function SihtaricaView(_ref31) {
       color: '#1a3d5c',
       padding: '0.3rem 0.2rem'
     }
-  }, yearlyStats.reduce((a, w) => a + w.kvota, 0) || '—'), /*#__PURE__*/React.createElement("td", {
-    style: {
-      textAlign: 'center',
-      border: '1px solid #9bbfd9',
-      background: '#e4edf5',
-      padding: '0.3rem 0.2rem'
-    }
-  }), /*#__PURE__*/React.createElement("td", {
-    style: {
-      textAlign: 'center',
-      border: '1px solid #9bbfd9',
-      background: '#e4edf5',
-      fontFamily: 'var(--mono)',
-      fontWeight: 700,
-      fontSize: '0.72rem',
-      color: '#1a3d5c',
-      padding: '0.3rem 0.2rem'
-    }
-  }, yearlyStats.reduce((a, w) => a + w.goUsed, 0) || '—'), /*#__PURE__*/React.createElement("td", {
-    style: {
-      textAlign: 'center',
-      border: '1px solid #9bbfd9',
-      background: '#e4edf5',
-      fontFamily: 'var(--mono)',
-      fontWeight: 700,
-      fontSize: '0.72rem',
-      color: '#1a3d5c',
-      padding: '0.3rem 0.2rem'
-    }
-  }, yearlyStats.some(w => w.kvota > 0) ? yearlyStats.reduce((a, w) => a + w.goRemaining, 0) : '—'))))), /*#__PURE__*/React.createElement("div", {
+  }, yearlyStats.some(w => w.kvota > 0) ? yearlyStats.reduce((a, w) => a + w.goRemaining, 0) + '/' + yearlyStats.reduce((a, w) => a + w.kvota, 0) : '—'))))), /*#__PURE__*/React.createElement("div", {
     className: "siht-godisnji-mobile"
   }, yearlyStats.map(w => {
     const cat = getCatById(w.category);
@@ -9152,6 +9034,167 @@ function SihtaricaView(_ref31) {
         }
       }, "\u2014"));
     })));
+  }))), sihtView === 'gokvota' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '1rem'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontSize: '0.95rem',
+      fontWeight: 700,
+      color: 'var(--text)',
+      marginBottom: '0.3rem'
+    }
+  }, "Broj dana godi\u0161njeg odmora po ugovoru"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)',
+      margin: 0
+    }
+  }, "Unesite broj dana GO i datum od kojeg se ra\u010Duna za svakog radnika.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gap: '0.4rem'
+    }
+  }, workers.filter(w => w.status === 'aktivan').map(w => {
+    const kv = getKvota(w.id);
+    const goUsed = (godisnji[w.id] || []).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+    const rem = kv.dana - goUsed;
+    const cat = getCatById(w.category);
+    return /*#__PURE__*/React.createElement("div", {
+      key: w.id,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.6rem',
+        padding: '0.5rem 0.75rem',
+        background: 'var(--surface)',
+        border: `1px solid ${cat?.border || 'var(--border)'}`,
+        borderLeft: `4px solid ${cat?.color || '#999'}`,
+        borderRadius: 6,
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        minWidth: 160,
+        flex: '1 1 160px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.85rem'
+      }
+    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: '0.82rem',
+        color: cat?.color || 'var(--text)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, w.name)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)',
+        whiteSpace: 'nowrap'
+      }
+    }, "Dana GO:"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      max: "60",
+      value: kv.dana || '',
+      placeholder: "0",
+      onChange: e => setWorkerKvota(w.id, parseInt(e.target.value) || 0, kv.datumOd || ''),
+      style: {
+        width: 50,
+        textAlign: 'center',
+        border: '1px solid #c0d4e8',
+        borderRadius: 4,
+        padding: '0.3rem',
+        fontSize: '0.82rem',
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        color: '#1a3d5c',
+        background: 'white'
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)',
+        whiteSpace: 'nowrap'
+      }
+    }, "Od datuma:"), /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      value: kv.datumOd || '',
+      onChange: e => setWorkerKvota(w.id, kv.dana || 0, e.target.value),
+      style: {
+        border: '1px solid #c0d4e8',
+        borderRadius: 4,
+        padding: '0.3rem 0.4rem',
+        fontSize: '0.78rem',
+        fontFamily: 'var(--mono)',
+        color: '#1a3d5c',
+        background: 'white'
+      }
+    })), kv.dana > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        marginLeft: 'auto'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        borderRadius: 4,
+        padding: '0.2rem 0.5rem',
+        background: rem < 0 ? '#fde8e8' : rem < 7 ? '#fff3e0' : '#e4edf5',
+        color: rem < 0 ? '#8b2020' : rem < 7 ? '#e65100' : '#1a3d5c',
+        border: `1px solid ${rem < 0 ? '#e0a0a0' : rem < 7 ? '#f0c060' : '#9bbfd9'}`
+      }
+    }, rem, "/", kv.dana, " preostalo"), goUsed > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.68rem',
+        color: 'var(--text-muted)',
+        fontFamily: 'var(--mono)'
+      }
+    }, "(", goUsed, " iskori\u0161teno)"), rem >= 0 && rem < 7 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.7rem',
+        color: '#e65100',
+        fontWeight: 600
+      }
+    }, "Malo!"), rem < 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.7rem',
+        color: '#8b2020',
+        fontWeight: 600
+      }
+    }, "Prekora\u010Deno!")) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.72rem',
+        color: 'var(--text-light)',
+        fontStyle: 'italic',
+        marginLeft: 'auto'
+      }
+    }, "Nije postavljeno"));
   }))), goModal && /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => e.target === e.currentTarget && setGoModal(null)

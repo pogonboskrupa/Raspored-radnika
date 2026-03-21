@@ -226,7 +226,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
 
         {/* View tabs */}
         <div style={{display:'flex',gap:0,borderRadius:6,overflow:'hidden',border:'1px solid var(--border)'}}>
-          {[['mjesecni','Mjesečni'],['radnik','Po radniku'],['godisnji','Godišnji'],['praznici','🎉 Praznici']].map(([k,l])=>(
+          {[['mjesecni','Mjesečni'],['radnik','Po radniku'],['godisnji','Godišnji'],['gokvota','GO Kvota'],['praznici','🎉 Praznici']].map(([k,l])=>(
             <button key={k} onClick={()=>setSihtView(k)} style={{
               padding:'0.35rem 0.7rem',fontSize:'0.75rem',fontWeight:sihtView===k?700:400,
               border:'none',cursor:'pointer',
@@ -238,7 +238,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
       </div>
 
       {/* NAV ROW */}
-      {sihtView !== 'praznici' && <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+      {sihtView !== 'praznici' && sihtView !== 'gokvota' && <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
         {sihtView !== 'godisnji' ? (
           <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
             <button className="date-nav-btn" onClick={() => { if(selMonth===0){setSelMonth(11);setSelYear(y=>y-1);}else setSelMonth(m=>m-1); }}>◀</button>
@@ -733,10 +733,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     </th>
                   ))}
                   <th style={{background:'var(--green)',color:'white',padding:'0.35rem 0.5rem',border:'1px solid var(--green)',fontFamily:'var(--mono)',fontSize:'0.65rem',textAlign:'center',minWidth:48}}>UKUP</th>
-                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:48}}>GO DANA</th>
-                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:80}}>OD DATUMA</th>
-                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:48}}>ISKOR.</th>
-                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:52}}>PREOST.</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:52}}>GO</th>
                 </tr>
               </thead>
               <tbody>
@@ -781,30 +778,15 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         {w.total.radnih}
                         {w.total.odsutnih > 0 && <div style={{fontSize:'0.55rem',color:'#8b2020',fontWeight:600}}>{w.total.odsutnih} ods</div>}
                       </td>
-                      {/* GO Dana - editable */}
-                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',padding:'0.15rem'}}>
-                        <input type="number" min="0" max="60" value={w.kvota||''} placeholder="—"
-                          onChange={e => setWorkerKvota(w.id, parseInt(e.target.value)||0, w.kvotaDatumOd||'')}
-                          style={{width:38,textAlign:'center',border:'1px solid #c0d4e8',borderRadius:3,padding:'0.15rem',fontSize:'0.75rem',fontFamily:'var(--mono)',fontWeight:700,color:'#1a3d5c',background:'white'}} />
-                      </td>
-                      {/* GO Od datuma - editable */}
-                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',padding:'0.15rem'}}>
-                        <input type="date" value={w.kvotaDatumOd||''}
-                          onChange={e => setWorkerKvota(w.id, w.kvota||0, e.target.value)}
-                          style={{width:90,textAlign:'center',border:'1px solid #c0d4e8',borderRadius:3,padding:'0.15rem',fontSize:'0.65rem',fontFamily:'var(--mono)',color:'#1a3d5c',background:'white'}} />
-                      </td>
-                      {/* GO Iskorišteno */}
-                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.78rem',color:'#1a3d5c',padding:'0.3rem 0.3rem'}}>
-                        {w.goUsed || '—'}
-                      </td>
-                      {/* GO Preostalo */}
-                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.78rem',padding:'0.3rem 0.3rem',
+                      {/* GO summary */}
+                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',padding:'0.2rem 0.3rem',
                         background: !w.kvota ? '#f8fbff' : w.goRemaining < 0 ? '#fde8e8' : w.goRemaining < 7 ? '#fff3e0' : '#e8f5e9',
                         color: !w.kvota ? '#ccc' : w.goRemaining < 0 ? '#8b2020' : w.goRemaining < 7 ? '#e65100' : '#2e7d32',
-                      }}>
-                        {w.kvota ? w.goRemaining : '—'}
-                        {w.kvota > 0 && w.goRemaining >= 0 && w.goRemaining < 7 && <div style={{fontSize:'0.45rem',fontWeight:600,color:'#e65100'}}>MALO!</div>}
-                        {w.kvota > 0 && w.goRemaining < 0 && <div style={{fontSize:'0.45rem',fontWeight:600,color:'#8b2020'}}>PREKORAČENO</div>}
+                        cursor:'pointer',
+                      }} onClick={()=>setSihtView('gokvota')} title="Otvori GO Kvota">
+                        {w.kvota ? <>{w.goRemaining}/{w.kvota}</> : '—'}
+                        {w.kvota > 0 && w.goRemaining >= 0 && w.goRemaining < 7 && <div style={{fontSize:'0.42rem',fontWeight:600,color:'#e65100'}}>MALO!</div>}
+                        {w.kvota > 0 && w.goRemaining < 0 && <div style={{fontSize:'0.42rem',fontWeight:600,color:'#8b2020'}}>PREKORAČENO</div>}
                       </td>
                     </tr>
                   );
@@ -821,14 +803,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     {yearlyStats.reduce((a,w)=>a+w.total.radnih,0)}
                   </td>
                   <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
-                    {yearlyStats.reduce((a,w)=>a+w.kvota,0)||'—'}
-                  </td>
-                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',padding:'0.3rem 0.2rem'}}></td>
-                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
-                    {yearlyStats.reduce((a,w)=>a+w.goUsed,0)||'—'}
-                  </td>
-                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
-                    {yearlyStats.some(w=>w.kvota>0) ? yearlyStats.reduce((a,w)=>a+w.goRemaining,0) : '—'}
+                    {yearlyStats.some(w=>w.kvota>0) ? yearlyStats.reduce((a,w)=>a+w.goRemaining,0)+'/'+yearlyStats.reduce((a,w)=>a+w.kvota,0) : '—'}
                   </td>
                 </tr>
               </tfoot>
@@ -877,6 +852,70 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             })}
           </div>
 
+        </div>
+      )}
+
+      {/* ═══════ GO KVOTA VIEW ═══════ */}
+      {sihtView === 'gokvota' && (
+        <div>
+          <div style={{marginBottom:'1rem'}}>
+            <h3 style={{fontSize:'0.95rem',fontWeight:700,color:'var(--text)',marginBottom:'0.3rem'}}>Broj dana godišnjeg odmora po ugovoru</h3>
+            <p style={{fontSize:'0.78rem',color:'var(--text-muted)',margin:0}}>Unesite broj dana GO i datum od kojeg se računa za svakog radnika.</p>
+          </div>
+          <div style={{display:'grid',gap:'0.4rem'}}>
+            {workers.filter(w => w.status === 'aktivan').map(w => {
+              const kv = getKvota(w.id);
+              const goUsed = (godisnji[w.id]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+              const rem = kv.dana - goUsed;
+              const cat = getCatById(w.category);
+              return (
+                <div key={w.id} style={{display:'flex',alignItems:'center',gap:'0.6rem',padding:'0.5rem 0.75rem',
+                  background:'var(--surface)',border:`1px solid ${cat?.border||'var(--border)'}`,borderLeft:`4px solid ${cat?.color||'#999'}`,
+                  borderRadius:6,flexWrap:'wrap',
+                }}>
+                  {/* Ime radnika */}
+                  <div style={{minWidth:160,flex:'1 1 160px',display:'flex',alignItems:'center',gap:'0.3rem'}}>
+                    <span style={{fontSize:'0.85rem'}}>{cat?.icon||'👤'}</span>
+                    <span style={{fontWeight:700,fontSize:'0.82rem',color:cat?.color||'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
+                  </div>
+
+                  {/* Broj dana */}
+                  <div style={{display:'flex',alignItems:'center',gap:'0.3rem'}}>
+                    <label style={{fontSize:'0.72rem',color:'var(--text-muted)',whiteSpace:'nowrap'}}>Dana GO:</label>
+                    <input type="number" min="0" max="60" value={kv.dana||''} placeholder="0"
+                      onChange={e => setWorkerKvota(w.id, parseInt(e.target.value)||0, kv.datumOd||'')}
+                      style={{width:50,textAlign:'center',border:'1px solid #c0d4e8',borderRadius:4,padding:'0.3rem',fontSize:'0.82rem',fontFamily:'var(--mono)',fontWeight:700,color:'#1a3d5c',background:'white'}} />
+                  </div>
+
+                  {/* Datum od */}
+                  <div style={{display:'flex',alignItems:'center',gap:'0.3rem'}}>
+                    <label style={{fontSize:'0.72rem',color:'var(--text-muted)',whiteSpace:'nowrap'}}>Od datuma:</label>
+                    <input type="date" value={kv.datumOd||''}
+                      onChange={e => setWorkerKvota(w.id, kv.dana||0, e.target.value)}
+                      style={{border:'1px solid #c0d4e8',borderRadius:4,padding:'0.3rem 0.4rem',fontSize:'0.78rem',fontFamily:'var(--mono)',color:'#1a3d5c',background:'white'}} />
+                  </div>
+
+                  {/* Status badge */}
+                  {kv.dana > 0 ? (
+                    <div style={{display:'flex',alignItems:'center',gap:'0.3rem',marginLeft:'auto'}}>
+                      <span style={{fontFamily:'var(--mono)',fontSize:'0.75rem',fontWeight:700,borderRadius:4,padding:'0.2rem 0.5rem',
+                        background: rem < 0 ? '#fde8e8' : rem < 7 ? '#fff3e0' : '#e4edf5',
+                        color: rem < 0 ? '#8b2020' : rem < 7 ? '#e65100' : '#1a3d5c',
+                        border: `1px solid ${rem < 0 ? '#e0a0a0' : rem < 7 ? '#f0c060' : '#9bbfd9'}`,
+                      }}>
+                        {rem}/{kv.dana} preostalo
+                      </span>
+                      {goUsed > 0 && <span style={{fontSize:'0.68rem',color:'var(--text-muted)',fontFamily:'var(--mono)'}}>({goUsed} iskorišteno)</span>}
+                      {rem >= 0 && rem < 7 && <span style={{fontSize:'0.7rem',color:'#e65100',fontWeight:600}}>Malo!</span>}
+                      {rem < 0 && <span style={{fontSize:'0.7rem',color:'#8b2020',fontWeight:600}}>Prekoračeno!</span>}
+                    </div>
+                  ) : (
+                    <span style={{fontSize:'0.72rem',color:'var(--text-light)',fontStyle:'italic',marginLeft:'auto'}}>Nije postavljeno</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
