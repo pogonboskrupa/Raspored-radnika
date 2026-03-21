@@ -448,7 +448,8 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
         const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
         const absentMap = {};
         Object.entries(godisnji || {}).forEach(([wId, entries]) => {
-          const entry = entries.find(e => e.date === selectedDate);
+          const entry = entries.find(e => e.date === selectedDate) ||
+            entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
           if (entry) absentMap[wId] = entry;
         });
         const activeWorkers = workers.filter(w => w.status === 'aktivan');

@@ -6,6 +6,8 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [selWorker, setSelWorker] = useState('');
   const [goModal, setGoModal] = useState(null); // { workerId } or null
   const [goForm, setGoForm] = useState({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
+  const [closingLeave, setClosingLeave] = useState(null); // { wId, entry } for closing open leave
+  const [closeDateDo, setCloseDateDo] = useState('');
   const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji' | 'praznici'
   const [holidayInput, setHolidayInput] = useState(false);
   const [holidayName, setHolidayName] = useState('');
@@ -39,7 +41,17 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     Object.entries(godisnji).forEach(([wId, entries]) => {
       if (!m[wId]) return;
       entries.forEach(e => {
-        m[wId][e.date] = { type: 'odsutnost', oType: e.type, note: e.note };
+        if (e.open && e.dateOd) {
+          // Open-ended leave: fill from dateOd through end of displayed month
+          days.forEach(d => {
+            const date = isoDate(d);
+            if (date >= e.dateOd && !isWeekend(d)) {
+              m[wId][date] = { type: 'odsutnost', oType: e.type, note: e.note, open: true, dateOd: e.dateOd };
+            }
+          });
+        } else if (e.date) {
+          m[wId][e.date] = { type: 'odsutnost', oType: e.type, note: e.note };
+        }
       });
     });
     // Praznici — override za sve radnike (ako nemaju raspored, upisi praznik)
@@ -73,20 +85,27 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     });
   }, [workerDayMap, days, selYear, selMonth]);
 
-  // Add odsutnost (supports date range)
+  // Add odsutnost (supports date range or open-ended)
   const saveGodisnji = () => {
     if (!goForm.date) return alert('Odaberi datum!');
     const wId = goModal.workerId;
+    if (goForm.dateDo && goForm.dateDo < goForm.date) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    if (!goForm.dateDo) {
+      // Open-ended leave
+      setGodisnji(g => {
+        const prev = (g[wId] || []).filter(e => !(e.open && e.dateOd === goForm.date && e.type === goForm.type));
+        return { ...g, [wId]: [...prev, { dateOd: goForm.date, type: goForm.type, note: goForm.note, open: true }] };
+      });
+      setGoModal(null);
+      setGoForm({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
+      return;
+    }
     const startDate = new Date(goForm.date);
-    const endDate = goForm.dateDo ? new Date(goForm.dateDo) : startDate;
-    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
-    // Collect all dates in range
+    const endDate = new Date(goForm.dateDo);
     const dates = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
       const dw = d.getDay();
-      if (dw !== 0 && dw !== 6) { // skip weekends
-        dates.push(d.toISOString().slice(0,10));
-      }
+      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0,10));
     }
     if (dates.length === 0) return alert('Nema radnih dana u odabranom periodu!');
     setGodisnji(g => {
@@ -98,8 +117,29 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     setGoForm({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
   };
 
+  // Close an open-ended leave by setting end date and expanding into individual date entries
+  const closeOpenLeave = (wId, openEntry, dateDo) => {
+    const startDate = new Date(openEntry.dateOd);
+    const endDate = new Date(dateDo);
+    if (endDate < startDate) return alert('Datum završetka mora biti nakon početka!');
+    const dates = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
+      const dw = d.getDay();
+      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0,10));
+    }
+    setGodisnji(g => {
+      const prev = (g[wId] || []).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type) && !dates.includes(e.date));
+      const newEntries = dates.map(dt => ({ date: dt, type: openEntry.type, note: openEntry.note }));
+      return { ...g, [wId]: [...prev, ...newEntries] };
+    });
+  };
+
   const deleteGodisnji = (wId, date) => {
     setGodisnji(g => ({ ...g, [wId]: (g[wId]||[]).filter(e => e.date !== date) }));
+  };
+
+  const deleteOpenLeave = (wId, openEntry) => {
+    setGodisnji(g => ({ ...g, [wId]: (g[wId]||[]).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type)) }));
   };
 
   const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
@@ -388,11 +428,11 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       cellBorderColor = oc.border;
                       cellText = (
                         <span style={{color:oc.color,fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)',cursor:'pointer'}}
-                          onClick={()=>deleteGodisnji(w.id,date)} title={'Klikni za brisanje: '+entry.oType}>
+                          onClick={()=>entry.open ? deleteOpenLeave(w.id, {dateOd:entry.dateOd, type:entry.oType, note:entry.note}) : deleteGodisnji(w.id,date)} title={entry.open ? 'Otvoreno od '+entry.dateOd+' · klikni za brisanje' : 'Klikni za brisanje: '+entry.oType}>
                           {oc.short}
                         </span>
                       );
-                      title = entry.oType + (entry.note ? ' — '+entry.note : '');
+                      title = entry.oType + (entry.open ? ' (otvoreno od '+entry.dateOd+')' : '') + (entry.note ? ' — '+entry.note : '');
                     }
                     return (
                       <td key={d} title={title} style={{
@@ -460,7 +500,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         fontSize:'0.42rem', fontWeight:fontW, fontFamily:'var(--mono)', color,
                         cursor: entry?.type==='odsutnost' ? 'pointer' : 'default',
                       }}
-                      onClick={()=>{if(entry?.type==='odsutnost')deleteGodisnji(w.id,date);}}>
+                      onClick={()=>{if(entry?.type==='odsutnost'){entry.open ? deleteOpenLeave(w.id,{dateOd:entry.dateOd,type:entry.oType,note:entry.note}) : deleteGodisnji(w.id,date);}}}>
                       {label}
                     </div>
                   );
@@ -479,7 +519,8 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(200px,100%),1fr))',gap:'0.5rem'}}>
           {displayWorkers.filter(w=>w.status==='aktivan').map(w => {
             const stats = workerStats.find(s=>s.id===w.id)||{radnih:0,odsutnih:0,praznih:0};
-            const goUpcoming = (godisnji[w.id]||[]).filter(e => e.date >= today()).sort((a,b)=>a.date.localeCompare(b.date));
+            const goUpcoming = (godisnji[w.id]||[]).filter(e => e.date && e.date >= today()).sort((a,b)=>a.date.localeCompare(b.date));
+            const openLeaves = (godisnji[w.id]||[]).filter(e => e.open);
             return (
               <div key={w.id} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:'0.75rem',boxShadow:'var(--shadow)'}}>
                 <div style={{fontWeight:700,fontSize:'0.82rem',marginBottom:'0.4rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</div>
@@ -490,6 +531,21 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     return <span key={k} style={{fontFamily:'var(--mono)',fontSize:'0.75rem',background:oc.bg,color:oc.color,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.1rem 0.4rem'}}>{v} {k.split(' ')[0].toLowerCase()}</span>;
                   })}
                 </div>
+                {openLeaves.length > 0 && (
+                  <div style={{marginTop:'0.3rem'}}>
+                    {openLeaves.map(e=>{
+                      const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc'};
+                      return (
+                        <div key={e.dateOd+e.type} style={{display:'flex',alignItems:'center',gap:'0.3rem',fontSize:'0.72rem',marginBottom:'0.15rem'}}>
+                          <span style={{fontFamily:'var(--mono)',color:oc.color,background:oc.bg,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',fontSize:'0.65rem',fontWeight:700}}>{ODSUTNOST_COLOR[e.type]?.short}</span>
+                          <span style={{fontFamily:'var(--mono)',color:'#b5620a',fontWeight:600}}>{fmtDate(e.dateOd)} → ?</span>
+                          {e.note && <span style={{color:'var(--text-light)',fontStyle:'italic',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.note}</span>}
+                          <button onClick={()=>deleteOpenLeave(w.id,e)} style={{marginLeft:'auto',background:'none',border:'none',color:'var(--text-light)',cursor:'pointer',fontSize:'0.7rem',padding:0}}>✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {goUpcoming.length > 0 && (
                   <div style={{marginTop:'0.3rem'}}>
                     {goUpcoming.slice(0,3).map(e=>{
@@ -775,6 +831,9 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                   <input type="date" className="form-input" value={goForm.dateDo} min={goForm.date||undefined} onChange={e=>setGoForm(f=>({...f,dateDo:e.target.value}))} />
                 </div>
               </div>
+              {goForm.date && !goForm.dateDo && (
+                <div style={{fontSize:'0.75rem',color:'#b5620a',marginTop:'-0.3rem',marginBottom:'0.3rem',fontStyle:'italic'}}>Bez krajnjeg datuma — odsutnost ostaje otvorena dok se ne zaključi</div>
+              )}
               {goForm.date && goForm.dateDo && goForm.dateDo >= goForm.date && (() => {
                 const s = new Date(goForm.date), e = new Date(goForm.dateDo);
                 let count = 0;
@@ -807,11 +866,45 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                 <label className="form-label">Napomena</label>
                 <input className="form-input" placeholder="npr. najava za prekosutra..." value={goForm.note} onChange={e=>setGoForm(f=>({...f,note:e.target.value}))} />
               </div>
-              {/* Upcoming for this worker */}
-              {(godisnji[goModal.workerId]||[]).filter(e=>e.date>=today()).length > 0 && (
+              {/* Open-ended leaves for this worker */}
+              {(godisnji[goModal.workerId]||[]).filter(e=>e.open).length > 0 && (
+                <div style={{background:'#fef3e0',border:'1px solid #f0c060',borderRadius:6,padding:'0.6rem 0.75rem',marginBottom:'0.5rem'}}>
+                  <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'#b5620a',marginBottom:'0.4rem'}}>Otvorene odsutnosti</div>
+                  {(godisnji[goModal.workerId]||[]).filter(e=>e.open).map(e=>{
+                    const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc',short:'?'};
+                    const isClosing = closingLeave && closingLeave.entry.dateOd === e.dateOd && closingLeave.entry.type === e.type;
+                    return (
+                      <div key={e.dateOd+e.type} style={{marginBottom:'0.3rem'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.78rem'}}>
+                          <span style={{fontFamily:'var(--mono)',color:oc.color,background:oc.bg,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',fontSize:'0.65rem',fontWeight:700}}>{oc.short}</span>
+                          <span style={{fontFamily:'var(--mono)',fontWeight:600}}>{fmtDate(e.dateOd)}</span>
+                          <span style={{color:'#b5620a',fontWeight:600}}>→ ?</span>
+                          <span style={{color:'var(--text-muted)'}}>{e.type}</span>
+                          {e.note && <span style={{color:'var(--text-light)',fontStyle:'italic'}}>{e.note}</span>}
+                          <button onClick={()=>{setClosingLeave({wId:goModal.workerId,entry:e});setCloseDateDo('');}} style={{marginLeft:'auto',background:'#fff',border:'1px solid #f0c060',color:'#b5620a',cursor:'pointer',fontSize:'0.65rem',borderRadius:4,padding:'0.15rem 0.4rem',fontWeight:600}}>Zaključi</button>
+                          <button onClick={()=>deleteOpenLeave(goModal.workerId,e)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:'0.8rem'}}>✕</button>
+                        </div>
+                        {isClosing && (
+                          <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.3rem',padding:'0.3rem 0.5rem',background:'#fff',borderRadius:4,border:'1px solid #f0c060'}}>
+                            <label style={{fontSize:'0.72rem',color:'var(--text-muted)',whiteSpace:'nowrap'}}>Do:</label>
+                            <input type="date" className="form-input" value={closeDateDo} min={e.dateOd}
+                              onChange={ev=>setCloseDateDo(ev.target.value)}
+                              style={{fontSize:'0.75rem',padding:'0.2rem 0.4rem',flex:1}} />
+                            <button disabled={!closeDateDo} onClick={()=>{closeOpenLeave(goModal.workerId,e,closeDateDo);setClosingLeave(null);}}
+                              style={{background:'#2e7d32',color:'#fff',border:'none',borderRadius:4,padding:'0.2rem 0.5rem',fontSize:'0.7rem',fontWeight:600,cursor:closeDateDo?'pointer':'default',opacity:closeDateDo?1:0.5}}>OK</button>
+                            <button onClick={()=>setClosingLeave(null)} style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:'0.75rem'}}>✕</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Upcoming for this worker (regular date entries) */}
+              {(godisnji[goModal.workerId]||[]).filter(e=>e.date && e.date>=today()).length > 0 && (
                 <div style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:6,padding:'0.6rem 0.75rem'}}>
                   <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.4rem'}}>Planirane odsutnosti</div>
-                  {(godisnji[goModal.workerId]||[]).filter(e=>e.date>=today()).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
+                  {(godisnji[goModal.workerId]||[]).filter(e=>e.date && e.date>=today()).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
                     const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc',short:'?'};
                     return (
                       <div key={e.date} style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.78rem',marginBottom:'0.2rem'}}>

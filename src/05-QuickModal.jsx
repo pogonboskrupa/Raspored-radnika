@@ -51,7 +51,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const absentWorkerIds = new Set(
     Object.entries(godisnji || {}).filter(([wId, entries]) =>
-      entries.some(e => e.date === selectedDate)
+      entries.some(e => e.date === selectedDate || (e.open && e.dateOd && e.dateOd <= selectedDate))
     ).map(([wId]) => wId)
   );
 
@@ -86,9 +86,18 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
 
   const handleSaveOdsutnost = () => {
     if (!odsDateOd) return alert('Odaberi datum!');
+    if (odsDateDo && odsDateDo < odsDateOd) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    if (!odsDateDo) {
+      // Open-ended leave — no end date known yet
+      setGodisnji(g => {
+        const prev = (g[worker.id] || []).filter(e => !(e.open && e.dateOd === odsDateOd && e.type === odsutnostType));
+        return { ...g, [worker.id]: [...prev, { dateOd: odsDateOd, type: odsutnostType, note, open: true }] };
+      });
+      onClose();
+      return;
+    }
     const startDate = new Date(odsDateOd);
-    const endDate = odsDateDo ? new Date(odsDateDo) : startDate;
-    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    const endDate = new Date(odsDateDo);
     const dates = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
       const dw = d.getDay();
@@ -202,6 +211,9 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                     onChange={e => setOdsDateDo(e.target.value)} />
                 </div>
               </div>
+              {odsDateOd && !odsDateDo && (
+                <div style={{fontSize:'0.75rem',color:'#b5620a',marginBottom:'0.4rem',fontStyle:'italic'}}>Bez krajnjeg datuma — odsutnost ostaje otvorena dok se ne zaključi</div>
+              )}
               {odsDateOd && odsDateDo && odsDateDo >= odsDateOd && (() => {
                 const s = new Date(odsDateOd), e = new Date(odsDateDo);
                 let count = 0;

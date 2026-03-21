@@ -45,9 +45,10 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
       .filter(s => s.date === form.date && (!isEdit || s.id !== form.id))
       .flatMap(s => s.allWorkers || [])
   );
+  const checkDate = form.date || selectedDate;
   const absentWorkerIds = new Set(
     Object.entries(godisnji || {}).filter(([wId, entries]) =>
-      entries.some(e => e.date === (form.date || selectedDate))
+      entries.some(e => e.date === checkDate || (e.open && e.dateOd && e.dateOd <= checkDate))
     ).map(([wId]) => wId)
   );
   const availableWorkers = activeWorkers.filter(w => !alreadyScheduled.has(w.id) && !absentWorkerIds.has(w.id));
