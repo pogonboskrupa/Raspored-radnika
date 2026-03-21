@@ -196,7 +196,7 @@ function AppMain({ onLogout }) {
               </button>
               {departments.map(d => (
                 <button key={d.id} className={`sidebar-item ${sidebarFilter===d.id?'active':''}`} onClick={() => setSidebarFilter(d.id)}>
-                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.name}</span>
+                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dName(d.id)}</span>
                   <span className="count">{statsByDept[d.id]?.size || 0}</span>
                 </button>
               ))}

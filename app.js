@@ -9898,7 +9898,7 @@ function AppMain(_ref44) {
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap'
     }
-  }, d.name), /*#__PURE__*/React.createElement("span", {
+  }, dName(d.id)), /*#__PURE__*/React.createElement("span", {
     className: "count"
   }, statsByDept[d.id]?.size || 0)))), /*#__PURE__*/React.createElement("div", {
     className: "sidebar-section"
