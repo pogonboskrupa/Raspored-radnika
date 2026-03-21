@@ -3610,6 +3610,15 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     setGoKvota(prev => ({ ...prev, [wId]: { dana, datumOd } }));
   };
 
+  // Sort workers by category order (WORKER_CATEGORIES), then by name
+  const catOrder = WORKER_CATEGORIES.map(c => c.id);
+  const sortedWorkers = useMemo(() =>
+    [...workers].sort((a, b) => {
+      const ai = catOrder.indexOf(a.category), bi = catOrder.indexOf(b.category);
+      const ca = ai === -1 ? 999 : ai, cb = bi === -1 ? 999 : bi;
+      return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
+    }), [workers]);
+
   const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO' },
@@ -3739,12 +3748,12 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     setGodisnji(g => ({ ...g, [wId]: (g[wId]||[]).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type)) }));
   };
 
-  const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
+  const displayWorkers = selWorker ? sortedWorkers.filter(w => w.id === selWorker) : sortedWorkers;
 
   // ── Yearly overview data ──
   const yearlyStats = useMemo(() => {
     if (sihtView !== 'godisnji') return [];
-    return workers.filter(w => w.status === 'aktivan').map(w => {
+    return sortedWorkers.filter(w => w.status === 'aktivan').map(w => {
       const months = Array.from({length:12}, (_,mi) => {
         const dim = new Date(selYear, mi+1, 0).getDate();
         let radnih=0, odsutnih=0, vikenda=0, praznih=0, praznika=0;
@@ -3846,7 +3855,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         {/* Worker filter */}
         <select className="form-select" value={selWorker} onChange={e=>setSelWorker(e.target.value)} style={{maxWidth:220}}>
           <option value="">{sihtView==='radnik' ? '— Odaberi radnika —' : 'Svi radnici'}</option>
-          {workers.filter(w=>w.status==='aktivan').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+          {sortedWorkers.filter(w=>w.status==='aktivan').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
 
         <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>Štampaj</button>
@@ -3996,7 +4005,6 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.3rem',
                   }}>
                     <div style={{display:'flex',alignItems:'center',gap:'0.3rem',minWidth:0,flex:1}}>
-                      <span style={{fontSize:'0.8rem',flexShrink:0}}>{cat?.short||'R'}</span>
                       <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:catColor}}>{w.name}</span>
                     </div>
                     <button
@@ -4069,7 +4077,6 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             <div key={w.id} style={{background:'var(--surface)',border:`1px solid ${catBorder}`,borderLeft:`4px solid ${catColor}`,borderRadius:6,marginBottom:'0.4rem',overflow:'hidden'}}>
               {/* Worker name + stats */}
               <div style={{display:'flex',alignItems:'center',gap:'0.3rem',padding:'0.35rem 0.5rem',background:catPale}}>
-                <span style={{fontSize:'0.8rem'}}>{cat?.short||'R'}</span>
                 <span style={{fontWeight:700,fontSize:'0.8rem',color:catColor,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
                 <span style={{fontFamily:'var(--mono)',fontSize:'0.65rem',fontWeight:700,color:'white',background:catColor,borderRadius:3,padding:'0.1rem 0.3rem'}}>{stats.radnih||0}R</span>
                 {(stats.odsutTypes?.['Godišnji odmor']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.6rem',fontWeight:700,color:'white',background:'#1a3d5c',borderRadius:3,padding:'0.1rem 0.25rem'}}>{stats.odsutTypes['Godišnji odmor']}GO</span>}
@@ -4339,7 +4346,6 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         fontWeight:600,background:cat?.pale||'#f0f0f0',position:'sticky',left:0,zIndex:1,
                       }}>
                         <div style={{display:'flex',alignItems:'center',gap:'0.3rem'}}>
-                          <span style={{fontSize:'0.8rem'}}>{cat?.short||'R'}</span>
                           <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:cat?.color||'var(--text)',cursor:'pointer'}}
                             onClick={()=>{setSelWorker(w.id);setSihtView('radnik')}} title="Otvori detalj">
                             {w.name}
@@ -4410,7 +4416,6 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
               return (
                 <div key={w.id} style={{background:'var(--surface)',border:`1px solid ${cat?.border||'#ccc'}`,borderLeft:`4px solid ${cat?.color||'#999'}`,borderRadius:6,marginBottom:'0.4rem',overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:'0.3rem',padding:'0.35rem 0.5rem',background:cat?.pale||'#f0f0f0'}}>
-                    <span style={{fontSize:'0.75rem'}}>{cat?.short||'R'}</span>
                     <span onClick={()=>{setSelWorker(w.id);setSihtView('radnik')}} style={{fontWeight:700,fontSize:'0.78rem',color:cat?.color||'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}>{w.name}</span>
                     <span style={{fontFamily:'var(--mono)',fontSize:'0.62rem',fontWeight:700,color:'white',background:'var(--green)',borderRadius:3,padding:'0.1rem 0.25rem'}}>{w.total.radnih}R</span>
                     {w.total.odsutnih>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.58rem',fontWeight:700,color:'white',background:'#8b2020',borderRadius:3,padding:'0.1rem 0.2rem'}}>{w.total.odsutnih}O</span>}
@@ -4456,7 +4461,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             <p style={{fontSize:'0.78rem',color:'var(--text-muted)',margin:0}}>Unesite broj dana GO i datum od kojeg se računa za svakog radnika.</p>
           </div>
           <div style={{display:'grid',gap:'0.4rem'}}>
-            {workers.filter(w => w.status === 'aktivan').map(w => {
+            {sortedWorkers.filter(w => w.status === 'aktivan').map(w => {
               const kv = getKvota(w.id);
               const goUsed = (godisnji[w.id]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
               const rem = kv.dana - goUsed;
@@ -4468,7 +4473,6 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                 }}>
                   {/* Ime radnika */}
                   <div style={{minWidth:160,flex:'1 1 160px',display:'flex',alignItems:'center',gap:'0.3rem'}}>
-                    <span style={{fontSize:'0.85rem'}}>{cat?.short||'R'}</span>
                     <span style={{fontWeight:700,fontSize:'0.82rem',color:cat?.color||'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
                   </div>
 

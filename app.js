@@ -6958,6 +6958,16 @@ function SihtaricaView(_ref31) {
       }
     }));
   };
+
+  // Sort workers by category order (WORKER_CATEGORIES), then by name
+  const catOrder = WORKER_CATEGORIES.map(c => c.id);
+  const sortedWorkers = useMemo(() => [...workers].sort((a, b) => {
+    const ai = catOrder.indexOf(a.category),
+      bi = catOrder.indexOf(b.category);
+    const ca = ai === -1 ? 999 : ai,
+      cb = bi === -1 ? 999 : bi;
+    return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
+  }), [workers]);
   const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': {
@@ -7180,12 +7190,12 @@ function SihtaricaView(_ref31) {
       [wId]: (g[wId] || []).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type))
     }));
   };
-  const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
+  const displayWorkers = selWorker ? sortedWorkers.filter(w => w.id === selWorker) : sortedWorkers;
 
   // ── Yearly overview data ──
   const yearlyStats = useMemo(() => {
     if (sihtView !== 'godisnji') return [];
-    return workers.filter(w => w.status === 'aktivan').map(w => {
+    return sortedWorkers.filter(w => w.status === 'aktivan').map(w => {
       const months = Array.from({
         length: 12
       }, (_, mi) => {
@@ -7414,7 +7424,7 @@ function SihtaricaView(_ref31) {
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, sihtView === 'radnik' ? '— Odaberi radnika —' : 'Svi radnici'), workers.filter(w => w.status === 'aktivan').map(w => /*#__PURE__*/React.createElement("option", {
+  }, sihtView === 'radnik' ? '— Odaberi radnika —' : 'Svi radnici'), sortedWorkers.filter(w => w.status === 'aktivan').map(w => /*#__PURE__*/React.createElement("option", {
     key: w.id,
     value: w.id
   }, w.name))), /*#__PURE__*/React.createElement("button", {
@@ -7776,11 +7786,6 @@ function SihtaricaView(_ref31) {
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: '0.8rem',
-        flexShrink: 0
-      }
-    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
-      style: {
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -7939,10 +7944,6 @@ function SihtaricaView(_ref31) {
         background: catPale
       }
     }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '0.8rem'
-      }
-    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       style: {
         fontWeight: 700,
         fontSize: '0.8rem',
@@ -8764,10 +8765,6 @@ function SihtaricaView(_ref31) {
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: '0.8rem'
-      }
-    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
-      style: {
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -8949,10 +8946,6 @@ function SihtaricaView(_ref31) {
         background: cat?.pale || '#f0f0f0'
       }
     }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '0.75rem'
-      }
-    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       onClick: () => {
         setSelWorker(w.id);
         setSihtView('radnik');
@@ -9065,7 +9058,7 @@ function SihtaricaView(_ref31) {
       display: 'grid',
       gap: '0.4rem'
     }
-  }, workers.filter(w => w.status === 'aktivan').map(w => {
+  }, sortedWorkers.filter(w => w.status === 'aktivan').map(w => {
     const kv = getKvota(w.id);
     const goUsed = (godisnji[w.id] || []).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
     const rem = kv.dana - goUsed;
@@ -9092,10 +9085,6 @@ function SihtaricaView(_ref31) {
         gap: '0.3rem'
       }
     }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '0.85rem'
-      }
-    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       style: {
         fontWeight: 700,
         fontSize: '0.82rem',
