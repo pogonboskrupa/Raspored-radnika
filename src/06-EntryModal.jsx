@@ -25,6 +25,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
   const isOtprema = form.jobType === 'Otprema';
+  const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
 
   const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -215,7 +216,14 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             <div className="form-group">
               <label className="form-label">Radnici</label>
               <div className="worker-selector">
-                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).map(w => {
+                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).sort((a, b) => {
+                  if (isTerenOrKanc) {
+                    const aP = a.category === 'poslovoda_isk' || a.category === 'poslovoda_uzg' ? 0 : 1;
+                    const bP = b.category === 'poslovoda_isk' || b.category === 'poslovoda_uzg' ? 0 : 1;
+                    return aP - bP;
+                  }
+                  return 0;
+                }).map(w => {
                   const cat = getCatById(w.category);
                   return (
                     <div key={w.id} className="worker-option"
