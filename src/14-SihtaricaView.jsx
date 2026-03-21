@@ -13,6 +13,17 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [holidayName, setHolidayName] = useState('');
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Helper: normalize goKvota entry (backward compat with old number format)
+  const getKvota = (wId) => {
+    const raw = goKvota[wId];
+    if (!raw) return { dana: 0, datumOd: '' };
+    if (typeof raw === 'number') return { dana: raw, datumOd: `${selYear}-01-01` };
+    return { dana: raw.dana || 0, datumOd: raw.datumOd || '' };
+  };
+  const setWorkerKvota = (wId, dana, datumOd) => {
+    setGoKvota(prev => ({ ...prev, [wId]: { dana, datumOd } }));
+  };
+
   const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO' },
@@ -168,13 +179,13 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         radnih:a.radnih+m.radnih, odsutnih:a.odsutnih+m.odsutnih,
         vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih, praznika:a.praznika+m.praznika
       }),{radnih:0,odsutnih:0,vikenda:0,praznih:0,praznika:0});
-      // Count GO days used this year
-      const goUsed = months.reduce((sum,m) => sum + (m.odsutTypes['Godišnji odmor']||0), 0);
-      const kvota = goKvota[w.id] || 0;
-      const goRemaining = kvota - goUsed;
-      return { ...w, months, total, goUsed, kvota, goRemaining };
+      // Count GO days used from datumOd onwards
+      const kv = getKvota(w.id);
+      const goUsed = (godisnji[w.id]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+      const goRemaining = kv.dana - goUsed;
+      return { ...w, months, total, goUsed, kvota: kv.dana, kvotaDatumOd: kv.datumOd, goRemaining };
     });
-  }, [sihtView, selYear, workerDayMap, workers, goKvota]);
+  }, [sihtView, selYear, workerDayMap, workers, goKvota, godisnji]);
 
   // ── Per-worker monthly detail ──
   const singleWorkerData = useMemo(() => {
@@ -531,15 +542,15 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                 <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'0.3rem'}}>
                   <span style={{fontFamily:'var(--mono)',fontSize:'0.75rem',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',borderRadius:3,padding:'0.1rem 0.4rem'}}>{stats.radnih} rad</span>
                   {(() => {
-                    const kvota = goKvota[w.id] || 0;
-                    if (!kvota) return null;
-                    const goUsedYear = (godisnji[w.id]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && e.date.startsWith(String(selYear))).length;
-                    const rem = kvota - goUsedYear;
+                    const kv = getKvota(w.id);
+                    if (!kv.dana) return null;
+                    const goUsed = (godisnji[w.id]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+                    const rem = kv.dana - goUsed;
                     return <span style={{fontFamily:'var(--mono)',fontSize:'0.75rem',borderRadius:3,padding:'0.1rem 0.4rem',fontWeight:700,
                       background: rem < 0 ? '#fde8e8' : rem < 7 ? '#fff3e0' : '#e4edf5',
                       color: rem < 0 ? '#8b2020' : rem < 7 ? '#e65100' : '#1a3d5c',
                       border: `1px solid ${rem < 0 ? '#e0a0a0' : rem < 7 ? '#f0c060' : '#9bbfd9'}`,
-                    }}>GO: {rem}/{kvota}</span>;
+                    }}>GO: {rem}/{kv.dana}</span>;
                   })()}
                   {Object.entries(stats.odsutTypes||{}).map(([k,v])=>{
                     const oc = ODSUTNOST_COLOR[k]||{bg:'#f0f0f0',color:'#555',border:'#ccc'};
@@ -722,8 +733,9 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     </th>
                   ))}
                   <th style={{background:'var(--green)',color:'white',padding:'0.35rem 0.5rem',border:'1px solid var(--green)',fontFamily:'var(--mono)',fontSize:'0.65rem',textAlign:'center',minWidth:48}}>UKUP</th>
-                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:52}}>KVOTA GO</th>
-                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:52}}>ISKOR.</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:48}}>GO DANA</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:80}}>OD DATUMA</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:48}}>ISKOR.</th>
                   <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:52}}>PREOST.</th>
                 </tr>
               </thead>
@@ -769,11 +781,17 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         {w.total.radnih}
                         {w.total.odsutnih > 0 && <div style={{fontSize:'0.55rem',color:'#8b2020',fontWeight:600}}>{w.total.odsutnih} ods</div>}
                       </td>
-                      {/* GO Kvota - editable */}
+                      {/* GO Dana - editable */}
                       <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',padding:'0.15rem'}}>
                         <input type="number" min="0" max="60" value={w.kvota||''} placeholder="—"
-                          onChange={e => setGoKvota(prev => ({...prev, [w.id]: parseInt(e.target.value)||0}))}
+                          onChange={e => setWorkerKvota(w.id, parseInt(e.target.value)||0, w.kvotaDatumOd||'')}
                           style={{width:38,textAlign:'center',border:'1px solid #c0d4e8',borderRadius:3,padding:'0.15rem',fontSize:'0.75rem',fontFamily:'var(--mono)',fontWeight:700,color:'#1a3d5c',background:'white'}} />
+                      </td>
+                      {/* GO Od datuma - editable */}
+                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',padding:'0.15rem'}}>
+                        <input type="date" value={w.kvotaDatumOd||''}
+                          onChange={e => setWorkerKvota(w.id, w.kvota||0, e.target.value)}
+                          style={{width:90,textAlign:'center',border:'1px solid #c0d4e8',borderRadius:3,padding:'0.15rem',fontSize:'0.65rem',fontFamily:'var(--mono)',color:'#1a3d5c',background:'white'}} />
                       </td>
                       {/* GO Iskorišteno */}
                       <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.78rem',color:'#1a3d5c',padding:'0.3rem 0.3rem'}}>
@@ -805,6 +823,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                   <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
                     {yearlyStats.reduce((a,w)=>a+w.kvota,0)||'—'}
                   </td>
+                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',padding:'0.3rem 0.2rem'}}></td>
                   <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
                     {yearlyStats.reduce((a,w)=>a+w.goUsed,0)||'—'}
                   </td>
@@ -875,25 +894,28 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             <div className="modal-body">
               {(() => {
                 const wId = goModal.workerId;
-                const kvota = goKvota[wId] || 0;
-                const goUsedYear = (godisnji[wId]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && e.date.startsWith(String(new Date().getFullYear()))).length;
-                const goRemaining = kvota - goUsedYear;
-                return kvota > 0 ? (
-                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.6rem',padding:'0.4rem 0.6rem',borderRadius:6,
+                const kv = getKvota(wId);
+                const goUsed = (godisnji[wId]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+                const goRemaining = kv.dana - goUsed;
+                return kv.dana > 0 ? (
+                  <div style={{marginBottom:'0.6rem',padding:'0.4rem 0.6rem',borderRadius:6,
                     background: goRemaining < 0 ? '#fde8e8' : goRemaining < 7 ? '#fff3e0' : '#e4edf5',
                     border: `1px solid ${goRemaining < 0 ? '#e0a0a0' : goRemaining < 7 ? '#f0c060' : '#9bbfd9'}`,
                   }}>
-                    <span style={{fontSize:'0.8rem'}}>🏖️</span>
-                    <span style={{fontFamily:'var(--mono)',fontSize:'0.78rem',fontWeight:700,color: goRemaining < 0 ? '#8b2020' : goRemaining < 7 ? '#e65100' : '#1a3d5c'}}>
-                      GO: {goRemaining}/{kvota} preostalo
-                    </span>
-                    {goRemaining < 7 && goRemaining >= 0 && <span style={{fontSize:'0.7rem',color:'#e65100',fontWeight:600,marginLeft:'auto'}}>Malo preostalo!</span>}
-                    {goRemaining < 0 && <span style={{fontSize:'0.7rem',color:'#8b2020',fontWeight:600,marginLeft:'auto'}}>Prekoračeno!</span>}
+                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+                      <span style={{fontSize:'0.8rem'}}>🏖️</span>
+                      <span style={{fontFamily:'var(--mono)',fontSize:'0.78rem',fontWeight:700,color: goRemaining < 0 ? '#8b2020' : goRemaining < 7 ? '#e65100' : '#1a3d5c'}}>
+                        GO: {goRemaining}/{kv.dana} preostalo
+                      </span>
+                      {goRemaining < 7 && goRemaining >= 0 && <span style={{fontSize:'0.7rem',color:'#e65100',fontWeight:600,marginLeft:'auto'}}>Malo preostalo!</span>}
+                      {goRemaining < 0 && <span style={{fontSize:'0.7rem',color:'#8b2020',fontWeight:600,marginLeft:'auto'}}>Prekoračeno!</span>}
+                    </div>
+                    {kv.datumOd && <div style={{fontSize:'0.65rem',color:'var(--text-muted)',marginTop:'0.15rem',fontFamily:'var(--mono)'}}>Računa se od: {fmtDate(kv.datumOd)}</div>}
                   </div>
                 ) : (
                   <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.6rem',padding:'0.3rem 0.6rem',borderRadius:6,background:'#f8f8f6',border:'1px solid var(--border)'}}>
                     <span style={{fontSize:'0.72rem',color:'var(--text-light)'}}>GO kvota nije postavljena —</span>
-                    <button onClick={()=>{const v=prompt('Unesite broj dana GO po ugovoru:');if(v)setGoKvota(prev=>({...prev,[wId]:parseInt(v)||0}));}}
+                    <button onClick={()=>{const v=prompt('Unesite broj dana GO po ugovoru:');if(v)setWorkerKvota(wId,parseInt(v)||0,new Date().toISOString().slice(0,10));}}
                       style={{fontSize:'0.7rem',color:'#1a3d5c',background:'#e4edf5',border:'1px solid #9bbfd9',borderRadius:4,padding:'0.15rem 0.4rem',cursor:'pointer',fontWeight:600}}>Postavi</button>
                   </div>
                 );

@@ -27,7 +27,7 @@ function AppMain({ onLogout }) {
   const [filterJob, setFilterJob] = useState('');
   // godisnji: { workerId: [ { date, type, note } ] }
   const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
-  // goKvota: { workerId: number } — broj dana godišnjeg po ugovoru
+  // goKvota: { workerId: { dana: number, datumOd: 'YYYY-MM-DD' } } — GO po ugovoru
   const [goKvota, setGoKvota] = useStorage('sumarija_go_kvota', {});
   // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
