@@ -49,9 +49,14 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
 
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const absentWorkerIds = new Set(
+    Object.entries(godisnji || {}).filter(([wId, entries]) =>
+      entries.some(e => e.date === selectedDate)
+    ).map(([wId]) => wId)
+  );
 
   const companions = activeWorkers.filter(w =>
-    w.id !== worker.id &&
+    w.id !== worker.id && !absentWorkerIds.has(w.id) &&
     (w.category === 'radnik_primka' || w.category === 'pomocni' || w.category === 'primac_panj')
   );
   const companionGroups = [

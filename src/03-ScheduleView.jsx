@@ -446,24 +446,30 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
       {/* MOBILE: Unassigned & absent workers (visible only on small screens via CSS) */}
       {(() => {
         const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-        const absentWorkerIds = new Set(
-          Object.entries(godisnji || {}).filter(([wId, entries]) =>
-            entries.some(e => e.date === selectedDate)
-          ).map(([wId]) => wId)
-        );
+        const absentMap = {};
+        Object.entries(godisnji || {}).forEach(([wId, entries]) => {
+          const entry = entries.find(e => e.date === selectedDate);
+          if (entry) absentMap[wId] = entry;
+        });
         const activeWorkers = workers.filter(w => w.status === 'aktivan');
-        const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkerIds.has(w.id));
-        const absentList = [...absentWorkerIds].map(wId => {
-          const w = workers.find(x => x.id === wId);
-          const entry = ((godisnji || {})[wId] || []).find(e => e.date === selectedDate);
-          return w && entry ? { worker: w, entry } : null;
-        }).filter(Boolean);
-        const ODSUTNOST_SHORT = {
+        const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentMap[w.id]);
+        const ODSUTNOST_STYLE = {
           'Godišnji odmor': { short:'GO', icon:'🏖️', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9' },
           'Bolovanje':      { short:'B',  icon:'🏥', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0' },
           'Slobodan dan':   { short:'SD', icon:'☀️', bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a' },
           'Neplaćeno':      { short:'N',  icon:'📋', bg:'#f0f0f0', color:'#555',    border:'#ccc' },
         };
+        const SHOWN_LEAVE_TYPES = ['Bolovanje', 'Godišnji odmor', 'Neplaćeno'];
+        const absentByType = {};
+        Object.entries(absentMap).forEach(([wId, entry]) => {
+          if (!SHOWN_LEAVE_TYPES.includes(entry.type)) return;
+          const w = workers.find(x => x.id === wId);
+          if (!w || assignedWorkers.has(w.id)) return;
+          if (!absentByType[entry.type]) absentByType[entry.type] = [];
+          absentByType[entry.type].push(w);
+        });
+        const hasAbsent = Object.keys(absentByType).length > 0;
+        const absentCount = Object.values(absentByType).reduce((s, arr) => s + arr.length, 0);
         const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
           cat, workers: unassigned.filter(w => w.category === cat.id),
         })).filter(g => g.workers.length > 0);
@@ -475,7 +481,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               style={{padding:'0.6rem 0.75rem',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',background:'#fafaf8',borderBottom: mobileUnassignedOpen ? '1px solid var(--border)' : 'none'}}
             >
               <span style={{fontFamily:'var(--mono)',fontSize:'0.7rem',fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-muted)'}}>
-                👷 Neraspoređeni ({unassigned.length}) {absentList.length > 0 && `· Odsutni (${absentList.length})`}
+                👷 Neraspoređeni ({unassigned.length}) {hasAbsent && `· Odsutni (${absentCount})`}
               </span>
               <span style={{fontSize:'0.7rem',color:'var(--text-light)'}}>{mobileUnassignedOpen ? '▲' : '▼'}</span>
             </div>
@@ -509,31 +515,36 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                     </div>
                   ))
                 )}
-                {absentList.length > 0 && (
-                  <>
-                    <div style={{height:1,background:'var(--border)',margin:'0.5rem 0'}}/>
-                    <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.4rem'}}>
-                      Odsutni ({absentList.length})
-                    </div>
-                    {absentList.map(({ worker: w, entry }) => {
-                      const s = ODSUTNOST_SHORT[entry.type] || { short:'?', icon:'❓', bg:'#f0f0f0', color:'#555', border:'#ccc' };
-                      return (
-                        <div key={w.id} style={{
-                          display:'flex',alignItems:'center',gap:'0.4rem',
-                          padding:'0.35rem 0.5rem',marginBottom:'0.15rem',
-                          fontSize:'0.8rem',fontWeight:500,
-                          background:s.bg, border:`1px solid ${s.border}`,
-                          borderLeft:`3px solid ${s.color}`,
-                          borderRadius:4, color:s.color, opacity:0.85,
-                        }}>
-                          <span style={{fontSize:'0.85rem'}}>{s.icon}</span>
-                          <span style={{flex:1}}>{w.name}</span>
-                          <span style={{fontSize:'0.6rem',fontWeight:700,fontFamily:'var(--mono)'}}>{s.short}</span>
+                {hasAbsent && (<>
+                  <div style={{height:1,background:'var(--border)',margin:'0.5rem 0'}}/>
+                  <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.4rem'}}>
+                    Odsutni ({absentCount})
+                  </div>
+                  {SHOWN_LEAVE_TYPES.filter(t => absentByType[t]).map(type => {
+                    const s = ODSUTNOST_STYLE[type];
+                    return (
+                      <div key={type} style={{marginBottom:'0.5rem'}}>
+                        <div style={{fontSize:'0.62rem',fontWeight:700,color:s.color,letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.2rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                          <span>{s.icon}</span>{type}
                         </div>
-                      );
-                    })}
-                  </>
-                )}
+                        {absentByType[type].map(w => (
+                          <div key={w.id} style={{
+                            display:'flex',alignItems:'center',gap:'0.4rem',
+                            padding:'0.35rem 0.5rem',marginBottom:'0.15rem',
+                            fontSize:'0.8rem',fontWeight:500,
+                            background:s.bg, border:`1px solid ${s.border}`,
+                            borderLeft:`3px solid ${s.color}`,
+                            borderRadius:4, color:s.color, opacity:0.7,
+                          }}>
+                            <span style={{fontSize:'0.85rem'}}>{s.icon}</span>
+                            <span style={{flex:1}}>{w.name}</span>
+                            <span style={{fontSize:'0.6rem',fontWeight:700,fontFamily:'var(--mono)'}}>{s.short}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </>)}
               </div>
             )}
           </div>

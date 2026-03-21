@@ -4,13 +4,32 @@ function RightPanel({ selectedDate, daySchedules, schedules, workers, department
 
   const [copyDate, setCopyDate] = useState('');
   const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-  const absentWorkers = new Set(
-    Object.entries(godisnji || {}).filter(([wId, entries]) =>
-      entries.some(e => e.date === selectedDate)
-    ).map(([wId]) => wId)
-  );
+  const absentMap = {};
+  Object.entries(godisnji || {}).forEach(([wId, entries]) => {
+    const entry = entries.find(e => e.date === selectedDate);
+    if (entry) absentMap[wId] = entry;
+  });
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
-  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkers.has(w.id));
+  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentMap[w.id]);
+
+  const ODSUTNOST_STYLE = {
+    'Godišnji odmor': { short:'GO', icon:'🏖️', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9' },
+    'Bolovanje':      { short:'B',  icon:'🏥', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0' },
+    'Slobodan dan':   { short:'SD', icon:'☀️', bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a' },
+    'Neplaćeno':      { short:'N',  icon:'📋', bg:'#f0f0f0', color:'#555',    border:'#ccc' },
+  };
+
+  // Absent workers grouped by leave type (only Bolovanje, Godišnji odmor, Neplaćeno)
+  const SHOWN_LEAVE_TYPES = ['Bolovanje', 'Godišnji odmor', 'Neplaćeno'];
+  const absentByType = {};
+  Object.entries(absentMap).forEach(([wId, entry]) => {
+    if (!SHOWN_LEAVE_TYPES.includes(entry.type)) return;
+    const w = workers.find(x => x.id === wId);
+    if (!w || assignedWorkers.has(w.id)) return;
+    if (!absentByType[entry.type]) absentByType[entry.type] = [];
+    absentByType[entry.type].push(w);
+  });
+  const hasAbsent = Object.keys(absentByType).length > 0;
 
   // Group unassigned by category
   const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
@@ -101,47 +120,39 @@ function RightPanel({ selectedDate, daySchedules, schedules, workers, department
         )}
       </div>
 
-      {/* Absent workers for this day */}
-      {absentWorkers.size > 0 && (() => {
-        const ODSUTNOST_SHORT = {
-          'Godišnji odmor': { short:'GO', icon:'🏖️', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9' },
-          'Bolovanje':      { short:'B',  icon:'🏥', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0' },
-          'Slobodan dan':   { short:'SD', icon:'☀️', bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a' },
-          'Neplaćeno':      { short:'N',  icon:'📋', bg:'#f0f0f0', color:'#555',    border:'#ccc' },
-        };
-        const absentList = [...absentWorkers].map(wId => {
-          const w = workers.find(x => x.id === wId);
-          const entry = (godisnji[wId] || []).find(e => e.date === selectedDate);
-          return w && entry ? { worker: w, entry } : null;
-        }).filter(Boolean);
-        return (
-          <>
-            <div className="divider"/>
-            <div>
-              <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.6rem'}}>
-                Odsutni ({absentList.length})
-              </div>
-              {absentList.map(({ worker: w, entry }) => {
-                const s = ODSUTNOST_SHORT[entry.type] || { short:'?', icon:'❓', bg:'#f0f0f0', color:'#555', border:'#ccc' };
-                return (
+      {/* Absent workers — separate section below */}
+      {hasAbsent && (<>
+        <div className="divider"/>
+        <div>
+          <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.6rem'}}>
+            Odsutni ({Object.values(absentByType).reduce((s, arr) => s + arr.length, 0)})
+          </div>
+          {SHOWN_LEAVE_TYPES.filter(t => absentByType[t]).map(type => {
+            const s = ODSUTNOST_STYLE[type];
+            return (
+              <div key={type} style={{marginBottom:'0.5rem'}}>
+                <div style={{fontSize:'0.62rem',fontWeight:700,color:s.color,letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.2rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                  <span>{s.icon}</span>{type}
+                </div>
+                {absentByType[type].map(w => (
                   <div key={w.id} style={{
                     display:'flex',alignItems:'center',gap:'0.4rem',
                     padding:'0.3rem 0.5rem',marginBottom:'0.15rem',
                     fontSize:'0.8rem',fontWeight:500,
                     background:s.bg, border:`1px solid ${s.border}`,
                     borderLeft:`3px solid ${s.color}`,
-                    borderRadius:4, color:s.color, opacity:0.85,
+                    borderRadius:4, color:s.color, opacity:0.7,
                   }}>
                     <span style={{fontSize:'0.85rem'}}>{s.icon}</span>
                     <span style={{flex:1}}>{w.name}</span>
                     <span style={{fontSize:'0.6rem',fontWeight:700,fontFamily:'var(--mono)'}}>{s.short}</span>
                   </div>
-                );
-              })}
-            </div>
-          </>
-        );
-      })()}
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </>)}
     </aside>
   );
 }

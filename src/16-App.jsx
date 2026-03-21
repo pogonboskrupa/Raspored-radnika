@@ -335,6 +335,8 @@ function AppMain({ onLogout }) {
           onSave={(d) => { saveSchedule(d, modal.isEdit); setModal(null); }}
           onClose={() => setModal(null)}
           wName={wName}
+          godisnji={godisnji}
+          selectedDate={selectedDate}
         />
       )}
 
