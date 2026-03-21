@@ -911,24 +911,31 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
       {/* MOBILE: Unassigned & absent workers (visible only on small screens via CSS) */}
       {(() => {
         const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-        const absentWorkerIds = new Set(
-          Object.entries(godisnji || {}).filter(([wId, entries]) =>
-            entries.some(e => e.date === selectedDate)
-          ).map(([wId]) => wId)
-        );
+        const absentMap = {};
+        Object.entries(godisnji || {}).forEach(([wId, entries]) => {
+          const entry = entries.find(e => e.date === selectedDate) ||
+            entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
+          if (entry) absentMap[wId] = entry;
+        });
         const activeWorkers = workers.filter(w => w.status === 'aktivan');
-        const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkerIds.has(w.id));
-        const absentList = [...absentWorkerIds].map(wId => {
-          const w = workers.find(x => x.id === wId);
-          const entry = ((godisnji || {})[wId] || []).find(e => e.date === selectedDate);
-          return w && entry ? { worker: w, entry } : null;
-        }).filter(Boolean);
-        const ODSUTNOST_SHORT = {
+        const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentMap[w.id]);
+        const ODSUTNOST_STYLE = {
           'Godišnji odmor': { short:'GO', icon:'🏖️', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9' },
           'Bolovanje':      { short:'B',  icon:'🏥', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0' },
           'Slobodan dan':   { short:'SD', icon:'☀️', bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a' },
           'Neplaćeno':      { short:'N',  icon:'📋', bg:'#f0f0f0', color:'#555',    border:'#ccc' },
         };
+        const SHOWN_LEAVE_TYPES = ['Bolovanje', 'Godišnji odmor', 'Neplaćeno'];
+        const absentByType = {};
+        Object.entries(absentMap).forEach(([wId, entry]) => {
+          if (!SHOWN_LEAVE_TYPES.includes(entry.type)) return;
+          const w = workers.find(x => x.id === wId);
+          if (!w || assignedWorkers.has(w.id)) return;
+          if (!absentByType[entry.type]) absentByType[entry.type] = [];
+          absentByType[entry.type].push(w);
+        });
+        const hasAbsent = Object.keys(absentByType).length > 0;
+        const absentCount = Object.values(absentByType).reduce((s, arr) => s + arr.length, 0);
         const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
           cat, workers: unassigned.filter(w => w.category === cat.id),
         })).filter(g => g.workers.length > 0);
@@ -940,7 +947,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               style={{padding:'0.6rem 0.75rem',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',background:'#fafaf8',borderBottom: mobileUnassignedOpen ? '1px solid var(--border)' : 'none'}}
             >
               <span style={{fontFamily:'var(--mono)',fontSize:'0.7rem',fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-muted)'}}>
-                👷 Neraspoređeni ({unassigned.length}) {absentList.length > 0 && `· Odsutni (${absentList.length})`}
+                👷 Neraspoređeni ({unassigned.length}) {hasAbsent && `· Odsutni (${absentCount})`}
               </span>
               <span style={{fontSize:'0.7rem',color:'var(--text-light)'}}>{mobileUnassignedOpen ? '▲' : '▼'}</span>
             </div>
@@ -974,31 +981,36 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                     </div>
                   ))
                 )}
-                {absentList.length > 0 && (
-                  <>
-                    <div style={{height:1,background:'var(--border)',margin:'0.5rem 0'}}/>
-                    <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.4rem'}}>
-                      Odsutni ({absentList.length})
-                    </div>
-                    {absentList.map(({ worker: w, entry }) => {
-                      const s = ODSUTNOST_SHORT[entry.type] || { short:'?', icon:'❓', bg:'#f0f0f0', color:'#555', border:'#ccc' };
-                      return (
-                        <div key={w.id} style={{
-                          display:'flex',alignItems:'center',gap:'0.4rem',
-                          padding:'0.35rem 0.5rem',marginBottom:'0.15rem',
-                          fontSize:'0.8rem',fontWeight:500,
-                          background:s.bg, border:`1px solid ${s.border}`,
-                          borderLeft:`3px solid ${s.color}`,
-                          borderRadius:4, color:s.color, opacity:0.85,
-                        }}>
-                          <span style={{fontSize:'0.85rem'}}>{s.icon}</span>
-                          <span style={{flex:1}}>{w.name}</span>
-                          <span style={{fontSize:'0.6rem',fontWeight:700,fontFamily:'var(--mono)'}}>{s.short}</span>
+                {hasAbsent && (<>
+                  <div style={{height:1,background:'var(--border)',margin:'0.5rem 0'}}/>
+                  <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.4rem'}}>
+                    Odsutni ({absentCount})
+                  </div>
+                  {SHOWN_LEAVE_TYPES.filter(t => absentByType[t]).map(type => {
+                    const s = ODSUTNOST_STYLE[type];
+                    return (
+                      <div key={type} style={{marginBottom:'0.5rem'}}>
+                        <div style={{fontSize:'0.62rem',fontWeight:700,color:s.color,letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.2rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                          <span>{s.icon}</span>{type}
                         </div>
-                      );
-                    })}
-                  </>
-                )}
+                        {absentByType[type].map(w => (
+                          <div key={w.id} style={{
+                            display:'flex',alignItems:'center',gap:'0.4rem',
+                            padding:'0.35rem 0.5rem',marginBottom:'0.15rem',
+                            fontSize:'0.8rem',fontWeight:500,
+                            background:s.bg, border:`1px solid ${s.border}`,
+                            borderLeft:`3px solid ${s.color}`,
+                            borderRadius:4, color:s.color, opacity:0.7,
+                          }}>
+                            <span style={{fontSize:'0.85rem'}}>{s.icon}</span>
+                            <span style={{flex:1}}>{w.name}</span>
+                            <span style={{fontSize:'0.6rem',fontWeight:700,fontFamily:'var(--mono)'}}>{s.short}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </>)}
               </div>
             )}
           </div>
@@ -1159,13 +1171,33 @@ function RightPanel({ selectedDate, daySchedules, schedules, workers, department
 
   const [copyDate, setCopyDate] = useState('');
   const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-  const absentWorkers = new Set(
-    Object.entries(godisnji || {}).filter(([wId, entries]) =>
-      entries.some(e => e.date === selectedDate)
-    ).map(([wId]) => wId)
-  );
+  const absentMap = {};
+  Object.entries(godisnji || {}).forEach(([wId, entries]) => {
+    const entry = entries.find(e => e.date === selectedDate) ||
+      entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
+    if (entry) absentMap[wId] = entry;
+  });
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
-  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentWorkers.has(w.id));
+  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id) && !absentMap[w.id]);
+
+  const ODSUTNOST_STYLE = {
+    'Godišnji odmor': { short:'GO', icon:'🏖️', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9' },
+    'Bolovanje':      { short:'B',  icon:'🏥', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0' },
+    'Slobodan dan':   { short:'SD', icon:'☀️', bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a' },
+    'Neplaćeno':      { short:'N',  icon:'📋', bg:'#f0f0f0', color:'#555',    border:'#ccc' },
+  };
+
+  // Absent workers grouped by leave type (only Bolovanje, Godišnji odmor, Neplaćeno)
+  const SHOWN_LEAVE_TYPES = ['Bolovanje', 'Godišnji odmor', 'Neplaćeno'];
+  const absentByType = {};
+  Object.entries(absentMap).forEach(([wId, entry]) => {
+    if (!SHOWN_LEAVE_TYPES.includes(entry.type)) return;
+    const w = workers.find(x => x.id === wId);
+    if (!w || assignedWorkers.has(w.id)) return;
+    if (!absentByType[entry.type]) absentByType[entry.type] = [];
+    absentByType[entry.type].push(w);
+  });
+  const hasAbsent = Object.keys(absentByType).length > 0;
 
   // Group unassigned by category
   const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
@@ -1256,47 +1288,39 @@ function RightPanel({ selectedDate, daySchedules, schedules, workers, department
         )}
       </div>
 
-      {/* Absent workers for this day */}
-      {absentWorkers.size > 0 && (() => {
-        const ODSUTNOST_SHORT = {
-          'Godišnji odmor': { short:'GO', icon:'🏖️', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9' },
-          'Bolovanje':      { short:'B',  icon:'🏥', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0' },
-          'Slobodan dan':   { short:'SD', icon:'☀️', bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a' },
-          'Neplaćeno':      { short:'N',  icon:'📋', bg:'#f0f0f0', color:'#555',    border:'#ccc' },
-        };
-        const absentList = [...absentWorkers].map(wId => {
-          const w = workers.find(x => x.id === wId);
-          const entry = (godisnji[wId] || []).find(e => e.date === selectedDate);
-          return w && entry ? { worker: w, entry } : null;
-        }).filter(Boolean);
-        return (
-          <>
-            <div className="divider"/>
-            <div>
-              <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.6rem'}}>
-                Odsutni ({absentList.length})
-              </div>
-              {absentList.map(({ worker: w, entry }) => {
-                const s = ODSUTNOST_SHORT[entry.type] || { short:'?', icon:'❓', bg:'#f0f0f0', color:'#555', border:'#ccc' };
-                return (
+      {/* Absent workers — separate section below */}
+      {hasAbsent && (<>
+        <div className="divider"/>
+        <div>
+          <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.6rem'}}>
+            Odsutni ({Object.values(absentByType).reduce((s, arr) => s + arr.length, 0)})
+          </div>
+          {SHOWN_LEAVE_TYPES.filter(t => absentByType[t]).map(type => {
+            const s = ODSUTNOST_STYLE[type];
+            return (
+              <div key={type} style={{marginBottom:'0.5rem'}}>
+                <div style={{fontSize:'0.62rem',fontWeight:700,color:s.color,letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.2rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                  <span>{s.icon}</span>{type}
+                </div>
+                {absentByType[type].map(w => (
                   <div key={w.id} style={{
                     display:'flex',alignItems:'center',gap:'0.4rem',
                     padding:'0.3rem 0.5rem',marginBottom:'0.15rem',
                     fontSize:'0.8rem',fontWeight:500,
                     background:s.bg, border:`1px solid ${s.border}`,
                     borderLeft:`3px solid ${s.color}`,
-                    borderRadius:4, color:s.color, opacity:0.85,
+                    borderRadius:4, color:s.color, opacity:0.7,
                   }}>
                     <span style={{fontSize:'0.85rem'}}>{s.icon}</span>
                     <span style={{flex:1}}>{w.name}</span>
                     <span style={{fontSize:'0.6rem',fontWeight:700,fontFamily:'var(--mono)'}}>{s.short}</span>
                   </div>
-                );
-              })}
-            </div>
-          </>
-        );
-      })()}
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </>)}
     </aside>
   );
 }
@@ -1353,9 +1377,14 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
 
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const absentWorkerIds = new Set(
+    Object.entries(godisnji || {}).filter(([wId, entries]) =>
+      entries.some(e => e.date === selectedDate || (e.open && e.dateOd && e.dateOd <= selectedDate))
+    ).map(([wId]) => wId)
+  );
 
   const companions = activeWorkers.filter(w =>
-    w.id !== worker.id &&
+    w.id !== worker.id && !absentWorkerIds.has(w.id) &&
     (w.category === 'radnik_primka' || w.category === 'pomocni' || w.category === 'primac_panj')
   );
   const companionGroups = [
@@ -1385,9 +1414,18 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
 
   const handleSaveOdsutnost = () => {
     if (!odsDateOd) return alert('Odaberi datum!');
+    if (odsDateDo && odsDateDo < odsDateOd) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    if (!odsDateDo) {
+      // Open-ended leave — no end date known yet
+      setGodisnji(g => {
+        const prev = (g[worker.id] || []).filter(e => !(e.open && e.dateOd === odsDateOd && e.type === odsutnostType));
+        return { ...g, [worker.id]: [...prev, { dateOd: odsDateOd, type: odsutnostType, note, open: true }] };
+      });
+      onClose();
+      return;
+    }
     const startDate = new Date(odsDateOd);
-    const endDate = odsDateDo ? new Date(odsDateDo) : startDate;
-    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    const endDate = new Date(odsDateDo);
     const dates = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
       const dw = d.getDay();
@@ -1501,6 +1539,9 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                     onChange={e => setOdsDateDo(e.target.value)} />
                 </div>
               </div>
+              {odsDateOd && !odsDateDo && (
+                <div style={{fontSize:'0.75rem',color:'#b5620a',marginBottom:'0.4rem',fontStyle:'italic'}}>Bez krajnjeg datuma — odsutnost ostaje otvorena dok se ne zaključi</div>
+              )}
               {odsDateOd && odsDateDo && odsDateDo >= odsDateOd && (() => {
                 const s = new Date(odsDateOd), e = new Date(odsDateDo);
                 let count = 0;
@@ -1773,7 +1814,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
 }
 
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
-function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName }) {
+function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName, godisnji, selectedDate }) {
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
@@ -1819,7 +1860,13 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
       .filter(s => s.date === form.date && (!isEdit || s.id !== form.id))
       .flatMap(s => s.allWorkers || [])
   );
-  const availableWorkers = activeWorkers.filter(w => !alreadyScheduled.has(w.id));
+  const checkDate = form.date || selectedDate;
+  const absentWorkerIds = new Set(
+    Object.entries(godisnji || {}).filter(([wId, entries]) =>
+      entries.some(e => e.date === checkDate || (e.open && e.dateOd && e.dateOd <= checkDate))
+    ).map(([wId]) => wId)
+  );
+  const availableWorkers = activeWorkers.filter(w => !alreadyScheduled.has(w.id) && !absentWorkerIds.has(w.id));
 
   useEffect(() => {
     if (isPrimka) {
@@ -3538,17 +3585,30 @@ function VozaciView({ vehicles, setVehicles, workers }) {
 }
 
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, holidays, setHolidays, wName, dName }) {
+function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, goKvota, setGoKvota, holidays, setHolidays, wName, dName }) {
   const now = new Date();
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
   const [selWorker, setSelWorker] = useState('');
   const [goModal, setGoModal] = useState(null); // { workerId } or null
   const [goForm, setGoForm] = useState({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
+  const [closingLeave, setClosingLeave] = useState(null); // { wId, entry } for closing open leave
+  const [closeDateDo, setCloseDateDo] = useState('');
   const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji' | 'praznici'
   const [holidayInput, setHolidayInput] = useState(false);
   const [holidayName, setHolidayName] = useState('');
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Helper: normalize goKvota entry (backward compat with old number format)
+  const getKvota = (wId) => {
+    const raw = goKvota[wId];
+    if (!raw) return { dana: 0, datumOd: '' };
+    if (typeof raw === 'number') return { dana: raw, datumOd: `${selYear}-01-01` };
+    return { dana: raw.dana || 0, datumOd: raw.datumOd || '' };
+  };
+  const setWorkerKvota = (wId, dana, datumOd) => {
+    setGoKvota(prev => ({ ...prev, [wId]: { dana, datumOd } }));
+  };
 
   const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno'];
   const ODSUTNOST_COLOR = {
@@ -3578,7 +3638,17 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     Object.entries(godisnji).forEach(([wId, entries]) => {
       if (!m[wId]) return;
       entries.forEach(e => {
-        m[wId][e.date] = { type: 'odsutnost', oType: e.type, note: e.note };
+        if (e.open && e.dateOd) {
+          // Open-ended leave: fill from dateOd through end of displayed month
+          days.forEach(d => {
+            const date = isoDate(d);
+            if (date >= e.dateOd && !isWeekend(d)) {
+              m[wId][date] = { type: 'odsutnost', oType: e.type, note: e.note, open: true, dateOd: e.dateOd };
+            }
+          });
+        } else if (e.date) {
+          m[wId][e.date] = { type: 'odsutnost', oType: e.type, note: e.note };
+        }
       });
     });
     // Praznici — override za sve radnike (ako nemaju raspored, upisi praznik)
@@ -3612,20 +3682,27 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     });
   }, [workerDayMap, days, selYear, selMonth]);
 
-  // Add odsutnost (supports date range)
+  // Add odsutnost (supports date range or open-ended)
   const saveGodisnji = () => {
     if (!goForm.date) return alert('Odaberi datum!');
     const wId = goModal.workerId;
+    if (goForm.dateDo && goForm.dateDo < goForm.date) return alert('Datum "Do" mora biti nakon datuma "Od"!');
+    if (!goForm.dateDo) {
+      // Open-ended leave
+      setGodisnji(g => {
+        const prev = (g[wId] || []).filter(e => !(e.open && e.dateOd === goForm.date && e.type === goForm.type));
+        return { ...g, [wId]: [...prev, { dateOd: goForm.date, type: goForm.type, note: goForm.note, open: true }] };
+      });
+      setGoModal(null);
+      setGoForm({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
+      return;
+    }
     const startDate = new Date(goForm.date);
-    const endDate = goForm.dateDo ? new Date(goForm.dateDo) : startDate;
-    if (endDate < startDate) return alert('Datum "Do" mora biti nakon datuma "Od"!');
-    // Collect all dates in range
+    const endDate = new Date(goForm.dateDo);
     const dates = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
       const dw = d.getDay();
-      if (dw !== 0 && dw !== 6) { // skip weekends
-        dates.push(d.toISOString().slice(0,10));
-      }
+      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0,10));
     }
     if (dates.length === 0) return alert('Nema radnih dana u odabranom periodu!');
     setGodisnji(g => {
@@ -3637,8 +3714,29 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     setGoForm({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
   };
 
+  // Close an open-ended leave by setting end date and expanding into individual date entries
+  const closeOpenLeave = (wId, openEntry, dateDo) => {
+    const startDate = new Date(openEntry.dateOd);
+    const endDate = new Date(dateDo);
+    if (endDate < startDate) return alert('Datum završetka mora biti nakon početka!');
+    const dates = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
+      const dw = d.getDay();
+      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0,10));
+    }
+    setGodisnji(g => {
+      const prev = (g[wId] || []).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type) && !dates.includes(e.date));
+      const newEntries = dates.map(dt => ({ date: dt, type: openEntry.type, note: openEntry.note }));
+      return { ...g, [wId]: [...prev, ...newEntries] };
+    });
+  };
+
   const deleteGodisnji = (wId, date) => {
     setGodisnji(g => ({ ...g, [wId]: (g[wId]||[]).filter(e => e.date !== date) }));
+  };
+
+  const deleteOpenLeave = (wId, openEntry) => {
+    setGodisnji(g => ({ ...g, [wId]: (g[wId]||[]).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type)) }));
   };
 
   const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
@@ -3667,9 +3765,13 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         radnih:a.radnih+m.radnih, odsutnih:a.odsutnih+m.odsutnih,
         vikenda:a.vikenda+m.vikenda, praznih:a.praznih+m.praznih, praznika:a.praznika+m.praznika
       }),{radnih:0,odsutnih:0,vikenda:0,praznih:0,praznika:0});
-      return { ...w, months, total };
+      // Count GO days used from datumOd onwards
+      const kv = getKvota(w.id);
+      const goUsed = (godisnji[w.id]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+      const goRemaining = kv.dana - goUsed;
+      return { ...w, months, total, goUsed, kvota: kv.dana, kvotaDatumOd: kv.datumOd, goRemaining };
     });
-  }, [sihtView, selYear, workerDayMap, workers]);
+  }, [sihtView, selYear, workerDayMap, workers, goKvota, godisnji]);
 
   // ── Per-worker monthly detail ──
   const singleWorkerData = useMemo(() => {
@@ -3927,11 +4029,11 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       cellBorderColor = oc.border;
                       cellText = (
                         <span style={{color:oc.color,fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)',cursor:'pointer'}}
-                          onClick={()=>deleteGodisnji(w.id,date)} title={'Klikni za brisanje: '+entry.oType}>
+                          onClick={()=>entry.open ? deleteOpenLeave(w.id, {dateOd:entry.dateOd, type:entry.oType, note:entry.note}) : deleteGodisnji(w.id,date)} title={entry.open ? 'Otvoreno od '+entry.dateOd+' · klikni za brisanje' : 'Klikni za brisanje: '+entry.oType}>
                           {oc.short}
                         </span>
                       );
-                      title = entry.oType + (entry.note ? ' — '+entry.note : '');
+                      title = entry.oType + (entry.open ? ' (otvoreno od '+entry.dateOd+')' : '') + (entry.note ? ' — '+entry.note : '');
                     }
                     return (
                       <td key={d} title={title} style={{
@@ -3999,7 +4101,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         fontSize:'0.42rem', fontWeight:fontW, fontFamily:'var(--mono)', color,
                         cursor: entry?.type==='odsutnost' ? 'pointer' : 'default',
                       }}
-                      onClick={()=>{if(entry?.type==='odsutnost')deleteGodisnji(w.id,date);}}>
+                      onClick={()=>{if(entry?.type==='odsutnost'){entry.open ? deleteOpenLeave(w.id,{dateOd:entry.dateOd,type:entry.oType,note:entry.note}) : deleteGodisnji(w.id,date);}}}>
                       {label}
                     </div>
                   );
@@ -4018,17 +4120,44 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(200px,100%),1fr))',gap:'0.5rem'}}>
           {displayWorkers.filter(w=>w.status==='aktivan').map(w => {
             const stats = workerStats.find(s=>s.id===w.id)||{radnih:0,odsutnih:0,praznih:0};
-            const goUpcoming = (godisnji[w.id]||[]).filter(e => e.date >= today()).sort((a,b)=>a.date.localeCompare(b.date));
+            const goUpcoming = (godisnji[w.id]||[]).filter(e => e.date && e.date >= today()).sort((a,b)=>a.date.localeCompare(b.date));
+            const openLeaves = (godisnji[w.id]||[]).filter(e => e.open);
             return (
               <div key={w.id} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:'0.75rem',boxShadow:'var(--shadow)'}}>
                 <div style={{fontWeight:700,fontSize:'0.82rem',marginBottom:'0.4rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</div>
                 <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'0.3rem'}}>
                   <span style={{fontFamily:'var(--mono)',fontSize:'0.75rem',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',borderRadius:3,padding:'0.1rem 0.4rem'}}>{stats.radnih} rad</span>
+                  {(() => {
+                    const kv = getKvota(w.id);
+                    if (!kv.dana) return null;
+                    const goUsed = (godisnji[w.id]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+                    const rem = kv.dana - goUsed;
+                    return <span style={{fontFamily:'var(--mono)',fontSize:'0.75rem',borderRadius:3,padding:'0.1rem 0.4rem',fontWeight:700,
+                      background: rem < 0 ? '#fde8e8' : rem < 7 ? '#fff3e0' : '#e4edf5',
+                      color: rem < 0 ? '#8b2020' : rem < 7 ? '#e65100' : '#1a3d5c',
+                      border: `1px solid ${rem < 0 ? '#e0a0a0' : rem < 7 ? '#f0c060' : '#9bbfd9'}`,
+                    }}>GO: {rem}/{kv.dana}</span>;
+                  })()}
                   {Object.entries(stats.odsutTypes||{}).map(([k,v])=>{
                     const oc = ODSUTNOST_COLOR[k]||{bg:'#f0f0f0',color:'#555',border:'#ccc'};
                     return <span key={k} style={{fontFamily:'var(--mono)',fontSize:'0.75rem',background:oc.bg,color:oc.color,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.1rem 0.4rem'}}>{v} {k.split(' ')[0].toLowerCase()}</span>;
                   })}
                 </div>
+                {openLeaves.length > 0 && (
+                  <div style={{marginTop:'0.3rem'}}>
+                    {openLeaves.map(e=>{
+                      const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc'};
+                      return (
+                        <div key={e.dateOd+e.type} style={{display:'flex',alignItems:'center',gap:'0.3rem',fontSize:'0.72rem',marginBottom:'0.15rem'}}>
+                          <span style={{fontFamily:'var(--mono)',color:oc.color,background:oc.bg,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',fontSize:'0.65rem',fontWeight:700}}>{ODSUTNOST_COLOR[e.type]?.short}</span>
+                          <span style={{fontFamily:'var(--mono)',color:'#b5620a',fontWeight:600}}>{fmtDate(e.dateOd)} → ?</span>
+                          {e.note && <span style={{color:'var(--text-light)',fontStyle:'italic',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.note}</span>}
+                          <button onClick={()=>deleteOpenLeave(w.id,e)} style={{marginLeft:'auto',background:'none',border:'none',color:'var(--text-light)',cursor:'pointer',fontSize:'0.7rem',padding:0}}>✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {goUpcoming.length > 0 && (
                   <div style={{marginTop:'0.3rem'}}>
                     {goUpcoming.slice(0,3).map(e=>{
@@ -4190,6 +4319,10 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     </th>
                   ))}
                   <th style={{background:'var(--green)',color:'white',padding:'0.35rem 0.5rem',border:'1px solid var(--green)',fontFamily:'var(--mono)',fontSize:'0.65rem',textAlign:'center',minWidth:48}}>UKUP</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:48}}>GO DANA</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:80}}>OD DATUMA</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:48}}>ISKOR.</th>
+                  <th style={{background:'#e4edf5',color:'#1a3d5c',padding:'0.35rem 0.4rem',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontSize:'0.6rem',textAlign:'center',minWidth:52}}>PREOST.</th>
                 </tr>
               </thead>
               <tbody>
@@ -4234,6 +4367,31 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         {w.total.radnih}
                         {w.total.odsutnih > 0 && <div style={{fontSize:'0.55rem',color:'#8b2020',fontWeight:600}}>{w.total.odsutnih} ods</div>}
                       </td>
+                      {/* GO Dana - editable */}
+                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',padding:'0.15rem'}}>
+                        <input type="number" min="0" max="60" value={w.kvota||''} placeholder="—"
+                          onChange={e => setWorkerKvota(w.id, parseInt(e.target.value)||0, w.kvotaDatumOd||'')}
+                          style={{width:38,textAlign:'center',border:'1px solid #c0d4e8',borderRadius:3,padding:'0.15rem',fontSize:'0.75rem',fontFamily:'var(--mono)',fontWeight:700,color:'#1a3d5c',background:'white'}} />
+                      </td>
+                      {/* GO Od datuma - editable */}
+                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',padding:'0.15rem'}}>
+                        <input type="date" value={w.kvotaDatumOd||''}
+                          onChange={e => setWorkerKvota(w.id, w.kvota||0, e.target.value)}
+                          style={{width:90,textAlign:'center',border:'1px solid #c0d4e8',borderRadius:3,padding:'0.15rem',fontSize:'0.65rem',fontFamily:'var(--mono)',color:'#1a3d5c',background:'white'}} />
+                      </td>
+                      {/* GO Iskorišteno */}
+                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#f8fbff',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.78rem',color:'#1a3d5c',padding:'0.3rem 0.3rem'}}>
+                        {w.goUsed || '—'}
+                      </td>
+                      {/* GO Preostalo */}
+                      <td style={{textAlign:'center',border:'1px solid #9bbfd9',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.78rem',padding:'0.3rem 0.3rem',
+                        background: !w.kvota ? '#f8fbff' : w.goRemaining < 0 ? '#fde8e8' : w.goRemaining < 7 ? '#fff3e0' : '#e8f5e9',
+                        color: !w.kvota ? '#ccc' : w.goRemaining < 0 ? '#8b2020' : w.goRemaining < 7 ? '#e65100' : '#2e7d32',
+                      }}>
+                        {w.kvota ? w.goRemaining : '—'}
+                        {w.kvota > 0 && w.goRemaining >= 0 && w.goRemaining < 7 && <div style={{fontSize:'0.45rem',fontWeight:600,color:'#e65100'}}>MALO!</div>}
+                        {w.kvota > 0 && w.goRemaining < 0 && <div style={{fontSize:'0.45rem',fontWeight:600,color:'#8b2020'}}>PREKORAČENO</div>}
+                      </td>
                     </tr>
                   );
                 })}
@@ -4247,6 +4405,16 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                   })}
                   <td style={{textAlign:'center',border:'1px solid var(--green)',background:'var(--green)',color:'white',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.85rem',padding:'0.3rem 0.4rem'}}>
                     {yearlyStats.reduce((a,w)=>a+w.total.radnih,0)}
+                  </td>
+                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
+                    {yearlyStats.reduce((a,w)=>a+w.kvota,0)||'—'}
+                  </td>
+                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',padding:'0.3rem 0.2rem'}}></td>
+                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
+                    {yearlyStats.reduce((a,w)=>a+w.goUsed,0)||'—'}
+                  </td>
+                  <td style={{textAlign:'center',border:'1px solid #9bbfd9',background:'#e4edf5',fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.72rem',color:'#1a3d5c',padding:'0.3rem 0.2rem'}}>
+                    {yearlyStats.some(w=>w.kvota>0) ? yearlyStats.reduce((a,w)=>a+w.goRemaining,0) : '—'}
                   </td>
                 </tr>
               </tfoot>
@@ -4264,6 +4432,12 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     <span onClick={()=>{setSelWorker(w.id);setSihtView('radnik')}} style={{fontWeight:700,fontSize:'0.78rem',color:cat?.color||'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}>{w.name}</span>
                     <span style={{fontFamily:'var(--mono)',fontSize:'0.62rem',fontWeight:700,color:'white',background:'var(--green)',borderRadius:3,padding:'0.1rem 0.25rem'}}>{w.total.radnih}R</span>
                     {w.total.odsutnih>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.58rem',fontWeight:700,color:'white',background:'#8b2020',borderRadius:3,padding:'0.1rem 0.2rem'}}>{w.total.odsutnih}O</span>}
+                    {w.kvota > 0 && (
+                      <span style={{fontFamily:'var(--mono)',fontSize:'0.58rem',fontWeight:700,borderRadius:3,padding:'0.1rem 0.25rem',
+                        background: w.goRemaining < 0 ? '#fde8e8' : w.goRemaining < 7 ? '#fff3e0' : '#e4edf5',
+                        color: w.goRemaining < 0 ? '#8b2020' : w.goRemaining < 7 ? '#e65100' : '#1a3d5c',
+                      }}>GO: {w.goRemaining}/{w.kvota}</span>
+                    )}
                   </div>
                   <div style={{padding:'0.2rem 0.35rem 0.25rem',display:'grid',gridTemplateColumns:'repeat(12, 1fr)',gap:'2px'}}>
                     {w.months.map((m,mi) => {
@@ -4304,6 +4478,34 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
               <button className="btn btn-ghost btn-icon" onClick={()=>setGoModal(null)}>✕</button>
             </div>
             <div className="modal-body">
+              {(() => {
+                const wId = goModal.workerId;
+                const kv = getKvota(wId);
+                const goUsed = (godisnji[wId]||[]).filter(e => e.date && e.type === 'Godišnji odmor' && (!kv.datumOd || e.date >= kv.datumOd)).length;
+                const goRemaining = kv.dana - goUsed;
+                return kv.dana > 0 ? (
+                  <div style={{marginBottom:'0.6rem',padding:'0.4rem 0.6rem',borderRadius:6,
+                    background: goRemaining < 0 ? '#fde8e8' : goRemaining < 7 ? '#fff3e0' : '#e4edf5',
+                    border: `1px solid ${goRemaining < 0 ? '#e0a0a0' : goRemaining < 7 ? '#f0c060' : '#9bbfd9'}`,
+                  }}>
+                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+                      <span style={{fontSize:'0.8rem'}}>🏖️</span>
+                      <span style={{fontFamily:'var(--mono)',fontSize:'0.78rem',fontWeight:700,color: goRemaining < 0 ? '#8b2020' : goRemaining < 7 ? '#e65100' : '#1a3d5c'}}>
+                        GO: {goRemaining}/{kv.dana} preostalo
+                      </span>
+                      {goRemaining < 7 && goRemaining >= 0 && <span style={{fontSize:'0.7rem',color:'#e65100',fontWeight:600,marginLeft:'auto'}}>Malo preostalo!</span>}
+                      {goRemaining < 0 && <span style={{fontSize:'0.7rem',color:'#8b2020',fontWeight:600,marginLeft:'auto'}}>Prekoračeno!</span>}
+                    </div>
+                    {kv.datumOd && <div style={{fontSize:'0.65rem',color:'var(--text-muted)',marginTop:'0.15rem',fontFamily:'var(--mono)'}}>Računa se od: {fmtDate(kv.datumOd)}</div>}
+                  </div>
+                ) : (
+                  <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.6rem',padding:'0.3rem 0.6rem',borderRadius:6,background:'#f8f8f6',border:'1px solid var(--border)'}}>
+                    <span style={{fontSize:'0.72rem',color:'var(--text-light)'}}>GO kvota nije postavljena —</span>
+                    <button onClick={()=>{const v=prompt('Unesite broj dana GO po ugovoru:');if(v)setWorkerKvota(wId,parseInt(v)||0,new Date().toISOString().slice(0,10));}}
+                      style={{fontSize:'0.7rem',color:'#1a3d5c',background:'#e4edf5',border:'1px solid #9bbfd9',borderRadius:4,padding:'0.15rem 0.4rem',cursor:'pointer',fontWeight:600}}>Postavi</button>
+                  </div>
+                );
+              })()}
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem'}}>
                 <div className="form-group">
                   <label className="form-label">Od *</label>
@@ -4314,6 +4516,9 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                   <input type="date" className="form-input" value={goForm.dateDo} min={goForm.date||undefined} onChange={e=>setGoForm(f=>({...f,dateDo:e.target.value}))} />
                 </div>
               </div>
+              {goForm.date && !goForm.dateDo && (
+                <div style={{fontSize:'0.75rem',color:'#b5620a',marginTop:'-0.3rem',marginBottom:'0.3rem',fontStyle:'italic'}}>Bez krajnjeg datuma — odsutnost ostaje otvorena dok se ne zaključi</div>
+              )}
               {goForm.date && goForm.dateDo && goForm.dateDo >= goForm.date && (() => {
                 const s = new Date(goForm.date), e = new Date(goForm.dateDo);
                 let count = 0;
@@ -4346,11 +4551,45 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                 <label className="form-label">Napomena</label>
                 <input className="form-input" placeholder="npr. najava za prekosutra..." value={goForm.note} onChange={e=>setGoForm(f=>({...f,note:e.target.value}))} />
               </div>
-              {/* Upcoming for this worker */}
-              {(godisnji[goModal.workerId]||[]).filter(e=>e.date>=today()).length > 0 && (
+              {/* Open-ended leaves for this worker */}
+              {(godisnji[goModal.workerId]||[]).filter(e=>e.open).length > 0 && (
+                <div style={{background:'#fef3e0',border:'1px solid #f0c060',borderRadius:6,padding:'0.6rem 0.75rem',marginBottom:'0.5rem'}}>
+                  <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'#b5620a',marginBottom:'0.4rem'}}>Otvorene odsutnosti</div>
+                  {(godisnji[goModal.workerId]||[]).filter(e=>e.open).map(e=>{
+                    const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc',short:'?'};
+                    const isClosing = closingLeave && closingLeave.entry.dateOd === e.dateOd && closingLeave.entry.type === e.type;
+                    return (
+                      <div key={e.dateOd+e.type} style={{marginBottom:'0.3rem'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.78rem'}}>
+                          <span style={{fontFamily:'var(--mono)',color:oc.color,background:oc.bg,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',fontSize:'0.65rem',fontWeight:700}}>{oc.short}</span>
+                          <span style={{fontFamily:'var(--mono)',fontWeight:600}}>{fmtDate(e.dateOd)}</span>
+                          <span style={{color:'#b5620a',fontWeight:600}}>→ ?</span>
+                          <span style={{color:'var(--text-muted)'}}>{e.type}</span>
+                          {e.note && <span style={{color:'var(--text-light)',fontStyle:'italic'}}>{e.note}</span>}
+                          <button onClick={()=>{setClosingLeave({wId:goModal.workerId,entry:e});setCloseDateDo('');}} style={{marginLeft:'auto',background:'#fff',border:'1px solid #f0c060',color:'#b5620a',cursor:'pointer',fontSize:'0.65rem',borderRadius:4,padding:'0.15rem 0.4rem',fontWeight:600}}>Zaključi</button>
+                          <button onClick={()=>deleteOpenLeave(goModal.workerId,e)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:'0.8rem'}}>✕</button>
+                        </div>
+                        {isClosing && (
+                          <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.3rem',padding:'0.3rem 0.5rem',background:'#fff',borderRadius:4,border:'1px solid #f0c060'}}>
+                            <label style={{fontSize:'0.72rem',color:'var(--text-muted)',whiteSpace:'nowrap'}}>Do:</label>
+                            <input type="date" className="form-input" value={closeDateDo} min={e.dateOd}
+                              onChange={ev=>setCloseDateDo(ev.target.value)}
+                              style={{fontSize:'0.75rem',padding:'0.2rem 0.4rem',flex:1}} />
+                            <button disabled={!closeDateDo} onClick={()=>{closeOpenLeave(goModal.workerId,e,closeDateDo);setClosingLeave(null);}}
+                              style={{background:'#2e7d32',color:'#fff',border:'none',borderRadius:4,padding:'0.2rem 0.5rem',fontSize:'0.7rem',fontWeight:600,cursor:closeDateDo?'pointer':'default',opacity:closeDateDo?1:0.5}}>OK</button>
+                            <button onClick={()=>setClosingLeave(null)} style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:'0.75rem'}}>✕</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Upcoming for this worker (regular date entries) */}
+              {(godisnji[goModal.workerId]||[]).filter(e=>e.date && e.date>=today()).length > 0 && (
                 <div style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:6,padding:'0.6rem 0.75rem'}}>
                   <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.4rem'}}>Planirane odsutnosti</div>
-                  {(godisnji[goModal.workerId]||[]).filter(e=>e.date>=today()).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
+                  {(godisnji[goModal.workerId]||[]).filter(e=>e.date && e.date>=today()).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
                     const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc',short:'?'};
                     return (
                       <div key={e.date} style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.78rem',marginBottom:'0.2rem'}}>
@@ -4404,6 +4643,8 @@ function AppMain({ onLogout }) {
   const [filterJob, setFilterJob] = useState('');
   // godisnji: { workerId: [ { date, type, note } ] }
   const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
+  // goKvota: { workerId: { dana: number, datumOd: 'YYYY-MM-DD' } } — GO po ugovoru
+  const [goKvota, setGoKvota] = useStorage('sumarija_go_kvota', {});
   // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
   // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
@@ -4635,6 +4876,7 @@ function AppMain({ onLogout }) {
             <SihtaricaView
               schedules={schedules} workers={workers} departments={departments}
               godisnji={godisnji} setGodisnji={setGodisnji}
+              goKvota={goKvota} setGoKvota={setGoKvota}
               holidays={holidays} setHolidays={setHolidays}
               wName={wName} dName={dName}
             />
@@ -4712,6 +4954,8 @@ function AppMain({ onLogout }) {
           onSave={(d) => { saveSchedule(d, modal.isEdit); setModal(null); }}
           onClose={() => setModal(null)}
           wName={wName}
+          godisnji={godisnji}
+          selectedDate={selectedDate}
         />
       )}
 
