@@ -27,6 +27,8 @@ function AppMain({ onLogout }) {
   const [filterJob, setFilterJob] = useState('');
   // godisnji: { workerId: [ { date, type, note } ] }
   const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
+  // goKvota: { workerId: number } — broj dana godišnjeg po ugovoru
+  const [goKvota, setGoKvota] = useStorage('sumarija_go_kvota', {});
   // vehicles: [{ id, driverId, tipVozila, registracija, brojMjesta, status:'vozno'|'popravka' }]
   const [vehicles, setVehicles] = useStorage('sumarija_vehicles', []);
   // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
@@ -258,6 +260,7 @@ function AppMain({ onLogout }) {
             <SihtaricaView
               schedules={schedules} workers={workers} departments={departments}
               godisnji={godisnji} setGodisnji={setGodisnji}
+              goKvota={goKvota} setGoKvota={setGoKvota}
               holidays={holidays} setHolidays={setHolidays}
               wName={wName} dName={dName}
             />
