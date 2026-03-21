@@ -1216,6 +1216,19 @@ function ScheduleView(_ref2) {
       padding: '0.5rem 1.2rem'
     }
   }, "\uD83D\uDEE0\uFE0F Dodaj kao radni dan")), !currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '0.5rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.65rem',
+      fontWeight: 700,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: 'var(--text-light)',
+      marginBottom: '0.35rem'
+    }
+  }, "Vrsta posla \u2014 klikni za unos"), /*#__PURE__*/React.createElement("div", {
     className: "stats-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "stat-card"
@@ -1241,25 +1254,23 @@ function ScheduleView(_ref2) {
     }, ws.size), /*#__PURE__*/React.createElement("div", {
       className: "stat-label"
     }, jt));
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: '0.35rem',
-      flexWrap: 'wrap',
-      marginBottom: '1rem'
-    }
-  }, JOB_TYPES.map(jt => /*#__PURE__*/React.createElement("button", {
+  }), JOB_TYPES.filter(jt => !statsByJob[jt]).map(jt => /*#__PURE__*/React.createElement("div", {
+    className: "stat-card",
     key: jt,
-    className: jobBadgeClass(jt),
-    onClick: () => onAddWithJob(jt),
     style: {
       cursor: 'pointer',
-      fontSize: '0.72rem',
-      padding: '0.3rem 0.6rem',
-      border: '1px solid var(--border)',
-      borderRadius: 4
+      opacity: 0.5
+    },
+    onClick: () => onAddWithJob(jt),
+    title: `+ Dodaj ${jt}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value",
+    style: {
+      fontSize: '1.2rem'
     }
-  }, "+ ", jt))), /*#__PURE__*/React.createElement("div", {
+  }, "0"), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, jt))))), /*#__PURE__*/React.createElement("div", {
     className: "section-header"
   }, /*#__PURE__*/React.createElement("div", {
     className: "section-title"

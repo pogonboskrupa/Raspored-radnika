@@ -599,28 +599,29 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
       )}
 
       {!currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
-      {/* STATS */}
-      <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-value">{totalToday}</div>
-          <div className="stat-label">Ukupno radnika</div>
+      {/* STATS + VRSTA POSLA */}
+      <div style={{marginBottom:'0.5rem'}}>
+        <div style={{fontSize:'0.65rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.35rem'}}>
+          Vrsta posla — klikni za unos
         </div>
-        {Object.entries(statsByJob).map(([jt, ws]) => (
-          <div className="stat-card" key={jt} style={{cursor:'pointer'}} onClick={() => onAddWithJob(jt)} title={`+ Dodaj ${jt}`}>
-            <div className="stat-value" style={{fontSize:'1.2rem'}}>{ws.size}</div>
-            <div className="stat-label">{jt}</div>
+        <div className="stats-row">
+          <div className="stat-card">
+            <div className="stat-value">{totalToday}</div>
+            <div className="stat-label">Ukupno radnika</div>
           </div>
-        ))}
-      </div>
-
-      {/* QUICK JOB BUTTONS */}
-      <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginBottom:'1rem'}}>
-        {JOB_TYPES.map(jt => (
-          <button key={jt} className={jobBadgeClass(jt)} onClick={() => onAddWithJob(jt)}
-            style={{cursor:'pointer',fontSize:'0.72rem',padding:'0.3rem 0.6rem',border:'1px solid var(--border)',borderRadius:4}}>
-            + {jt}
-          </button>
-        ))}
+          {Object.entries(statsByJob).map(([jt, ws]) => (
+            <div className="stat-card" key={jt} style={{cursor:'pointer'}} onClick={() => onAddWithJob(jt)} title={`+ Dodaj ${jt}`}>
+              <div className="stat-value" style={{fontSize:'1.2rem'}}>{ws.size}</div>
+              <div className="stat-label">{jt}</div>
+            </div>
+          ))}
+          {JOB_TYPES.filter(jt => !statsByJob[jt]).map(jt => (
+            <div className="stat-card" key={jt} style={{cursor:'pointer',opacity:0.5}} onClick={() => onAddWithJob(jt)} title={`+ Dodaj ${jt}`}>
+              <div className="stat-value" style={{fontSize:'1.2rem'}}>0</div>
+              <div className="stat-label">{jt}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* SECTION TITLE */}
