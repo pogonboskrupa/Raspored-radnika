@@ -359,7 +359,7 @@ function LoginScreen({ onLogin }) {
     if (pin !== confirmPin) { setError('PIN-ovi se ne poklapaju'); return; }
     const hash = hashPin(pin);
     saveHash(hash);
-    sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+    localStorage.setItem(AUTH_SESSION_KEY, 'true');
     onLogin();
   };
 
@@ -368,7 +368,7 @@ function LoginScreen({ onLogin }) {
     if (!pin) { setError('Unesite PIN'); return; }
     const hash = hashPin(pin);
     if (hash === existingHash) {
-      sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+      localStorage.setItem(AUTH_SESSION_KEY, 'true');
       onLogin();
     } else {
       setError('Pogrešan PIN!');
@@ -4675,13 +4675,13 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
 }
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(AUTH_SESSION_KEY) === 'true');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem(AUTH_SESSION_KEY) === 'true');
 
   if (!isAuthenticated) {
     return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
   }
 
-  return <AppMain onLogout={() => { sessionStorage.removeItem(AUTH_SESSION_KEY); setIsAuthenticated(false); }} />;
+  return <AppMain onLogout={() => { localStorage.removeItem(AUTH_SESSION_KEY); setIsAuthenticated(false); }} />;
 }
 
 function AppMain({ onLogout }) {

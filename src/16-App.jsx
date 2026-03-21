@@ -1,12 +1,12 @@
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(AUTH_SESSION_KEY) === 'true');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem(AUTH_SESSION_KEY) === 'true');
 
   if (!isAuthenticated) {
     return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
   }
 
-  return <AppMain onLogout={() => { sessionStorage.removeItem(AUTH_SESSION_KEY); setIsAuthenticated(false); }} />;
+  return <AppMain onLogout={() => { localStorage.removeItem(AUTH_SESSION_KEY); setIsAuthenticated(false); }} />;
 }
 
 function AppMain({ onLogout }) {

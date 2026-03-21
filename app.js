@@ -709,7 +709,7 @@ function LoginScreen(_ref) {
     }
     const hash = hashPin(pin);
     saveHash(hash);
-    sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+    localStorage.setItem(AUTH_SESSION_KEY, 'true');
     onLogin();
   };
   const handleLogin = () => {
@@ -720,7 +720,7 @@ function LoginScreen(_ref) {
     }
     const hash = hashPin(pin);
     if (hash === existingHash) {
-      sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+      localStorage.setItem(AUTH_SESSION_KEY, 'true');
       onLogin();
     } else {
       setError('Pogrešan PIN!');
@@ -9652,7 +9652,7 @@ function SihtaricaView(_ref31) {
 }
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(AUTH_SESSION_KEY) === 'true');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem(AUTH_SESSION_KEY) === 'true');
   if (!isAuthenticated) {
     return /*#__PURE__*/React.createElement(LoginScreen, {
       onLogin: () => setIsAuthenticated(true)
@@ -9660,7 +9660,7 @@ function App() {
   }
   return /*#__PURE__*/React.createElement(AppMain, {
     onLogout: () => {
-      sessionStorage.removeItem(AUTH_SESSION_KEY);
+      localStorage.removeItem(AUTH_SESSION_KEY);
       setIsAuthenticated(false);
     }
   });
