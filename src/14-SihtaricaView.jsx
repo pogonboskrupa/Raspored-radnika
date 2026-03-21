@@ -226,7 +226,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
 
         {/* View tabs */}
         <div style={{display:'flex',gap:0,borderRadius:6,overflow:'hidden',border:'1px solid var(--border)'}}>
-          {[['mjesecni','Mjesečni'],['radnik','Po radniku'],['godisnji','Godišnji'],['gokvota','GO Kvota'],['praznici','🎉 Praznici']].map(([k,l])=>(
+          {[['mjesecni','Mjesečni'],['radnik','Po radniku'],['godisnji','Godišnji'],['gokvota','GO Kvota'],['praznici','Praznici']].map(([k,l])=>(
             <button key={k} onClick={()=>setSihtView(k)} style={{
               padding:'0.35rem 0.7rem',fontSize:'0.75rem',fontWeight:sihtView===k?700:400,
               border:'none',cursor:'pointer',
@@ -263,7 +263,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           {workers.filter(w=>w.status==='aktivan').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
 
-        <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨️ Štampaj</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>Štampaj</button>
       </div>}
 
       {/* ═══════ PRAZNICI VIEW ═══════ */}
@@ -326,7 +326,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       <tr key={date}>
                         <td style={{padding:'0.5rem 0.75rem',fontFamily:'var(--mono)'}}>{date}</td>
                         <td style={{padding:'0.5rem 0.75rem'}}>{dayNames[d.getDay()]}</td>
-                        <td style={{padding:'0.5rem 0.75rem',fontWeight:600}}>🎉 {name}</td>
+                        <td style={{padding:'0.5rem 0.75rem',fontWeight:600}}>{name}</td>
                         <td style={{padding:'0.5rem 0.75rem',textAlign:'center'}}>
                           <button className="btn btn-sm" onClick={()=>{
                             if(confirm(`Ukloniti praznik "${name}" (${date})?`))
@@ -410,7 +410,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.3rem',
                   }}>
                     <div style={{display:'flex',alignItems:'center',gap:'0.3rem',minWidth:0,flex:1}}>
-                      <span style={{fontSize:'0.8rem',flexShrink:0}}>{cat?.icon||'👤'}</span>
+                      <span style={{fontSize:'0.8rem',flexShrink:0}}>{cat?.short||'R'}</span>
                       <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:catColor}}>{w.name}</span>
                     </div>
                     <button
@@ -428,15 +428,18 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     let cellText = wknd ? <span style={{color:'#ccc8c0',fontSize:'0.55rem'}}>—</span> : null;
                     let title = '';
                     if (entry?.type === 'rad') {
+                      const isPoslovoda = w.category === 'poslovoda_isk' || w.category === 'poslovoda_uzg';
+                      const isTeren = entry.jobType === 'Teren' || entry.jobType === 'Doznaka stabala' || (entry.jobType && entry.jobType !== 'Kancelarija');
+                      const cellLabel = isPoslovoda ? (entry.jobType === 'Kancelarija' ? '8' : 'U') : '8';
                       cellBg = catPale;
                       cellBorderColor = catBorder;
-                      cellText = <span style={{color:catColor,fontWeight:700,fontSize:'0.65rem',fontFamily:'var(--mono)'}}>{cat?.icon||'R'}</span>;
+                      cellText = <span style={{color:catColor,fontWeight:700,fontSize:'0.65rem',fontFamily:'var(--mono)'}}>{cellLabel}</span>;
                       title = (cat?.short||'Rad') + ' · ' + entry.jobType;
                     } else if (entry?.type === 'praznik') {
                       cellBg = '#fff3e0';
                       cellBorderColor = '#ffb74d';
                       cellText = <span style={{color:'#e65100',fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>P</span>;
-                      title = '🎉 Praznik: ' + (entry.holidayName||'');
+                      title = 'Praznik: ' + (entry.holidayName||'');
                     } else if (entry?.type === 'odsutnost') {
                       const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Neplaćeno'];
                       cellBg = oc.bg;
@@ -480,7 +483,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             <div key={w.id} style={{background:'var(--surface)',border:`1px solid ${catBorder}`,borderLeft:`4px solid ${catColor}`,borderRadius:6,marginBottom:'0.4rem',overflow:'hidden'}}>
               {/* Worker name + stats */}
               <div style={{display:'flex',alignItems:'center',gap:'0.3rem',padding:'0.35rem 0.5rem',background:catPale}}>
-                <span style={{fontSize:'0.8rem'}}>{cat?.icon||'👤'}</span>
+                <span style={{fontSize:'0.8rem'}}>{cat?.short||'R'}</span>
                 <span style={{fontWeight:700,fontSize:'0.8rem',color:catColor,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
                 <span style={{fontFamily:'var(--mono)',fontSize:'0.65rem',fontWeight:700,color:'white',background:catColor,borderRadius:3,padding:'0.1rem 0.3rem'}}>{stats.radnih||0}R</span>
                 {(stats.odsutTypes?.['Godišnji odmor']||0)>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.6rem',fontWeight:700,color:'white',background:'#1a3d5c',borderRadius:3,padding:'0.1rem 0.25rem'}}>{stats.odsutTypes['Godišnji odmor']}GO</span>}
@@ -496,6 +499,8 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                   const wknd = isWeekend(d);
                   let bg, color, fontW = 400, label = String(d);
                   if (entry?.type === 'rad') {
+                    const isPoslovoda = w.category === 'poslovoda_isk' || w.category === 'poslovoda_uzg';
+                    label = isPoslovoda ? (entry.jobType === 'Kancelarija' ? '8' : 'U') : '8';
                     bg = catColor; color = 'white'; fontW = 700;
                   } else if (entry?.type === 'praznik') {
                     bg = '#e65100'; color = 'white'; fontW = 700; label = 'P';
@@ -599,7 +604,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
       {sihtView === 'radnik' && (
         !selWorker ? (
           <div className="empty-state">
-            <span className="icon">👷</span>
+            <span className="icon">R</span>
             <p>Odaberi radnika iz padajućeg menija iznad.</p>
           </div>
         ) : !singleWorkerData ? (
@@ -611,7 +616,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             <div>
               {/* Worker header */}
               <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem',padding:'0.75rem 1rem',background:cat?.pale||'#f0f0f0',border:`2px solid ${cat?.border||'#ccc'}`,borderLeft:`5px solid ${cat?.color||'#999'}`,borderRadius:6}}>
-                <span style={{fontSize:'1.4rem'}}>{cat?.icon||'👤'}</span>
+                <span style={{fontSize:'1.4rem'}}>{cat?.short||'R'}</span>
                 <div>
                   <div style={{fontWeight:700,fontSize:'1rem',color:cat?.color||'var(--text)'}}>{w.name}</div>
                   <div style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>{cat?.label} · {selYear}</div>
@@ -658,9 +663,11 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                               let content = wknd ? <span style={{color:'#ccc8c0',fontSize:'0.5rem'}}>—</span> : null;
                               let border = wknd ? '#ddd9d0' : '#ece9e2';
                               if (entry?.type==='rad') {
+                                const isPoslovoda = singleWorkerData.category === 'poslovoda_isk' || singleWorkerData.category === 'poslovoda_uzg';
+                                const cellLabel = isPoslovoda ? (entry.jobType === 'Kancelarija' ? '8' : 'U') : '8';
                                 bg = cat?.pale||'#e8f0e6';
                                 border = cat?.border||'#9bc492';
-                                content = <span style={{color:cat?.color||'#2d5a27',fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>{cat?.icon||'R'}</span>;
+                                content = <span style={{color:cat?.color||'#2d5a27',fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>{cellLabel}</span>;
                               } else if (entry?.type==='praznik') {
                                 bg = '#fff3e0'; border = '#ffb74d';
                                 content = <span style={{color:'#e65100',fontWeight:700,fontSize:'0.58rem',fontFamily:'var(--mono)'}}>P</span>;
@@ -679,7 +686,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     <div className="siht-radnik-mobile" style={{padding:'0.25rem 0.4rem 0.3rem',display:'grid',gridTemplateColumns:`repeat(${mo.days.length}, 1fr)`,gap:'1.5px'}}>
                       {mo.days.map(({d,iso,wknd,entry}) => {
                         let bg, color, label = String(d), fontW = 400;
-                        if (entry?.type==='rad') { bg = cat?.color||'#2d5a27'; color = 'white'; fontW = 700; }
+                        if (entry?.type==='rad') { const isPoslovoda = singleWorkerData.category === 'poslovoda_isk' || singleWorkerData.category === 'poslovoda_uzg'; label = isPoslovoda ? (entry.jobType === 'Kancelarija' ? '8' : 'U') : '8'; bg = cat?.color||'#2d5a27'; color = 'white'; fontW = 700; }
                         else if (entry?.type==='praznik') { bg = '#e65100'; color = 'white'; fontW = 700; label = 'P'; }
                         else if (entry?.type==='odsutnost') { const oc = ODSUTNOST_COLOR[entry.oType]||ODSUTNOST_COLOR['Neplaćeno']; bg = oc.color; color = 'white'; fontW = 700; label = oc.short; }
                         else if (wknd) { bg = '#d5d0c8'; color = '#fff'; }
@@ -746,7 +753,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         fontWeight:600,background:cat?.pale||'#f0f0f0',position:'sticky',left:0,zIndex:1,
                       }}>
                         <div style={{display:'flex',alignItems:'center',gap:'0.3rem'}}>
-                          <span style={{fontSize:'0.8rem'}}>{cat?.icon||'👤'}</span>
+                          <span style={{fontSize:'0.8rem'}}>{cat?.short||'R'}</span>
                           <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:cat?.color||'var(--text)',cursor:'pointer'}}
                             onClick={()=>{setSelWorker(w.id);setSihtView('radnik')}} title="Otvori detalj">
                             {w.name}
@@ -817,7 +824,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
               return (
                 <div key={w.id} style={{background:'var(--surface)',border:`1px solid ${cat?.border||'#ccc'}`,borderLeft:`4px solid ${cat?.color||'#999'}`,borderRadius:6,marginBottom:'0.4rem',overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:'0.3rem',padding:'0.35rem 0.5rem',background:cat?.pale||'#f0f0f0'}}>
-                    <span style={{fontSize:'0.75rem'}}>{cat?.icon||'👤'}</span>
+                    <span style={{fontSize:'0.75rem'}}>{cat?.short||'R'}</span>
                     <span onClick={()=>{setSelWorker(w.id);setSihtView('radnik')}} style={{fontWeight:700,fontSize:'0.78rem',color:cat?.color||'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}>{w.name}</span>
                     <span style={{fontFamily:'var(--mono)',fontSize:'0.62rem',fontWeight:700,color:'white',background:'var(--green)',borderRadius:3,padding:'0.1rem 0.25rem'}}>{w.total.radnih}R</span>
                     {w.total.odsutnih>0 && <span style={{fontFamily:'var(--mono)',fontSize:'0.58rem',fontWeight:700,color:'white',background:'#8b2020',borderRadius:3,padding:'0.1rem 0.2rem'}}>{w.total.odsutnih}O</span>}
@@ -875,7 +882,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                 }}>
                   {/* Ime radnika */}
                   <div style={{minWidth:160,flex:'1 1 160px',display:'flex',alignItems:'center',gap:'0.3rem'}}>
-                    <span style={{fontSize:'0.85rem'}}>{cat?.icon||'👤'}</span>
+                    <span style={{fontSize:'0.85rem'}}>{cat?.short||'R'}</span>
                     <span style={{fontWeight:700,fontSize:'0.82rem',color:cat?.color||'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</span>
                   </div>
 
@@ -924,7 +931,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setGoModal(null)}>
           <div className="modal" style={{maxWidth:400}}>
             <div className="modal-header">
-              <span>📅</span>
+              <span>GO</span>
               <div className="modal-title">
                 Dodaj odsutnost — {workers.find(w=>w.id===goModal.workerId)?.name}
               </div>
@@ -942,7 +949,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     border: `1px solid ${goRemaining < 0 ? '#e0a0a0' : goRemaining < 7 ? '#f0c060' : '#9bbfd9'}`,
                   }}>
                     <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                      <span style={{fontSize:'0.8rem'}}>🏖️</span>
+                      <span style={{fontSize:'0.8rem',fontWeight:700,fontFamily:'var(--mono)',color:'#1a3d5c'}}>GO</span>
                       <span style={{fontFamily:'var(--mono)',fontSize:'0.78rem',fontWeight:700,color: goRemaining < 0 ? '#8b2020' : goRemaining < 7 ? '#e65100' : '#1a3d5c'}}>
                         GO: {goRemaining}/{kv.dana} preostalo
                       </span>
@@ -976,7 +983,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                 const s = new Date(goForm.date), e = new Date(goForm.dateDo);
                 let count = 0;
                 for (let d = new Date(s); d <= e; d.setDate(d.getDate()+1)) { const dw=d.getDay(); if(dw!==0&&dw!==6) count++; }
-                return <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginTop:'-0.3rem',marginBottom:'0.3rem'}}>📅 {count} radni{count===1?'':count<5?'a':'h'} dan{count===1?'':count<5?'a':'a'} u periodu</div>;
+                return <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginTop:'-0.3rem',marginBottom:'0.3rem'}}>{count} radni{count===1?'':count<5?'a':'h'} dan{count===1?'':count<5?'a':'a'} u periodu</div>;
               })()}
               <div className="form-group">
                 <label className="form-label">Vrsta odsutnosti</label>
@@ -1059,7 +1066,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={()=>setGoModal(null)}>Odustani</button>
-              <button className="btn btn-primary" onClick={saveGodisnji}>💾 Sačuvaj</button>
+              <button className="btn btn-primary" onClick={saveGodisnji}>Sačuvaj</button>
             </div>
           </div>
         </div>

@@ -7332,7 +7332,7 @@ function SihtaricaView(_ref31) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['gokvota', 'GO Kvota'], ['praznici', '🎉 Praznici']].map(_ref34 => {
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['gokvota', 'GO Kvota'], ['praznici', 'Praznici']].map(_ref34 => {
     let [k, l] = _ref34;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
@@ -7420,7 +7420,7 @@ function SihtaricaView(_ref31) {
   }, w.name))), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm",
     onClick: () => window.print()
-  }, "\uD83D\uDDA8\uFE0F \u0160tampaj")), sihtView === 'praznici' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, "\u0160tampaj")), sihtView === 'praznici' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -7548,7 +7548,7 @@ function SihtaricaView(_ref31) {
         padding: '0.5rem 0.75rem',
         fontWeight: 600
       }
-    }, "\uD83C\uDF89 ", name), /*#__PURE__*/React.createElement("td", {
+    }, name), /*#__PURE__*/React.createElement("td", {
       style: {
         padding: '0.5rem 0.75rem',
         textAlign: 'center'
@@ -7779,7 +7779,7 @@ function SihtaricaView(_ref31) {
         fontSize: '0.8rem',
         flexShrink: 0
       }
-    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       style: {
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -7824,6 +7824,9 @@ function SihtaricaView(_ref31) {
       }, "\u2014") : null;
       let title = '';
       if (entry?.type === 'rad') {
+        const isPoslovoda = w.category === 'poslovoda_isk' || w.category === 'poslovoda_uzg';
+        const isTeren = entry.jobType === 'Teren' || entry.jobType === 'Doznaka stabala' || entry.jobType && entry.jobType !== 'Kancelarija';
+        const cellLabel = isPoslovoda ? entry.jobType === 'Kancelarija' ? '8' : 'U' : '8';
         cellBg = catPale;
         cellBorderColor = catBorder;
         cellText = /*#__PURE__*/React.createElement("span", {
@@ -7833,7 +7836,7 @@ function SihtaricaView(_ref31) {
             fontSize: '0.65rem',
             fontFamily: 'var(--mono)'
           }
-        }, cat?.icon || 'R');
+        }, cellLabel);
         title = (cat?.short || 'Rad') + ' · ' + entry.jobType;
       } else if (entry?.type === 'praznik') {
         cellBg = '#fff3e0';
@@ -7846,7 +7849,7 @@ function SihtaricaView(_ref31) {
             fontFamily: 'var(--mono)'
           }
         }, "P");
-        title = '🎉 Praznik: ' + (entry.holidayName || '');
+        title = 'Praznik: ' + (entry.holidayName || '');
       } else if (entry?.type === 'odsutnost') {
         const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Neplaćeno'];
         cellBg = oc.bg;
@@ -7939,7 +7942,7 @@ function SihtaricaView(_ref31) {
       style: {
         fontSize: '0.8rem'
       }
-    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       style: {
         fontWeight: 700,
         fontSize: '0.8rem',
@@ -8017,6 +8020,8 @@ function SihtaricaView(_ref31) {
         fontW = 400,
         label = String(d);
       if (entry?.type === 'rad') {
+        const isPoslovoda = w.category === 'poslovoda_isk' || w.category === 'poslovoda_uzg';
+        label = isPoslovoda ? entry.jobType === 'Kancelarija' ? '8' : 'U' : '8';
         bg = catColor;
         color = 'white';
         fontW = 700;
@@ -8279,7 +8284,7 @@ function SihtaricaView(_ref31) {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
-  }, "\uD83D\uDC77"), /*#__PURE__*/React.createElement("p", null, "Odaberi radnika iz padaju\u0107eg menija iznad.")) : !singleWorkerData ? /*#__PURE__*/React.createElement("div", {
+  }, "R"), /*#__PURE__*/React.createElement("p", null, "Odaberi radnika iz padaju\u0107eg menija iznad.")) : !singleWorkerData ? /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("p", null, "Radnik nije prona\u0111en.")) : (() => {
     const {
@@ -8304,7 +8309,7 @@ function SihtaricaView(_ref31) {
       style: {
         fontSize: '1.4rem'
       }
-    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 700,
         fontSize: '1rem',
@@ -8448,6 +8453,8 @@ function SihtaricaView(_ref31) {
         }, "\u2014") : null;
         let border = wknd ? '#ddd9d0' : '#ece9e2';
         if (entry?.type === 'rad') {
+          const isPoslovoda = singleWorkerData.category === 'poslovoda_isk' || singleWorkerData.category === 'poslovoda_uzg';
+          const cellLabel = isPoslovoda ? entry.jobType === 'Kancelarija' ? '8' : 'U' : '8';
           bg = cat?.pale || '#e8f0e6';
           border = cat?.border || '#9bc492';
           content = /*#__PURE__*/React.createElement("span", {
@@ -8457,7 +8464,7 @@ function SihtaricaView(_ref31) {
               fontSize: '0.6rem',
               fontFamily: 'var(--mono)'
             }
-          }, cat?.icon || 'R');
+          }, cellLabel);
         } else if (entry?.type === 'praznik') {
           bg = '#fff3e0';
           border = '#ffb74d';
@@ -8512,6 +8519,8 @@ function SihtaricaView(_ref31) {
           label = String(d),
           fontW = 400;
         if (entry?.type === 'rad') {
+          const isPoslovoda = singleWorkerData.category === 'poslovoda_isk' || singleWorkerData.category === 'poslovoda_uzg';
+          label = isPoslovoda ? entry.jobType === 'Kancelarija' ? '8' : 'U' : '8';
           bg = cat?.color || '#2d5a27';
           color = 'white';
           fontW = 700;
@@ -8757,7 +8766,7 @@ function SihtaricaView(_ref31) {
       style: {
         fontSize: '0.8rem'
       }
-    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       style: {
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -8943,7 +8952,7 @@ function SihtaricaView(_ref31) {
       style: {
         fontSize: '0.75rem'
       }
-    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       onClick: () => {
         setSelWorker(w.id);
         setSihtView('radnik');
@@ -9086,7 +9095,7 @@ function SihtaricaView(_ref31) {
       style: {
         fontSize: '0.85rem'
       }
-    }, cat?.icon || '👤'), /*#__PURE__*/React.createElement("span", {
+    }, cat?.short || 'R'), /*#__PURE__*/React.createElement("span", {
       style: {
         fontWeight: 700,
         fontSize: '0.82rem',
@@ -9205,7 +9214,7 @@ function SihtaricaView(_ref31) {
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCC5"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "GO"), /*#__PURE__*/React.createElement("div", {
     className: "modal-title"
   }, "Dodaj odsutnost \u2014 ", workers.find(w => w.id === goModal.workerId)?.name), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-ghost btn-icon",
@@ -9233,9 +9242,12 @@ function SihtaricaView(_ref31) {
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: '0.8rem'
+        fontSize: '0.8rem',
+        fontWeight: 700,
+        fontFamily: 'var(--mono)',
+        color: '#1a3d5c'
       }
-    }, "\uD83C\uDFD6\uFE0F"), /*#__PURE__*/React.createElement("span", {
+    }, "GO"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontFamily: 'var(--mono)',
         fontSize: '0.78rem',
@@ -9355,7 +9367,7 @@ function SihtaricaView(_ref31) {
         marginTop: '-0.3rem',
         marginBottom: '0.3rem'
       }
-    }, "\uD83D\uDCC5 ", count, " radni", count === 1 ? '' : count < 5 ? 'a' : 'h', " dan", count === 1 ? '' : count < 5 ? 'a' : 'a', " u periodu");
+    }, count, " radni", count === 1 ? '' : count < 5 ? 'a' : 'h', " dan", count === 1 ? '' : count < 5 ? 'a' : 'a', " u periodu");
   })(), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
@@ -9638,7 +9650,7 @@ function SihtaricaView(_ref31) {
   }, "Odustani"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary",
     onClick: saveGodisnji
-  }, "\uD83D\uDCBE Sa\u010Duvaj")))));
+  }, "Sa\u010Duvaj")))));
 }
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
