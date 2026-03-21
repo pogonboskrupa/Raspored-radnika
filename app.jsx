@@ -1839,6 +1839,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
+  const isOtprema = form.jobType === 'Otprema';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
 
   const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -2029,7 +2030,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             <div className="form-group">
               <label className="form-label">Radnici</label>
               <div className="worker-selector">
-                {availableWorkers.filter(w => !form.allWorkers.includes(w.id)).map(w => {
+                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).map(w => {
                   const cat = getCatById(w.category);
                   return (
                     <div key={w.id} className="worker-option"
@@ -2040,7 +2041,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                     </div>
                   );
                 })}
-                {availableWorkers.filter(w => !form.allWorkers.includes(w.id)).length === 0 && (
+                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).length === 0 && (
                   <div style={{padding:'0.6rem 0.75rem',fontSize:'0.78rem',color:'var(--text-muted)',fontStyle:'italic'}}>Svi raspoloživi radnici su odabrani.</div>
                 )}
               </div>

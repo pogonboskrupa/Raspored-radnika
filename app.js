@@ -3654,6 +3654,7 @@ function EntryModal(_ref15) {
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
+  const isOtprema = form.jobType === 'Otprema';
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
   const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   // Auto-detect default vehicle from driver in selected workers
@@ -3984,7 +3985,7 @@ function EntryModal(_ref15) {
     className: "form-label"
   }, "Radnici"), /*#__PURE__*/React.createElement("div", {
     className: "worker-selector"
-  }, availableWorkers.filter(w => !form.allWorkers.includes(w.id)).map(w => {
+  }, availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).map(w => {
     const cat = getCatById(w.category);
     return /*#__PURE__*/React.createElement("div", {
       key: w.id,
@@ -4006,7 +4007,7 @@ function EntryModal(_ref15) {
         fontFamily: 'var(--mono)'
       }
     }, cat?.short));
-  }), availableWorkers.filter(w => !form.allWorkers.includes(w.id)).length === 0 && /*#__PURE__*/React.createElement("div", {
+  }), availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '0.6rem 0.75rem',
       fontSize: '0.78rem',
