@@ -189,26 +189,32 @@ function AppMain({ onLogout }) {
         {activeTab === 'raspored' && (
           <aside className="sidebar">
             <div className="sidebar-section">
-              <div className="sidebar-label">Odjeli</div>
+              <div className="sidebar-label">Raspored za dan</div>
               <button className={`sidebar-item ${!sidebarFilter?'active':''}`} onClick={() => setSidebarFilter(null)}>
-                <span>Svi odjeli</span>
-                <span className="count">{Object.values(statsByDept).reduce((a,s)=>a+s.size,0)}</span>
+                <span>Sve stavke</span>
+                <span className="count">{new Set(schedules.filter(s => s.date === selectedDate).flatMap(s => s.allWorkers)).size}</span>
               </button>
-              {departments.map(d => (
-                <button key={d.id} className={`sidebar-item ${sidebarFilter===d.id?'active':''}`} onClick={() => setSidebarFilter(d.id)}>
-                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dName(d.id)}</span>
-                  <span className="count">{statsByDept[d.id]?.size || 0}</span>
-                </button>
-              ))}
-            </div>
-            <div className="sidebar-section">
-              <div className="sidebar-label">Vrste posla <span style={{opacity:0.5,fontSize:'0.5rem',fontWeight:400}}>klikni za brzi unos</span></div>
-              {allJobTypes.map(jt => (
-                <button key={jt} className="sidebar-item" onClick={() => setModal({type:'entry', data:{date:selectedDate, jobType:jt}})}>
-                  <span className={jobBadgeClass(jt)} style={{fontSize:'0.65rem'}}>{jt}</span>
-                  <span className="count">{statsByJob[jt]?.size || 0}</span>
-                </button>
-              ))}
+              {(() => {
+                const todayEntries = schedules.filter(s => s.date === selectedDate);
+                const grouped = {};
+                todayEntries.forEach(s => {
+                  const key = `${s.deptId}__${s.jobType}`;
+                  if (!grouped[key]) grouped[key] = { deptId: s.deptId, jobType: s.jobType, workers: new Set() };
+                  s.allWorkers.forEach(w => grouped[key].workers.add(w));
+                });
+                return Object.values(grouped).map(g => (
+                  <button key={`${g.deptId}__${g.jobType}`} className={`sidebar-item ${sidebarFilter===g.deptId?'active':''}`} onClick={() => setSidebarFilter(g.deptId)} style={{flexDirection:'column',alignItems:'flex-start',gap:'0.15rem'}}>
+                    <div style={{display:'flex',width:'100%',alignItems:'center',gap:'0.4rem'}}>
+                      <span className={jobBadgeClass(g.jobType)} style={{fontSize:'0.6rem'}}>{g.jobType}</span>
+                      <span className="count" style={{marginLeft:'auto'}}>{g.workers.size}</span>
+                    </div>
+                    <span style={{fontSize:'0.7rem',color:'var(--text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',width:'100%'}}>{dName(g.deptId)}</span>
+                  </button>
+                ));
+              })()}
+              {schedules.filter(s => s.date === selectedDate).length === 0 && (
+                <div style={{padding:'0.5rem 1rem',fontSize:'0.78rem',color:'var(--text-muted)',fontStyle:'italic'}}>Nema unosa za ovaj dan.</div>
+              )}
             </div>
           </aside>
         )}

@@ -9883,51 +9883,67 @@ function AppMain(_ref44) {
     className: "sidebar-section"
   }, /*#__PURE__*/React.createElement("div", {
     className: "sidebar-label"
-  }, "Odjeli"), /*#__PURE__*/React.createElement("button", {
+  }, "Raspored za dan"), /*#__PURE__*/React.createElement("button", {
     className: `sidebar-item ${!sidebarFilter ? 'active' : ''}`,
     onClick: () => setSidebarFilter(null)
-  }, /*#__PURE__*/React.createElement("span", null, "Svi odjeli"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", null, "Sve stavke"), /*#__PURE__*/React.createElement("span", {
     className: "count"
-  }, Object.values(statsByDept).reduce((a, s) => a + s.size, 0))), departments.map(d => /*#__PURE__*/React.createElement("button", {
-    key: d.id,
-    className: `sidebar-item ${sidebarFilter === d.id ? 'active' : ''}`,
-    onClick: () => setSidebarFilter(d.id)
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap'
-    }
-  }, dName(d.id)), /*#__PURE__*/React.createElement("span", {
-    className: "count"
-  }, statsByDept[d.id]?.size || 0)))), /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-label"
-  }, "Vrste posla ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      opacity: 0.5,
-      fontSize: '0.5rem',
-      fontWeight: 400
-    }
-  }, "klikni za brzi unos")), allJobTypes.map(jt => /*#__PURE__*/React.createElement("button", {
-    key: jt,
-    className: "sidebar-item",
-    onClick: () => setModal({
-      type: 'entry',
-      data: {
-        date: selectedDate,
-        jobType: jt
+  }, new Set(schedules.filter(s => s.date === selectedDate).flatMap(s => s.allWorkers)).size)), (() => {
+    const todayEntries = schedules.filter(s => s.date === selectedDate);
+    const grouped = {};
+    todayEntries.forEach(s => {
+      const key = `${s.deptId}__${s.jobType}`;
+      if (!grouped[key]) grouped[key] = {
+        deptId: s.deptId,
+        jobType: s.jobType,
+        workers: new Set()
+      };
+      s.allWorkers.forEach(w => grouped[key].workers.add(w));
+    });
+    return Object.values(grouped).map(g => /*#__PURE__*/React.createElement("button", {
+      key: `${g.deptId}__${g.jobType}`,
+      className: `sidebar-item ${sidebarFilter === g.deptId ? 'active' : ''}`,
+      onClick: () => setSidebarFilter(g.deptId),
+      style: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: '0.15rem'
       }
-    })
-  }, /*#__PURE__*/React.createElement("span", {
-    className: jobBadgeClass(jt),
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        width: '100%',
+        alignItems: 'center',
+        gap: '0.4rem'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: jobBadgeClass(g.jobType),
+      style: {
+        fontSize: '0.6rem'
+      }
+    }, g.jobType), /*#__PURE__*/React.createElement("span", {
+      className: "count",
+      style: {
+        marginLeft: 'auto'
+      }
+    }, g.workers.size)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.7rem',
+        color: 'var(--text-muted)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        width: '100%'
+      }
+    }, dName(g.deptId))));
+  })(), schedules.filter(s => s.date === selectedDate).length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: '0.65rem'
+      padding: '0.5rem 1rem',
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)',
+      fontStyle: 'italic'
     }
-  }, jt), /*#__PURE__*/React.createElement("span", {
-    className: "count"
-  }, statsByJob[jt]?.size || 0))))), /*#__PURE__*/React.createElement("main", {
+  }, "Nema unosa za ovaj dan."))), /*#__PURE__*/React.createElement("main", {
     className: "main-content"
   }, activeTab === 'raspored' && /*#__PURE__*/React.createElement(ScheduleView, {
     selectedDate: selectedDate,
