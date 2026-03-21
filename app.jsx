@@ -4851,7 +4851,7 @@ function AppMain({ onLogout }) {
           }
         </div>
         <nav className="nav-tabs">
-          {[['raspored','📋 Raspored'],['radnici','👷 Radnici'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['sihtarica','📄 Šihtarica'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
+          {[['raspored','📋 Raspored'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
             <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
           )}
           <button className="nav-tab no-print" onClick={onLogout} title="Odjavi se"
