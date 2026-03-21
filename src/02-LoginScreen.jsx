@@ -102,7 +102,7 @@ function LoginScreen({ onLogin }) {
       <div style={{background:'white',borderRadius:16,boxShadow:'0 8px 32px rgba(0,0,0,0.12)',padding:'2rem',width:'100%',maxWidth:380,margin:'1rem'}}>
         {/* Logo/Header */}
         <div style={{textAlign:'center',marginBottom:'1.5rem'}}>
-          <div style={{fontSize:'2.5rem',marginBottom:'0.3rem'}}>🌲</div>
+          <img src="1774102184971~2.png" alt="Raspored Radnika" style={{width:100,height:100,borderRadius:18,marginBottom:'0.5rem',boxShadow:'0 4px 16px rgba(0,0,0,0.15)'}} />
           <div style={{fontFamily:'var(--mono)',fontWeight:800,fontSize:'1.1rem',color:'var(--green)',letterSpacing:'-0.03em'}}>
             Šumarija Bos.Krupa
           </div>

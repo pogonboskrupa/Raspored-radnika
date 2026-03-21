@@ -771,12 +771,17 @@ function LoginScreen(_ref) {
       textAlign: 'center',
       marginBottom: '1.5rem'
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "1774102184971~2.png",
+    alt: "Raspored Radnika",
     style: {
-      fontSize: '2.5rem',
-      marginBottom: '0.3rem'
+      width: 100,
+      height: 100,
+      borderRadius: 18,
+      marginBottom: '0.5rem',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.15)'
     }
-  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: 'var(--mono)',
       fontWeight: 800,
