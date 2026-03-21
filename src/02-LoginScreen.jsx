@@ -104,10 +104,10 @@ function LoginScreen({ onLogin }) {
         <div style={{textAlign:'center',marginBottom:'1.5rem'}}>
           <div style={{fontSize:'2.5rem',marginBottom:'0.3rem'}}>🌲</div>
           <div style={{fontFamily:'var(--mono)',fontWeight:800,fontSize:'1.1rem',color:'var(--green)',letterSpacing:'-0.03em'}}>
-            Raspored Radnika
+            Šumarija Bos.Krupa
           </div>
           <div style={{fontFamily:'var(--mono)',fontSize:'0.7rem',color:'var(--text-muted)',marginTop:'0.25rem'}}>
-            Šumarija Bos.Krupa
+            raspored radnika
           </div>
         </div>
 

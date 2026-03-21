@@ -784,14 +784,14 @@ function LoginScreen(_ref) {
       color: 'var(--green)',
       letterSpacing: '-0.03em'
     }
-  }, "Raspored Radnika"), /*#__PURE__*/React.createElement("div", {
+  }, "\u0160umarija Bos.Krupa"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: 'var(--mono)',
       fontSize: '0.7rem',
       color: 'var(--text-muted)',
       marginTop: '0.25rem'
     }
-  }, "\u0160umarija Bos.Krupa")), mode === 'setup' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "raspored radnika")), mode === 'setup' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
       marginBottom: '1rem'
@@ -9829,7 +9829,7 @@ function AppMain(_ref44) {
     className: "app-title"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
-  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Raspored"), FIREBASE_ENABLED ? /*#__PURE__*/React.createElement("span", {
+  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Bos.Krupa"), FIREBASE_ENABLED ? /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: '0.65rem',
       background: 'rgba(255,255,255,0.15)',

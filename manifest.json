@@ -1,7 +1,7 @@
 {
-  "name": "Šumarija Raspored Radnika",
-  "short_name": "Raspored",
-  "description": "Raspored radnika — Šumarija Bosanska Krupa",
+  "name": "Šumarija Bos.Krupa - raspored radnika",
+  "short_name": "Šumarija Bos.Krupa",
+  "description": "Šumarija Bos.Krupa - raspored radnika",
   "start_url": "/Raspored-radnika/",
   "scope": "/Raspored-radnika/",
   "display": "standalone",

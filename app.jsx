@@ -398,10 +398,10 @@ function LoginScreen({ onLogin }) {
         <div style={{textAlign:'center',marginBottom:'1.5rem'}}>
           <div style={{fontSize:'2.5rem',marginBottom:'0.3rem'}}>🌲</div>
           <div style={{fontFamily:'var(--mono)',fontWeight:800,fontSize:'1.1rem',color:'var(--green)',letterSpacing:'-0.03em'}}>
-            Raspored Radnika
+            Šumarija Bos.Krupa
           </div>
           <div style={{fontFamily:'var(--mono)',fontSize:'0.7rem',color:'var(--text-muted)',marginTop:'0.25rem'}}>
-            Šumarija Bos.Krupa
+            raspored radnika
           </div>
         </div>
 
@@ -4835,7 +4835,7 @@ function AppMain({ onLogout }) {
       <header className="app-header">
         <div className="app-title">
           <span className="icon">🌲</span>
-          <span>Šumarija Raspored</span>
+          <span>Šumarija Bos.Krupa</span>
           {FIREBASE_ENABLED
             ? <span style={{fontSize:'0.65rem',background:'rgba(255,255,255,0.15)',padding:'0.15rem 0.5rem',borderRadius:10,marginLeft:'0.25rem',fontFamily:'var(--mono)'}}>🔴 live sync</span>
             : <span style={{fontSize:'0.65rem',background:'rgba(255,255,255,0.1)',padding:'0.15rem 0.5rem',borderRadius:10,marginLeft:'0.25rem',fontFamily:'var(--mono)',opacity:0.6}}>💾 lokalno</span>
