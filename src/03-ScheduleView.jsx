@@ -97,6 +97,9 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
             <input type="date" className="date-input" value={selectedDate}
               onChange={e => setSelectedDate(e.target.value)} />
             <button className="date-nav-btn" onClick={nextDay}>›</button>
+            <span style={{fontWeight:800,fontSize:'0.85rem',color:'var(--green)',letterSpacing:'0.03em'}}>
+              {['NEDJELJA','PONEDJELJAK','UTORAK','SRIJEDA','ČETVRTAK','PETAK','SUBOTA'][new Date(selectedDate+'T00:00:00').getDay()]}
+            </span>
             {isToday && <span className="today-chip">DANAS</span>}
           </div>
         </div>

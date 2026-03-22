@@ -1146,7 +1146,14 @@ function ScheduleView(_ref2) {
   }), /*#__PURE__*/React.createElement("button", {
     className: "date-nav-btn",
     onClick: nextDay
-  }, "\u203A"), isToday && /*#__PURE__*/React.createElement("span", {
+  }, "\u203A"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 800,
+      fontSize: '0.85rem',
+      color: 'var(--green)',
+      letterSpacing: '0.03em'
+    }
+  }, ['NEDJELJA', 'PONEDJELJAK', 'UTORAK', 'SRIJEDA', 'ČETVRTAK', 'PETAK', 'SUBOTA'][new Date(selectedDate + 'T00:00:00').getDay()]), isToday && /*#__PURE__*/React.createElement("span", {
     className: "today-chip"
   }, "DANAS"))), /*#__PURE__*/React.createElement("div", {
     style: {
