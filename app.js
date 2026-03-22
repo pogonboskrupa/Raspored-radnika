@@ -9838,7 +9838,108 @@ function AppMain(_ref44) {
   };
 
   // Print
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    const DANI = ['NEDJELJA', 'PONEDJELJAK', 'UTORAK', 'SRIJEDA', 'ČETVRTAK', 'PETAK', 'SUBOTA'];
+    const danNaziv = DANI[new Date(selectedDate + 'T00:00:00').getDay()];
+    const datumFmt = fmtDate(selectedDate);
+    const allToday = schedules.filter(s => s.date === selectedDate);
+
+    // Group by dept, then by jobType
+    const byDept = {};
+    allToday.forEach(s => {
+      if (!byDept[s.deptId]) byDept[s.deptId] = {};
+      if (!byDept[s.deptId][s.jobType]) byDept[s.deptId][s.jobType] = [];
+      byDept[s.deptId][s.jobType].push(s);
+    });
+
+    // Absent workers
+    const assignedIds = new Set(allToday.flatMap(s => s.allWorkers || []));
+    const ODSUTNOST_STYLE = {
+      'Godišnji odmor': '🏖️ GO',
+      'Bolovanje': '🏥 B',
+      'Slobodan dan': '☀️ SD',
+      'Neplaćeno': '📋 N'
+    };
+    const absentList = [];
+    Object.entries(godisnji || {}).forEach(_ref45 => {
+      let [wId, entries] = _ref45;
+      const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
+      if (!entry) return;
+      const w = workers.find(x => x.id === wId);
+      if (!w || assignedIds.has(w.id)) return;
+      absentList.push({
+        name: w.name,
+        type: entry.type
+      });
+    });
+    let html = `<html><head><meta charset="UTF-8"/><title>Raspored ${datumFmt}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:Arial,sans-serif;font-size:11pt;padding:12mm;color:#222}
+      h1{font-size:16pt;margin-bottom:2mm;text-align:center}
+      .subtitle{font-size:11pt;text-align:center;color:#555;margin-bottom:6mm}
+      .dept{margin-bottom:5mm;page-break-inside:avoid}
+      .dept-name{background:#2d5a27;color:white;padding:2mm 4mm;font-weight:700;font-size:11pt;margin-bottom:0}
+      table{border-collapse:collapse;width:100%;margin-bottom:1mm}
+      th{background:#e8f0e6;border:1px solid #999;padding:1.5mm 3mm;text-align:left;font-size:9pt;font-weight:700}
+      td{border:1px solid #bbb;padding:1.5mm 3mm;font-size:9.5pt;vertical-align:top}
+      .workers{line-height:1.6}
+      .worker{display:inline-block;background:#f0f0f0;border:1px solid #ccc;border-radius:3px;padding:0.5mm 2mm;margin:0.5mm;font-size:9pt}
+      .absent-section{margin-top:6mm;page-break-inside:avoid}
+      .absent-title{font-weight:700;font-size:11pt;border-bottom:1.5px solid #333;padding-bottom:1mm;margin-bottom:2mm}
+      .absent-item{display:inline-block;background:#fde8e8;border:1px solid #daa;border-radius:3px;padding:0.5mm 2mm;margin:0.5mm;font-size:9pt}
+      .vehicle-info{font-size:8.5pt;color:#555;margin-top:0.5mm}
+      .summary{text-align:center;font-size:10pt;color:#444;margin-bottom:4mm}
+    </style></head><body>`;
+    html += `<h1>RASPORED RADNIKA — ${danNaziv}, ${datumFmt}</h1>`;
+    html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
+    const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
+    html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
+    Object.entries(byDept).forEach(_ref46 => {
+      let [deptId, jobs] = _ref46;
+      const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
+      html += `<div class="dept">`;
+      html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
+      html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
+      Object.entries(jobs).forEach(_ref47 => {
+        let [jobType, rows] = _ref47;
+        rows.forEach(row => {
+          const workerNames = (row.allWorkers || []).map(wId => wName(wId));
+          const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
+          const vehicleInfo = vIds.map(vid => {
+            const v = (vehicles || []).find(x => x.id === vid);
+            if (!v) return '';
+            const driver = workers.find(w => w.id === (row.otherDriverId || v.driverId));
+            return `🚗 ${v.registracija} (${v.tipVozila}, ${v.brojMjesta} mj.)${driver ? ' — ' + driver.name : ''}`;
+          }).filter(Boolean).join('<br>');
+          html += `<tr>`;
+          html += `<td><strong>${jobType}</strong></td>`;
+          html += `<td class="workers">${workerNames.map(n => `<span class="worker">${n}</span>`).join(' ')}<div style="font-size:8pt;color:#666;margin-top:1mm">${workerNames.length} radnika</div></td>`;
+          html += `<td class="vehicle-info">${vehicleInfo || '—'}</td>`;
+          html += `<td>${row.note || '—'}</td>`;
+          html += `</tr>`;
+        });
+      });
+      html += `</tbody></table></div>`;
+    });
+    if (absentList.length > 0) {
+      html += `<div class="absent-section">`;
+      html += `<div class="absent-title">Odsutni radnici (${absentList.length})</div>`;
+      html += `<div>`;
+      absentList.forEach(a => {
+        const label = ODSUTNOST_STYLE[a.type] || a.type;
+        html += `<span class="absent-item">${a.name} — ${label}</span> `;
+      });
+      html += `</div></div>`;
+    }
+    html += `</body></html>`;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => {
+      win.print();
+    };
+  };
 
   // Quick assign from panel click
   const onWorkerClick = worker => setQuickModal({
@@ -9877,8 +9978,8 @@ function AppMain(_ref44) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref45 => {
-    let [k, l] = _ref45;
+  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref48 => {
+    let [k, l] = _ref48;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,
