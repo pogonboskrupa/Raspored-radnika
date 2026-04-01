@@ -4883,10 +4883,32 @@ function AppMain({ onLogout }) {
       setSchedules(prev => prev.map(s => s.id === data.id ? data : s));
       addHistory('edit', data.id, old, data);
     } else {
-      const newId = uid();
-      const nd = { ...data, id: newId };
-      setSchedules(prev => [...prev, nd]);
-      addHistory('create', newId, null, nd);
+      // Provjeri da li postoji isti posao + odjel za isti datum — spoji radnike
+      const existing = schedules.find(s =>
+        s.date === data.date &&
+        s.jobType === data.jobType &&
+        s.deptId === data.deptId &&
+        s.deptId // ne spajaj ako nema odjela
+      );
+      if (existing) {
+        const old = { ...existing };
+        const mergedWorkers = [...new Set([...(existing.allWorkers || []), ...(data.allWorkers || [])])];
+        const mergedExtra = [...new Set([...(existing.extraWorkers || []), ...(data.extraWorkers || [])])];
+        const updated = {
+          ...existing,
+          allWorkers: mergedWorkers,
+          extraWorkers: mergedExtra,
+          note: [existing.note, data.note].filter(Boolean).join('; ') || '',
+          kisaMode: data.kisaMode || existing.kisaMode,
+        };
+        setSchedules(prev => prev.map(s => s.id === existing.id ? updated : s));
+        addHistory('edit', existing.id, old, updated);
+      } else {
+        const newId = uid();
+        const nd = { ...data, id: newId };
+        setSchedules(prev => [...prev, nd]);
+        addHistory('create', newId, null, nd);
+      }
     }
   };
 
