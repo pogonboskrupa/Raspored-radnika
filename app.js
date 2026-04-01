@@ -3649,11 +3649,13 @@ function EntryModal(_ref15) {
     godisnji,
     selectedDate
   } = _ref15;
+  const initJobType = data.jobType || (allJobTypes || JOB_TYPES)[0];
+  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
-    deptId: data.deptId || departments[0]?.id || '',
-    jobType: data.jobType || (allJobTypes || JOB_TYPES)[0],
+    deptId: data.deptId || (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : departments[0]?.id || ''),
+    jobType: initJobType,
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
     helper2Worker: data.helper2Worker || '',
@@ -3674,6 +3676,8 @@ function EntryModal(_ref15) {
   const isPrimka = form.jobType === 'Primka';
   const isOtprema = form.jobType === 'Otprema';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
   const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   // Auto-detect default vehicle from driver in selected workers
@@ -3799,8 +3803,17 @@ function EntryModal(_ref15) {
   })), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "form-label"
-  }, "Odjel / Radili\u0161te"), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
+    className: "form-label",
+    style: isDeptRequired ? {
+      color: '#b5620a',
+      fontWeight: 700
+    } : {}
+  }, "Odjel / Radili\u0161te ", isDeptRequired && !form.deptId && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#c53030',
+      fontSize: '0.75rem'
+    }
+  }, " \u26A0\uFE0F obavezno za ", form.jobType)), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: form.deptId,
     onChange: e => setForm(f => ({
@@ -3808,7 +3821,11 @@ function EntryModal(_ref15) {
       deptId: e.target.value
     })),
     style: {
-      marginBottom: '0.4rem'
+      marginBottom: '0.4rem',
+      ...(isDeptRequired && !form.deptId ? {
+        border: '2px solid #c53030',
+        background: '#fff5f5'
+      } : {})
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
@@ -3906,15 +3923,20 @@ function EntryModal(_ref15) {
   }, "Vrsta posla"), /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: form.jobType,
-    onChange: e => setForm(f => ({
-      ...f,
-      jobType: e.target.value,
-      allWorkers: [],
-      primatWorker: '',
-      helper1Worker: '',
-      helper2Worker: '',
-      extraWorkers: []
-    }))
+    onChange: e => {
+      const newJob = e.target.value;
+      const needsDept = DEPT_REQUIRED_JOBS.includes(newJob);
+      setForm(f => ({
+        ...f,
+        jobType: newJob,
+        allWorkers: [],
+        primatWorker: '',
+        helper1Worker: '',
+        helper2Worker: '',
+        extraWorkers: [],
+        deptId: needsDept && !isEdit ? '' : f.deptId
+      }));
+    }
   }, (allJobTypes || JOB_TYPES).map(jt => /*#__PURE__*/React.createElement("option", {
     key: jt
   }, jt)))), isPrimka ? /*#__PURE__*/React.createElement("div", {
