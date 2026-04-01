@@ -119,7 +119,7 @@ const GOSPODARSKE_JEDINICE = [
 
 const INITIAL_DEPARTMENTS = [];
 
-const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Ostalo'];
+const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Kiša', 'Farbanje sjekačkih linija', 'Ostalo'];
 
 const today = () => new Date().toISOString().split('T')[0];
 const yesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; };
@@ -223,6 +223,8 @@ const jobBadgeClass = t => {
   if (t === 'Sektor ekologije') return 'badge badge-ekologija';
   if (t === 'Kancelarija') return 'badge badge-kancelarija';
   if (t === 'Teren') return 'badge badge-teren';
+  if (t === 'Kiša') return 'badge badge-kisa';
+  if (t === 'Farbanje sjekačkih linija') return 'badge badge-farbanje';
   return 'badge badge-ostalo';
 };
 

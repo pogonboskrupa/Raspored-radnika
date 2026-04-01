@@ -54,7 +54,19 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     // Radni dani iz rasporeda
     schedules.forEach(s => {
       s.allWorkers.forEach(wId => {
-        if (m[wId]) m[wId][s.date] = { type: 'rad', jobType: s.jobType };
+        if (!m[wId]) return;
+        // Kiša — mapira se prema kisaMode
+        if (s.jobType === 'Kiša') {
+          const mode = s.kisaMode || 'go';
+          if (mode === 'rad') {
+            m[wId][s.date] = { type: 'rad', jobType: 'Kiša' };
+          } else {
+            const KISA_MAP = { go: 'Godišnji odmor', bolovanje: 'Bolovanje', neplaceno: 'Neplaćeno' };
+            m[wId][s.date] = { type: 'odsutnost', oType: KISA_MAP[mode] || 'Godišnji odmor', note: 'Kiša', kisa: true };
+          }
+        } else {
+          m[wId][s.date] = { type: 'rad', jobType: s.jobType };
+        }
       });
     });
     // Odsutnost

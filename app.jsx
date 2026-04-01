@@ -119,7 +119,7 @@ const GOSPODARSKE_JEDINICE = [
 
 const INITIAL_DEPARTMENTS = [];
 
-const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Ostalo'];
+const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Kiša', 'Farbanje sjekačkih linija', 'Ostalo'];
 
 const today = () => new Date().toISOString().split('T')[0];
 const yesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; };
@@ -223,6 +223,8 @@ const jobBadgeClass = t => {
   if (t === 'Sektor ekologije') return 'badge badge-ekologija';
   if (t === 'Kancelarija') return 'badge badge-kancelarija';
   if (t === 'Teren') return 'badge badge-teren';
+  if (t === 'Kiša') return 'badge badge-kisa';
+  if (t === 'Farbanje sjekačkih linija') return 'badge badge-farbanje';
   return 'badge badge-ostalo';
 };
 
@@ -1845,6 +1847,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
     vehicleId: data.vehicleId || '',
     vehicleIds: data.vehicleIds || (data.vehicleId ? [data.vehicleId] : []),
     otherDriverId: data.otherDriverId || '',
+    kisaMode: data.kisaMode || 'go',
     overrides: data.overrides || [],
   });
   const [conflicts, setConflicts] = useState([]);
@@ -1856,9 +1859,11 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const activeWorkers = workers.filter(w => w.status === 'aktivan');
   const isPrimka = form.jobType === 'Primka';
   const isOtprema = form.jobType === 'Otprema';
+  const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
   const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
   const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
+  const TERENSKI_CATS = ['primac_panj', 'otpremac', 'pomocni', 'radnik_primka', 'vlastita_rezija', 'vozac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
 
   const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -1910,7 +1915,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   };
 
   const handleSubmit = () => {
-    if (!form.deptId) return alert('Odaberite odjel!');
+    if (!form.deptId && !isKisa) return alert('Odaberite odjel!');
     if (form.allWorkers.length === 0) return alert('Odaberite barem jednog radnika!');
     const c = checkConflict(form, isEdit ? form.id : null);
     if (c.length > 0 && !forceOverride) {
@@ -2006,6 +2011,61 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               {(allJobTypes || JOB_TYPES).map(jt => <option key={jt}>{jt}</option>)}
             </select>
           </div>
+
+          {/* ─── KIŠA — dodaj sve terenske radnike ─── */}
+          {isKisa && (
+            <div style={{background:'#e4edf5',border:'1px solid #9bbfd9',borderRadius:'var(--radius)',padding:'0.6rem 0.75rem',marginBottom:'0.75rem'}}>
+              <div style={{fontSize:'0.8rem',fontWeight:700,color:'#1a3d5c',marginBottom:'0.5rem'}}>🌧️ Kiša — terenski radnici</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem',marginBottom:'0.5rem'}}>
+                {TERENSKI_CATS.map(catId => {
+                  const cat = getCatById(catId);
+                  const catWorkers = availableWorkers.filter(w => w.category === catId && !form.allWorkers.includes(w.id));
+                  const catSelected = form.allWorkers.filter(wId => { const w = workers.find(x=>x.id===wId); return w?.category === catId; });
+                  return (
+                    <button key={catId} className="btn btn-sm" onClick={() => {
+                      const toAdd = catWorkers.map(w => w.id);
+                      setForm(f => ({...f, allWorkers: [...new Set([...f.allWorkers, ...toAdd])]}));
+                    }}
+                    style={{fontSize:'0.7rem',padding:'0.25rem 0.5rem',background:catSelected.length > 0 ? cat?.color : cat?.pale,color:catSelected.length > 0 ? 'white' : cat?.color,border:`1px solid ${cat?.border}`,borderRadius:4,cursor: catWorkers.length===0 ? 'default' : 'pointer',opacity: catWorkers.length===0 ? 0.5 : 1}}>
+                      {cat?.icon} + {cat?.short} ({catWorkers.length})
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{display:'flex',gap:'0.4rem'}}>
+                <button className="btn btn-primary btn-sm" style={{fontSize:'0.72rem'}} onClick={() => {
+                  const allTerenski = availableWorkers.filter(w => TERENSKI_CATS.includes(w.category)).map(w => w.id);
+                  setForm(f => ({...f, allWorkers: [...new Set([...f.allWorkers, ...allTerenski])]}));
+                }}>
+                  🌧️ Dodaj SVE terenske radnike
+                </button>
+                {form.allWorkers.length > 0 && (
+                  <button className="btn btn-danger btn-sm" style={{fontSize:'0.72rem'}} onClick={() => {
+                    const terenskiIds = new Set(workers.filter(w => TERENSKI_CATS.includes(w.category)).map(w => w.id));
+                    setForm(f => ({...f, allWorkers: f.allWorkers.filter(id => !terenskiIds.has(id))}));
+                  }}>
+                    ✕ Ukloni sve terenske
+                  </button>
+                )}
+              </div>
+              <div style={{marginTop:'0.6rem',borderTop:'1px solid #9bbfd9',paddingTop:'0.5rem'}}>
+                <div style={{fontSize:'0.7rem',fontWeight:700,color:'#1a3d5c',marginBottom:'0.3rem'}}>📋 U šihtarici vodi kao:</div>
+                <div style={{display:'flex',gap:'0.3rem',flexWrap:'wrap'}}>
+                  {[
+                    {value:'go', label:'Godišnji odmor (GO)', bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9'},
+                    {value:'rad', label:'Radni dan', bg:'#e8f0e6', color:'#2d5a27', border:'#9bc492'},
+                    {value:'bolovanje', label:'Bolovanje', bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0'},
+                    {value:'neplaceno', label:'Neplaćeno', bg:'#f0f0f0', color:'#555', border:'#ccc'},
+                  ].map(opt => (
+                    <button key={opt.value} className="btn btn-sm" onClick={() => setForm(f=>({...f, kisaMode: opt.value}))}
+                      style={{fontSize:'0.7rem',padding:'0.25rem 0.5rem',background: form.kisaMode===opt.value ? opt.color : opt.bg, color: form.kisaMode===opt.value ? 'white' : opt.color, border:`2px solid ${form.kisaMode===opt.value ? opt.color : opt.border}`, borderRadius:4,fontWeight: form.kisaMode===opt.value ? 700 : 400,cursor:'pointer'}}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {isPrimka ? (
             <div className="primka-section">
@@ -3677,7 +3737,19 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     // Radni dani iz rasporeda
     schedules.forEach(s => {
       s.allWorkers.forEach(wId => {
-        if (m[wId]) m[wId][s.date] = { type: 'rad', jobType: s.jobType };
+        if (!m[wId]) return;
+        // Kiša — mapira se prema kisaMode
+        if (s.jobType === 'Kiša') {
+          const mode = s.kisaMode || 'go';
+          if (mode === 'rad') {
+            m[wId][s.date] = { type: 'rad', jobType: 'Kiša' };
+          } else {
+            const KISA_MAP = { go: 'Godišnji odmor', bolovanje: 'Bolovanje', neplaceno: 'Neplaćeno' };
+            m[wId][s.date] = { type: 'odsutnost', oType: KISA_MAP[mode] || 'Godišnji odmor', note: 'Kiša', kisa: true };
+          }
+        } else {
+          m[wId][s.date] = { type: 'rad', jobType: s.jobType };
+        }
       });
     });
     // Odsutnost
