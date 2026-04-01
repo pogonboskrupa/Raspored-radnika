@@ -9906,7 +9906,7 @@ function AppMain(_ref44) {
   // holidays: { 'YYYY-MM-DD': 'Naziv praznika' }
   const [holidays, setHolidays] = useStorage('sumarija_holidays', {});
   const [customJobTypes, setCustomJobTypes] = useStorage('sumarija_custom_jobs', []);
-  const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes, 'Ostalo'];
+  const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes.filter(jt => !JOB_TYPES.includes(jt)), 'Ostalo'];
   const addHistory = (action, scheduleId, oldData, newData) => {
     setHistory(h => [{
       id: uid(),
