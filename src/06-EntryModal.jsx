@@ -299,7 +299,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             </div>
           )}
 
-          {/* ─── VOZILA SEKCIJA (više vozila) ─── */}
+          {/* ─── VOZILA SEKCIJA (više vozila) — samo za terenske poslove ─── */}
+          {isDeptRequired && (
           <div className="form-group">
             <label className="form-label">🚗 Vozila (prevoz radnika)</label>
 
@@ -423,6 +424,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               </div>
             )}
           </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Napomena</label>

@@ -1029,6 +1029,7 @@ function ScheduleView(_ref2) {
     customJobTypes,
     setCustomJobTypes
   } = _ref2;
+  const VEHICLE_JOBS = ['Primka', 'Otprema', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const currentHoliday = holidays?.[selectedDate] || null;
   const isSaturday = new Date(selectedDate + 'T00:00:00').getDay() === 6;
@@ -1442,7 +1443,7 @@ function ScheduleView(_ref2) {
       style: {
         fontSize: '0.8rem'
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, VEHICLE_JOBS.includes(row.jobType) ? /*#__PURE__*/React.createElement("div", {
       style: {
         cursor: 'pointer'
       },
@@ -1544,7 +1545,12 @@ function ScheduleView(_ref2) {
           marginTop: '2px'
         }
       }, "\u26A0\uFE0F ", bezMjesta, " radnika nema mjesta!"));
-    })())), /*#__PURE__*/React.createElement("td", {
+    })()) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-light)',
+        fontSize: '0.75rem'
+      }
+    }, "\u2014")), /*#__PURE__*/React.createElement("td", {
       "data-label": "Napomena",
       style: {
         color: 'var(--text-muted)',
@@ -4149,7 +4155,7 @@ function EntryModal(_ref15) {
       },
       title: "Ukloni prima\u010Da"
     }, "\u2715"));
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), isDeptRequired && /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"

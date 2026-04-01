@@ -469,6 +469,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   sidebarFilter, setSidebarFilter, godisnji,
   prevDay, nextDay, onAdd, onAddWithJob, onEdit, onDelete, onHistory, onAssignVehicle, copyFromDate, handlePrint, yesterday, holidays, onWorkerClick, allJobTypes, customJobTypes, setCustomJobTypes }) {
 
+  const VEHICLE_JOBS = ['Primka', 'Otprema', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
   const currentHoliday = holidays?.[selectedDate] || null;
   const isSaturday = new Date(selectedDate+'T00:00:00').getDay() === 6;
@@ -713,6 +714,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                       </div>
                     </td>
                     <td data-label="Vozilo" style={{fontSize:'0.8rem'}}>
+                      {VEHICLE_JOBS.includes(row.jobType) ? (
                       <div style={{cursor:'pointer'}} onClick={(e) => openVehiclePopup(row, e)} className="no-print">
                         {(() => {
                           const vIds = getVehicleIds(row);
@@ -758,6 +760,9 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                           );
                         })()}
                       </div>
+                      ) : (
+                        <span style={{color:'var(--text-light)',fontSize:'0.75rem'}}>—</span>
+                      )}
                     </td>
                     <td data-label="Napomena" style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{row.note || '—'}</td>
                     <td data-label="" className="no-print">
@@ -2123,7 +2128,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             </div>
           )}
 
-          {/* ─── VOZILA SEKCIJA (više vozila) ─── */}
+          {/* ─── VOZILA SEKCIJA (više vozila) — samo za terenske poslove ─── */}
+          {isDeptRequired && (
           <div className="form-group">
             <label className="form-label">🚗 Vozila (prevoz radnika)</label>
 
@@ -2247,6 +2253,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               </div>
             )}
           </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Napomena</label>
