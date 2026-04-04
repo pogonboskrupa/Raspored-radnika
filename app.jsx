@@ -4790,6 +4790,39 @@ function AppMain({ onLogout }) {
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
   const [history, setHistory] = useStorage('sumarija_history', []);
 
+  // PWA install prompt
+  const [installPromptEvent, setInstallPromptEvent] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+    if (isStandalone) return;
+
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPromptEvent(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+
+    const installedHandler = () => setShowInstallBanner(false);
+    window.addEventListener('appinstalled', installedHandler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPromptEvent) return;
+    installPromptEvent.prompt();
+    const { outcome } = await installPromptEvent.userChoice;
+    if (outcome === 'accepted') setShowInstallBanner(false);
+    setInstallPromptEvent(null);
+  };
+
   const [activeTab, setActiveTab] = useState('raspored');
   const [selectedDate, setSelectedDate] = useState(today());
   const [sidebarFilter, setSidebarFilter] = useState(null);
@@ -5076,6 +5109,30 @@ function AppMain({ onLogout }) {
             style={{marginLeft:'auto',opacity:0.7,fontSize:'0.75rem'}}>🔒 Odjava</button>
         </nav>
       </header>
+
+      {/* PWA INSTALL BANNER */}
+      {showInstallBanner && (
+        <div style={{
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          background:'#2d5a27', color:'white',
+          padding:'0.5rem 1rem', gap:'0.75rem', flexWrap:'wrap',
+          fontSize:'0.85rem',
+        }}>
+          <span>📲 Instalirajte aplikaciju na uređaj za brži pristup</span>
+          <div style={{display:'flex', gap:'0.5rem'}}>
+            <button onClick={handleInstallClick} style={{
+              background:'white', color:'#2d5a27', border:'none',
+              borderRadius:6, padding:'0.3rem 0.9rem', fontWeight:700,
+              cursor:'pointer', fontSize:'0.85rem',
+            }}>Instaliraj</button>
+            <button onClick={() => setShowInstallBanner(false)} style={{
+              background:'transparent', color:'rgba(255,255,255,0.7)', border:'none',
+              borderRadius:6, padding:'0.3rem 0.5rem', cursor:'pointer',
+              fontSize:'1rem', lineHeight:1,
+            }}>✕</button>
+          </div>
+        </div>
+      )}
 
       <div className="app-layout">
         {/* SIDEBAR */}
