@@ -7128,6 +7128,8 @@ function SihtaricaView(_ref31) {
   const [closingLeave, setClosingLeave] = useState(null); // { wId, entry } for closing open leave
   const [closeDateDo, setCloseDateDo] = useState('');
   const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji' | 'praznici'
+  const [sihtManual, setSihtManual] = useStorage('sumarija_siht_manual', {});
+  const [cellPicker, setCellPicker] = useState(null); // { workerId, date, x, y }
   const [holidayInput, setHolidayInput] = useState(false);
   const [holidayName, setHolidayName] = useState('');
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
@@ -7167,7 +7169,7 @@ function SihtaricaView(_ref31) {
       cb = bi === -1 ? 999 : bi;
     return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
   }), [workers]);
-  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Neplaćeno'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Neplaćeno', 'Službeni put', 'Neopravdan dan'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': {
       bg: '#e4edf5',
@@ -7186,7 +7188,38 @@ function SihtaricaView(_ref31) {
       color: '#555',
       border: '#ccc',
       short: 'N'
+    },
+    'Službeni put': {
+      bg: '#edf4fb',
+      color: '#0a4b78',
+      border: '#7ab8e0',
+      short: 'SP'
+    },
+    'Neopravdan dan': {
+      bg: '#3d0000',
+      color: '#fff',
+      border: '#8b0000',
+      short: 'ND'
     }
+  };
+
+  // Helper: set/clear manual cell override
+  const setManualCell = (workerId, date, type) => {
+    setSihtManual(prev => {
+      const wDates = {
+        ...(prev[workerId] || {})
+      };
+      if (type === null) {
+        delete wDates[date];
+      } else {
+        wDates[date] = type;
+      }
+      return {
+        ...prev,
+        [workerId]: wDates
+      };
+    });
+    setCellPicker(null);
   };
   const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
   const days = Array.from({
@@ -7281,8 +7314,35 @@ function SihtaricaView(_ref31) {
         });
       });
     }
+    // sihtManual — najviši prioritet, override svega
+    if (sihtManual) {
+      Object.entries(sihtManual).forEach(_ref34 => {
+        let [wId, dates] = _ref34;
+        if (!m[wId]) return;
+        Object.entries(dates).forEach(_ref35 => {
+          let [date, type] = _ref35;
+          if (!type) {
+            delete m[wId][date];
+            return;
+          }
+          if (type === 'Teren' || type === 'Kancelarija') {
+            m[wId][date] = {
+              type: 'rad',
+              jobType: type,
+              manual: true
+            };
+          } else {
+            m[wId][date] = {
+              type: 'odsutnost',
+              oType: type,
+              manual: true
+            };
+          }
+        });
+      });
+    }
     return m;
-  }, [schedules, godisnji, workers, holidays]);
+  }, [schedules, godisnji, workers, holidays, sihtManual]);
 
   // Stats per worker for selected month
   const workerStats = useMemo(() => {
@@ -7565,8 +7625,8 @@ function SihtaricaView(_ref31) {
       overflow: 'hidden',
       border: '1px solid var(--border)'
     }
-  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['gokvota', 'GO Kvota'], ['praznici', 'Praznici']].map(_ref34 => {
-    let [k, l] = _ref34;
+  }, [['mjesecni', 'Mjesečni'], ['radnik', 'Po radniku'], ['godisnji', 'Godišnji'], ['gokvota', 'GO Kvota'], ['praznici', 'Praznici']].map(_ref36 => {
+    let [k, l] = _ref36;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       onClick: () => setSihtView(k),
@@ -7757,12 +7817,12 @@ function SihtaricaView(_ref31) {
       padding: '0.5rem 0.75rem',
       width: 80
     }
-  }))), /*#__PURE__*/React.createElement("tbody", null, Object.entries(holidays).sort((_ref35, _ref36) => {
-    let [a] = _ref35;
-    let [b] = _ref36;
+  }))), /*#__PURE__*/React.createElement("tbody", null, Object.entries(holidays).sort((_ref37, _ref38) => {
+    let [a] = _ref37;
+    let [b] = _ref38;
     return a.localeCompare(b);
-  }).map(_ref37 => {
-    let [date, name] = _ref37;
+  }).map(_ref39 => {
+    let [date, name] = _ref39;
     const d = new Date(date + 'T00:00:00');
     const dayNames = ['Nedjelja', 'Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota'];
     return /*#__PURE__*/React.createElement("tr", {
@@ -7843,8 +7903,8 @@ function SihtaricaView(_ref31) {
       color: 'var(--text-muted)',
       fontWeight: 700
     }
-  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref38 => {
-    let [k, v] = _ref38;
+  }, "Odsutnost:"), Object.entries(ODSUTNOST_COLOR).map(_ref40 => {
+    let [k, v] = _ref40;
     return /*#__PURE__*/React.createElement("span", {
       key: k,
       style: {
@@ -8042,6 +8102,7 @@ function SihtaricaView(_ref31) {
       const date = isoDate(d);
       const entry = workerDayMap[w.id]?.[date];
       const wknd = isWeekend(d);
+      const hasManual = !!sihtManual[w.id]?.[date];
       let cellBg = wknd ? '#f0ede6' : 'white';
       let cellBorderColor = wknd ? '#ddd9d0' : '#ece9e2';
       let cellText = wknd ? /*#__PURE__*/React.createElement("span", {
@@ -8050,13 +8111,12 @@ function SihtaricaView(_ref31) {
           fontSize: '0.55rem'
         }
       }, "\u2014") : null;
-      let title = '';
+      let title = wknd ? '' : 'Klikni za postavljanje statusa';
       if (entry?.type === 'rad') {
         const isPoslovoda = w.category === 'poslovoda_isk' || w.category === 'poslovoda_uzg';
-        const isTeren = entry.jobType === 'Teren' || entry.jobType === 'Doznaka stabala' || entry.jobType && entry.jobType !== 'Kancelarija';
         const cellLabel = isPoslovoda ? entry.jobType === 'Kancelarija' ? '8' : 'U' : '8';
         cellBg = catPale;
-        cellBorderColor = catBorder;
+        cellBorderColor = entry.manual ? catColor : catBorder;
         cellText = /*#__PURE__*/React.createElement("span", {
           style: {
             color: catColor,
@@ -8065,7 +8125,7 @@ function SihtaricaView(_ref31) {
             fontFamily: 'var(--mono)'
           }
         }, cellLabel);
-        title = (cat?.short || 'Rad') + ' · ' + entry.jobType;
+        title = (cat?.short || 'Rad') + ' · ' + entry.jobType + (entry.manual ? ' (ručno)' : '');
       } else if (entry?.type === 'praznik') {
         cellBg = '#fff3e0';
         cellBorderColor = '#ffb74d';
@@ -8081,7 +8141,12 @@ function SihtaricaView(_ref31) {
       } else if (entry?.type === 'odsutnost') {
         const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Neplaćeno'];
         cellBg = oc.bg;
-        cellBorderColor = oc.border;
+        cellBorderColor = entry.manual ? oc.color : oc.border;
+        const clickHandler = entry.manual ? () => setManualCell(w.id, date, null) : () => entry.open ? deleteOpenLeave(w.id, {
+          dateOd: entry.dateOd,
+          type: entry.oType,
+          note: entry.note
+        }) : deleteGodisnji(w.id, date);
         cellText = /*#__PURE__*/React.createElement("span", {
           style: {
             color: oc.color,
@@ -8090,14 +8155,13 @@ function SihtaricaView(_ref31) {
             fontFamily: 'var(--mono)',
             cursor: 'pointer'
           },
-          onClick: () => entry.open ? deleteOpenLeave(w.id, {
-            dateOd: entry.dateOd,
-            type: entry.oType,
-            note: entry.note
-          }) : deleteGodisnji(w.id, date),
-          title: entry.open ? 'Otvoreno od ' + entry.dateOd + ' · klikni za brisanje' : 'Klikni za brisanje: ' + entry.oType
+          onClick: e => {
+            e.stopPropagation();
+            clickHandler();
+          },
+          title: entry.manual ? 'Ručni unos · klikni za brisanje' : entry.open ? 'Otvoreno od ' + entry.dateOd + ' · klikni za brisanje' : 'Klikni za brisanje: ' + entry.oType
         }, oc.short);
-        title = entry.oType + (entry.open ? ' (otvoreno od ' + entry.dateOd + ')' : '') + (entry.note ? ' — ' + entry.note : '');
+        title = entry.oType + (entry.manual ? ' (ručno)' : entry.open ? ' (otvoreno od ' + entry.dateOd + ')' : '') + (entry.note ? ' — ' + entry.note : '');
       }
       return /*#__PURE__*/React.createElement("td", {
         key: d,
@@ -8106,7 +8170,19 @@ function SihtaricaView(_ref31) {
           padding: '0.25rem 0.15rem',
           border: `1px solid ${cellBorderColor}`,
           textAlign: 'center',
-          background: cellBg
+          background: cellBg,
+          cursor: wknd ? 'default' : 'pointer',
+          outline: hasManual ? `2px solid ${catColor}` : 'none',
+          outlineOffset: -2
+        },
+        onClick: wknd ? undefined : e => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setCellPicker({
+            workerId: w.id,
+            date,
+            x: rect.left,
+            y: rect.bottom
+          });
         }
       }, cellText);
     }), /*#__PURE__*/React.createElement("td", {
@@ -8269,7 +8345,7 @@ function SihtaricaView(_ref31) {
       }
       return /*#__PURE__*/React.createElement("div", {
         key: d,
-        title: `${d}. ${entry?.type === 'rad' ? (cat?.short || 'Rad') + ' · ' + entry.jobType : entry?.type === 'praznik' ? 'Praznik: ' + (entry.holidayName || '') : entry?.oType || (wknd ? 'vikend' : '')}`,
+        title: `${d}. ${entry?.type === 'rad' ? (cat?.short || 'Rad') + ' · ' + entry.jobType : entry?.type === 'praznik' ? 'Praznik: ' + (entry.holidayName || '') : entry?.oType || (wknd ? 'vikend' : 'Klikni za status')}`,
         style: {
           height: 22,
           background: bg,
@@ -8281,16 +8357,18 @@ function SihtaricaView(_ref31) {
           fontWeight: fontW,
           fontFamily: 'var(--mono)',
           color,
-          cursor: entry?.type === 'odsutnost' ? 'pointer' : 'default'
+          cursor: wknd ? 'default' : 'pointer',
+          outline: sihtManual[w.id]?.[date] ? '1.5px solid ' + catColor : 'none',
+          outlineOffset: -1
         },
-        onClick: () => {
-          if (entry?.type === 'odsutnost') {
-            entry.open ? deleteOpenLeave(w.id, {
-              dateOd: entry.dateOd,
-              type: entry.oType,
-              note: entry.note
-            }) : deleteGodisnji(w.id, date);
-          }
+        onClick: wknd ? undefined : e => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setCellPicker({
+            workerId: w.id,
+            date,
+            x: rect.left,
+            y: rect.bottom
+          });
         }
       }, label);
     })));
@@ -8373,8 +8451,8 @@ function SihtaricaView(_ref31) {
           border: `1px solid ${rem < 0 ? '#e0a0a0' : rem < 7 ? '#f0c060' : '#9bbfd9'}`
         }
       }, "GO: ", rem, "/", kv.dana);
-    })(), Object.entries(stats.odsutTypes || {}).map(_ref39 => {
-      let [k, v] = _ref39;
+    })(), Object.entries(stats.odsutTypes || {}).map(_ref41 => {
+      let [k, v] = _ref41;
       const oc = ODSUTNOST_COLOR[k] || {
         bg: '#f0f0f0',
         color: '#555',
@@ -8637,12 +8715,12 @@ function SihtaricaView(_ref31) {
           fontSize: '0.75rem',
           width: '100%'
         }
-      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref40 => {
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref42 => {
         let {
           d,
           dw,
           wknd
-        } = _ref40;
+        } = _ref42;
         return /*#__PURE__*/React.createElement("th", {
           key: d,
           style: {
@@ -8661,13 +8739,13 @@ function SihtaricaView(_ref31) {
             opacity: 0.7
           }
         }, 'NPUSČPS'[dw]));
-      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref41 => {
+      }))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, mo.days.map(_ref43 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref41;
+        } = _ref43;
         let bg = wknd ? '#f0ede6' : 'white';
         let content = wknd ? /*#__PURE__*/React.createElement("span", {
           style: {
@@ -8731,13 +8809,13 @@ function SihtaricaView(_ref31) {
           gridTemplateColumns: `repeat(${mo.days.length}, 1fr)`,
           gap: '1.5px'
         }
-      }, mo.days.map(_ref42 => {
+      }, mo.days.map(_ref44 => {
         let {
           d,
           iso,
           wknd,
           entry
-        } = _ref42;
+        } = _ref44;
         let bg,
           color,
           label = String(d),
@@ -8800,8 +8878,8 @@ function SihtaricaView(_ref31) {
           padding: '0.1rem 0.4rem',
           fontWeight: 700
         }
-      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref43 => {
-        let [k, v] = _ref43;
+      }, mo.radnih, " rad"), Object.entries(mo.odsutTypes || {}).map(_ref45 => {
+        let [k, v] = _ref45;
         const oc = ODSUTNOST_COLOR[k] || {
           bg: '#f0f0f0',
           color: '#555',
@@ -9416,7 +9494,161 @@ function SihtaricaView(_ref31) {
         marginLeft: 'auto'
       }
     }, "Nije postavljeno"));
-  }))), goModal && /*#__PURE__*/React.createElement("div", {
+  }))), cellPicker && (() => {
+    const pickerWorker = workers.find(w => w.id === cellPicker.workerId);
+    const cat = getCatById(pickerWorker?.category);
+    const catColor = cat?.color || '#2d5a27';
+    const existing = workerDayMap[cellPicker.workerId]?.[cellPicker.date];
+    const hasManual = !!sihtManual[cellPicker.workerId]?.[cellPicker.date];
+    const RADNI = [{
+      type: 'Teren',
+      label: '🌲 Teren',
+      bg: catColor,
+      color: 'white'
+    }, {
+      type: 'Kancelarija',
+      label: '🏢 Kancelarija',
+      bg: '#4a7a8a',
+      color: 'white'
+    }];
+    const ODSUTNI = [{
+      type: 'Godišnji odmor',
+      label: '🏖️ Godišnji odmor',
+      ...ODSUTNOST_COLOR['Godišnji odmor']
+    }, {
+      type: 'Bolovanje',
+      label: '🏥 Bolovanje',
+      ...ODSUTNOST_COLOR['Bolovanje']
+    }, {
+      type: 'Službeni put',
+      label: '✈️ Službeni put',
+      ...ODSUTNOST_COLOR['Službeni put']
+    }, {
+      type: 'Neopravdan dan',
+      label: '❌ Neopravdan dan',
+      ...ODSUTNOST_COLOR['Neopravdan dan']
+    }, {
+      type: 'Neplaćeno',
+      label: '📋 Neplaćeno',
+      ...ODSUTNOST_COLOR['Neplaćeno']
+    }];
+    // Position picker: clamp to viewport
+    const pickerW = 210;
+    const pickerX = Math.min(cellPicker.x, window.innerWidth - pickerW - 8);
+    const pickerY = cellPicker.y + 4;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'fixed',
+        inset: 0,
+        zIndex: 3000
+      },
+      onClick: () => setCellPicker(null)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'fixed',
+        left: pickerX,
+        top: pickerY,
+        width: pickerW,
+        background: 'white',
+        borderRadius: 8,
+        boxShadow: '0 4px 24px rgba(0,0,0,0.22)',
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+        zIndex: 3001
+      },
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: catColor,
+        color: 'white',
+        padding: '0.4rem 0.75rem',
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("span", null, pickerWorker?.name, " \xB7 ", cellPicker.date.slice(8), ".", cellPicker.date.slice(5, 7), "."), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setCellPicker(null),
+      style: {
+        background: 'none',
+        border: 'none',
+        color: 'white',
+        cursor: 'pointer',
+        fontSize: '1rem',
+        lineHeight: 1,
+        padding: 0
+      }
+    }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.3rem 0.5rem 0.1rem',
+        fontSize: '0.6rem',
+        fontWeight: 700,
+        color: 'var(--text-muted)',
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase'
+      }
+    }, "Radni dan"), RADNI.map(opt => /*#__PURE__*/React.createElement("button", {
+      key: opt.type,
+      onClick: () => setManualCell(cellPicker.workerId, cellPicker.date, opt.type),
+      style: {
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '0.35rem 0.75rem',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        background: existing?.type === 'rad' && existing?.jobType === opt.type ? opt.bg : 'white',
+        color: existing?.type === 'rad' && existing?.jobType === opt.type ? opt.color : 'var(--text)',
+        fontWeight: existing?.type === 'rad' && existing?.jobType === opt.type ? 700 : 400
+      }
+    }, opt.label)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.3rem 0.5rem 0.1rem',
+        fontSize: '0.6rem',
+        fontWeight: 700,
+        color: 'var(--text-muted)',
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        borderTop: '1px solid var(--border)',
+        marginTop: '0.15rem'
+      }
+    }, "Odsutnost"), ODSUTNI.map(opt => /*#__PURE__*/React.createElement("button", {
+      key: opt.type,
+      onClick: () => setManualCell(cellPicker.workerId, cellPicker.date, opt.type),
+      style: {
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '0.35rem 0.75rem',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        background: existing?.type === 'odsutnost' && existing?.oType === opt.type ? opt.bg : 'white',
+        color: existing?.type === 'odsutnost' && existing?.oType === opt.type ? opt.color : 'var(--text)',
+        fontWeight: existing?.type === 'odsutnost' && existing?.oType === opt.type ? 700 : 400
+      }
+    }, opt.label)), (hasManual || existing) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        borderTop: '1px solid var(--border)',
+        margin: '0.1rem 0'
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setManualCell(cellPicker.workerId, cellPicker.date, null),
+      style: {
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '0.35rem 0.75rem',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        color: 'var(--red)',
+        background: 'white'
+      }
+    }, "\uD83D\uDDD1\uFE0F Ukloni ru\u010Dni unos"))));
+  })(), goModal && /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => e.target === e.currentTarget && setGoModal(null)
   }, /*#__PURE__*/React.createElement("div", {
@@ -9879,10 +10111,10 @@ function App() {
     }
   });
 }
-function AppMain(_ref44) {
+function AppMain(_ref46) {
   let {
     onLogout
-  } = _ref44;
+  } = _ref46;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -10106,8 +10338,8 @@ function AppMain(_ref44) {
       'Neplaćeno': '📋 N'
     };
     const absentList = [];
-    Object.entries(godisnji || {}).forEach(_ref45 => {
-      let [wId, entries] = _ref45;
+    Object.entries(godisnji || {}).forEach(_ref47 => {
+      let [wId, entries] = _ref47;
       const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
       if (!entry) return;
       const w = workers.find(x => x.id === wId);
@@ -10140,14 +10372,14 @@ function AppMain(_ref44) {
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
     html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
-    Object.entries(byDept).forEach(_ref46 => {
-      let [deptId, jobs] = _ref46;
+    Object.entries(byDept).forEach(_ref48 => {
+      let [deptId, jobs] = _ref48;
       const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
       html += `<div class="dept">`;
       html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
       html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
-      Object.entries(jobs).forEach(_ref47 => {
-        let [jobType, rows] = _ref47;
+      Object.entries(jobs).forEach(_ref49 => {
+        let [jobType, rows] = _ref49;
         rows.forEach(row => {
           const workerNames = (row.allWorkers || []).map(wId => wName(wId));
           const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
@@ -10223,8 +10455,8 @@ function AppMain(_ref44) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref48 => {
-    let [k, l] = _ref48;
+  }, [['raspored', '📋 Raspored'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref50 => {
+    let [k, l] = _ref50;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,

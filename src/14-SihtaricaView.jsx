@@ -9,6 +9,8 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [closingLeave, setClosingLeave] = useState(null); // { wId, entry } for closing open leave
   const [closeDateDo, setCloseDateDo] = useState('');
   const [sihtView, setSihtView] = useState('mjesecni'); // 'mjesecni' | 'radnik' | 'godisnji' | 'praznici'
+  const [sihtManual, setSihtManual] = useStorage('sumarija_siht_manual', {});
+  const [cellPicker, setCellPicker] = useState(null); // { workerId, date, x, y }
   const [holidayInput, setHolidayInput] = useState(false);
   const [holidayName, setHolidayName] = useState('');
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
@@ -33,11 +35,24 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
       return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
     }), [workers]);
 
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno','Službeni put','Neopravdan dan'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO' },
     'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B'  },
     'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N'  },
+    'Službeni put':   { bg:'#edf4fb', color:'#0a4b78', border:'#7ab8e0', short:'SP' },
+    'Neopravdan dan': { bg:'#3d0000', color:'#fff',    border:'#8b0000', short:'ND' },
+  };
+
+  // Helper: set/clear manual cell override
+  const setManualCell = (workerId, date, type) => {
+    setSihtManual(prev => {
+      const wDates = { ...(prev[workerId] || {}) };
+      if (type === null) { delete wDates[date]; }
+      else { wDates[date] = type; }
+      return { ...prev, [workerId]: wDates };
+    });
+    setCellPicker(null);
   };
 
   const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
@@ -96,8 +111,22 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         });
       });
     }
+    // sihtManual — najviši prioritet, override svega
+    if (sihtManual) {
+      Object.entries(sihtManual).forEach(([wId, dates]) => {
+        if (!m[wId]) return;
+        Object.entries(dates).forEach(([date, type]) => {
+          if (!type) { delete m[wId][date]; return; }
+          if (type === 'Teren' || type === 'Kancelarija') {
+            m[wId][date] = { type: 'rad', jobType: type, manual: true };
+          } else {
+            m[wId][date] = { type: 'odsutnost', oType: type, manual: true };
+          }
+        });
+      });
+    }
     return m;
-  }, [schedules, godisnji, workers, holidays]);
+  }, [schedules, godisnji, workers, holidays, sihtManual]);
 
   // Stats per worker for selected month
   const workerStats = useMemo(() => {
@@ -443,18 +472,18 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     const date = isoDate(d);
                     const entry = workerDayMap[w.id]?.[date];
                     const wknd = isWeekend(d);
+                    const hasManual = !!(sihtManual[w.id]?.[date]);
                     let cellBg = wknd ? '#f0ede6' : 'white';
                     let cellBorderColor = wknd ? '#ddd9d0' : '#ece9e2';
                     let cellText = wknd ? <span style={{color:'#ccc8c0',fontSize:'0.55rem'}}>—</span> : null;
-                    let title = '';
+                    let title = wknd ? '' : 'Klikni za postavljanje statusa';
                     if (entry?.type === 'rad') {
                       const isPoslovoda = w.category === 'poslovoda_isk' || w.category === 'poslovoda_uzg';
-                      const isTeren = entry.jobType === 'Teren' || entry.jobType === 'Doznaka stabala' || (entry.jobType && entry.jobType !== 'Kancelarija');
                       const cellLabel = isPoslovoda ? (entry.jobType === 'Kancelarija' ? '8' : 'U') : '8';
                       cellBg = catPale;
-                      cellBorderColor = catBorder;
+                      cellBorderColor = entry.manual ? catColor : catBorder;
                       cellText = <span style={{color:catColor,fontWeight:700,fontSize:'0.65rem',fontFamily:'var(--mono)'}}>{cellLabel}</span>;
-                      title = (cat?.short||'Rad') + ' · ' + entry.jobType;
+                      title = (cat?.short||'Rad') + ' · ' + entry.jobType + (entry.manual ? ' (ručno)' : '');
                     } else if (entry?.type === 'praznik') {
                       cellBg = '#fff3e0';
                       cellBorderColor = '#ffb74d';
@@ -463,14 +492,18 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     } else if (entry?.type === 'odsutnost') {
                       const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Neplaćeno'];
                       cellBg = oc.bg;
-                      cellBorderColor = oc.border;
+                      cellBorderColor = entry.manual ? oc.color : oc.border;
+                      const clickHandler = entry.manual
+                        ? () => setManualCell(w.id, date, null)
+                        : () => (entry.open ? deleteOpenLeave(w.id, {dateOd:entry.dateOd, type:entry.oType, note:entry.note}) : deleteGodisnji(w.id, date));
                       cellText = (
                         <span style={{color:oc.color,fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)',cursor:'pointer'}}
-                          onClick={()=>entry.open ? deleteOpenLeave(w.id, {dateOd:entry.dateOd, type:entry.oType, note:entry.note}) : deleteGodisnji(w.id,date)} title={entry.open ? 'Otvoreno od '+entry.dateOd+' · klikni za brisanje' : 'Klikni za brisanje: '+entry.oType}>
+                          onClick={e=>{e.stopPropagation();clickHandler();}}
+                          title={entry.manual ? 'Ručni unos · klikni za brisanje' : (entry.open ? 'Otvoreno od '+entry.dateOd+' · klikni za brisanje' : 'Klikni za brisanje: '+entry.oType)}>
                           {oc.short}
                         </span>
                       );
-                      title = entry.oType + (entry.open ? ' (otvoreno od '+entry.dateOd+')' : '') + (entry.note ? ' — '+entry.note : '');
+                      title = entry.oType + (entry.manual ? ' (ručno)' : entry.open ? ' (otvoreno od '+entry.dateOd+')' : '') + (entry.note ? ' — '+entry.note : '');
                     }
                     return (
                       <td key={d} title={title} style={{
@@ -478,6 +511,12 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                         border:`1px solid ${cellBorderColor}`,
                         textAlign:'center',
                         background: cellBg,
+                        cursor: wknd ? 'default' : 'pointer',
+                        outline: hasManual ? `2px solid ${catColor}` : 'none',
+                        outlineOffset: -2,
+                      }} onClick={wknd ? undefined : (e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setCellPicker({ workerId: w.id, date, x: rect.left, y: rect.bottom });
                       }}>{cellText}</td>
                     );
                   })}
@@ -532,14 +571,19 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     bg = '#e8e4dc'; color = '#a09888';
                   }
                   return (
-                    <div key={d} title={`${d}. ${entry?.type==='rad'?(cat?.short||'Rad')+' · '+entry.jobType : entry?.type==='praznik'?'Praznik: '+(entry.holidayName||'') : entry?.oType || (wknd?'vikend':'')}`}
+                    <div key={d} title={`${d}. ${entry?.type==='rad'?(cat?.short||'Rad')+' · '+entry.jobType : entry?.type==='praznik'?'Praznik: '+(entry.holidayName||'') : entry?.oType || (wknd?'vikend':'Klikni za status')}`}
                       style={{
                         height:22, background:bg, borderRadius:2,
                         display:'flex', alignItems:'center', justifyContent:'center',
                         fontSize:'0.42rem', fontWeight:fontW, fontFamily:'var(--mono)', color,
-                        cursor: entry?.type==='odsutnost' ? 'pointer' : 'default',
+                        cursor: wknd ? 'default' : 'pointer',
+                        outline: sihtManual[w.id]?.[date] ? '1.5px solid '+catColor : 'none',
+                        outlineOffset: -1,
                       }}
-                      onClick={()=>{if(entry?.type==='odsutnost'){entry.open ? deleteOpenLeave(w.id,{dateOd:entry.dateOd,type:entry.oType,note:entry.note}) : deleteGodisnji(w.id,date);}}}>
+                      onClick={wknd ? undefined : (e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setCellPicker({ workerId: w.id, date, x: rect.left, y: rect.bottom });
+                      }}>
                       {label}
                     </div>
                   );
@@ -941,6 +985,84 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           </div>
         </div>
       )}
+
+      {/* CELL PICKER — odabir statusa dana */}
+      {cellPicker && (() => {
+        const pickerWorker = workers.find(w => w.id === cellPicker.workerId);
+        const cat = getCatById(pickerWorker?.category);
+        const catColor = cat?.color || '#2d5a27';
+        const existing = workerDayMap[cellPicker.workerId]?.[cellPicker.date];
+        const hasManual = !!(sihtManual[cellPicker.workerId]?.[cellPicker.date]);
+        const RADNI = [
+          { type: 'Teren',      label: '🌲 Teren',       bg: catColor,   color: 'white' },
+          { type: 'Kancelarija',label: '🏢 Kancelarija', bg: '#4a7a8a',  color: 'white' },
+        ];
+        const ODSUTNI = [
+          { type: 'Godišnji odmor', label: '🏖️ Godišnji odmor', ...ODSUTNOST_COLOR['Godišnji odmor'] },
+          { type: 'Bolovanje',      label: '🏥 Bolovanje',       ...ODSUTNOST_COLOR['Bolovanje'] },
+          { type: 'Službeni put',   label: '✈️ Službeni put',    ...ODSUTNOST_COLOR['Službeni put'] },
+          { type: 'Neopravdan dan', label: '❌ Neopravdan dan',  ...ODSUTNOST_COLOR['Neopravdan dan'] },
+          { type: 'Neplaćeno',      label: '📋 Neplaćeno',       ...ODSUTNOST_COLOR['Neplaćeno'] },
+        ];
+        // Position picker: clamp to viewport
+        const pickerW = 210;
+        const pickerX = Math.min(cellPicker.x, window.innerWidth - pickerW - 8);
+        const pickerY = cellPicker.y + 4;
+        return (
+          <div style={{position:'fixed',inset:0,zIndex:3000}} onClick={()=>setCellPicker(null)}>
+            <div style={{
+              position:'fixed', left: pickerX, top: pickerY,
+              width: pickerW, background:'white', borderRadius:8,
+              boxShadow:'0 4px 24px rgba(0,0,0,0.22)', border:'1px solid var(--border)',
+              overflow:'hidden', zIndex:3001,
+            }} onClick={e=>e.stopPropagation()}>
+              {/* Header */}
+              <div style={{background:catColor,color:'white',padding:'0.4rem 0.75rem',fontSize:'0.75rem',fontWeight:700,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span>{pickerWorker?.name} · {cellPicker.date.slice(8)}.{cellPicker.date.slice(5,7)}.</span>
+                <button onClick={()=>setCellPicker(null)} style={{background:'none',border:'none',color:'white',cursor:'pointer',fontSize:'1rem',lineHeight:1,padding:0}}>✕</button>
+              </div>
+              {/* Radni dan */}
+              <div style={{padding:'0.3rem 0.5rem 0.1rem',fontSize:'0.6rem',fontWeight:700,color:'var(--text-muted)',letterSpacing:'0.08em',textTransform:'uppercase'}}>Radni dan</div>
+              {RADNI.map(opt => (
+                <button key={opt.type} onClick={()=>setManualCell(cellPicker.workerId, cellPicker.date, opt.type)}
+                  style={{
+                    display:'block',width:'100%',textAlign:'left',padding:'0.35rem 0.75rem',
+                    border:'none',cursor:'pointer',fontSize:'0.82rem',
+                    background: existing?.type==='rad' && existing?.jobType===opt.type ? opt.bg : 'white',
+                    color: existing?.type==='rad' && existing?.jobType===opt.type ? opt.color : 'var(--text)',
+                    fontWeight: existing?.type==='rad' && existing?.jobType===opt.type ? 700 : 400,
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+              {/* Odsutnost */}
+              <div style={{padding:'0.3rem 0.5rem 0.1rem',fontSize:'0.6rem',fontWeight:700,color:'var(--text-muted)',letterSpacing:'0.08em',textTransform:'uppercase',borderTop:'1px solid var(--border)',marginTop:'0.15rem'}}>Odsutnost</div>
+              {ODSUTNI.map(opt => (
+                <button key={opt.type} onClick={()=>setManualCell(cellPicker.workerId, cellPicker.date, opt.type)}
+                  style={{
+                    display:'block',width:'100%',textAlign:'left',padding:'0.35rem 0.75rem',
+                    border:'none',cursor:'pointer',fontSize:'0.82rem',
+                    background: existing?.type==='odsutnost' && existing?.oType===opt.type ? opt.bg : 'white',
+                    color: existing?.type==='odsutnost' && existing?.oType===opt.type ? opt.color : 'var(--text)',
+                    fontWeight: existing?.type==='odsutnost' && existing?.oType===opt.type ? 700 : 400,
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+              {/* Briši */}
+              {(hasManual || existing) && (
+                <>
+                  <div style={{borderTop:'1px solid var(--border)',margin:'0.1rem 0'}} />
+                  <button onClick={()=>setManualCell(cellPicker.workerId, cellPicker.date, null)}
+                    style={{display:'block',width:'100%',textAlign:'left',padding:'0.35rem 0.75rem',border:'none',cursor:'pointer',fontSize:'0.82rem',color:'var(--red)',background:'white'}}>
+                    🗑️ Ukloni ručni unos
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL — dodaj odsutnost */}
       {goModal && (
