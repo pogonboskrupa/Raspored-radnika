@@ -2,23 +2,24 @@
 <html lang="bs">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Šumarija Raspored</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0" />
+<title>Šumarija Bos.Krupa - raspored radnika</title>
 
 <!-- PWA -->
-<meta name="application-name" content="Šumarija Raspored" />
+<meta name="application-name" content="Šumarija Bos.Krupa - raspored radnika" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Raspored" />
+<meta name="apple-mobile-web-app-title" content="Šumarija Bos.Krupa" />
 <meta name="theme-color" content="#2d5a27" />
 <meta name="description" content="Raspored radnika — Šumarija Bosanska Krupa" />
 <link rel="manifest" href="manifest.json" />
 
-<!-- PWA icons inline as data URIs — no external files needed -->
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%232d5a27'/%3E%3Ctext y='140' x='96' text-anchor='middle' font-size='120' font-family='serif'%3E🌲%3C/text%3E%3C/svg%3E" />
+<!-- PWA icons -->
+<link rel="icon" type="image/png" href="1774102184971~2.png" />
+<link rel="apple-touch-icon" href="1774102184971~2.png" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -65,7 +66,9 @@ if (FIREBASE_ENABLED) {
     --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+  html { overflow-x: clip; width: 100vw; max-width: 100vw; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: clip; width: 100vw; max-width: 100vw; }
+  #root { width: 100%; max-width: 100vw; overflow-x: clip; }
   button { font-family: var(--sans); cursor: pointer; }
   input, select, textarea { font-family: var(--sans); }
   
@@ -82,6 +85,9 @@ if (FIREBASE_ENABLED) {
     top: 0;
     z-index: 100;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 100vw;
+    overflow: hidden;
   }
   .app-title {
     font-family: var(--mono);
@@ -113,7 +119,7 @@ if (FIREBASE_ENABLED) {
   .nav-tab.active { color: white; border-bottom-color: #8bc34a; }
 
   /* LAYOUT */
-  .app-layout { display: flex; min-height: calc(100vh - 56px); }
+  .app-layout { display: flex; min-height: calc(100vh - 56px); width: 100%; max-width: 100vw; overflow-x: hidden; }
   .sidebar {
     width: 220px;
     background: var(--surface);
@@ -130,7 +136,10 @@ if (FIREBASE_ENABLED) {
     padding: 1.5rem;
     overflow-y: auto;
     max-width: 100%;
+    width: 100%;
+    overflow-x: hidden;
   }
+  .main-content > * { max-width: 100%; }
   .right-panel {
     width: 340px;
     flex-shrink: 0;
@@ -296,6 +305,8 @@ if (FIREBASE_ENABLED) {
   .badge-ekologija { background: #e6f5ea; color: #1a5a2d; border: 1px solid #7bc492; }
   .badge-kancelarija { background: #e8eaf6; color: #3949ab; border: 1px solid #9fa8da; }
   .badge-teren { background: #e8f5e9; color: #2e7d32; border: 1px solid #81c784; }
+  .badge-kisa { background: #e0ecf5; color: #1565c0; border: 1px solid #90caf9; }
+  .badge-farbanje { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
 
   /* WORKER PILLS */
   .worker-pill {
@@ -503,17 +514,137 @@ if (FIREBASE_ENABLED) {
   /* DIVIDER */
   .divider { height: 1px; background: var(--border); margin: 0.9rem 0; }
 
+  /* CATEGORY & WORKER GRIDS */
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+  }
+  .category-card {
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.12s;
+  }
+  .category-card-icon { font-size: 1.2rem; }
+  .category-card-count { font-family: var(--mono); font-size: 1.4rem; font-weight: 700; }
+  .category-card-label { font-size: 0.75rem; font-weight: 600; margin-top: 0.3rem; }
+  .worker-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.75rem;
+  }
+
   /* MOBILE */
   @media (max-width: 768px) {
-    .sidebar { display: none; }
-    .right-panel { display: none; }
-    .app-layout { display: block; }
-    .main-content { padding: 1rem; }
-    .nav-tab { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
-    .stats-row { gap: 0.5rem; }
-    .stat-card { min-width: 80px; }
-    .date-bar { gap: 0.5rem; }
+    .app-header {
+      flex-wrap: wrap;
+      height: auto;
+      padding: 0;
+      width: 100%;
+      max-width: 100vw;
+    }
+    .app-header > .app-title {
+      padding: 0.5rem 1rem;
+      width: 100%;
+    }
+    .nav-tabs {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tab { padding: 0.5rem 0.75rem; font-size: 0.75rem; white-space: nowrap; height: 42px; flex-shrink: 0; }
     .app-title .subtitle { display: none; }
+
+    .sidebar { display: none; }
+    .app-layout { display: block; width: 100%; max-width: 100vw; overflow-x: clip; }
+    .main-content { padding: 0.5rem; width: 100% !important; max-width: 100vw !important; overflow-x: clip; }
+    .main-content > div { max-width: 100%; }
+    /* Force all tables to not exceed viewport on mobile */
+    table { min-width: 0 !important; max-width: 100% !important; }
+    /* Restrict any overflow wrapper to viewport width */
+    .main-content [style*="overflow"] { max-width: 100vw !important; width: 100% !important; }
+    /* Spisak tabela mora moći skrolati horizontalno */
+    .spisak-desktop { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+    .spisak-desktop table { min-width: max-content !important; max-width: none !important; }
+
+    /* Right panel hidden on mobile — content shown inline via mobile-sidebar-panel */
+    .right-panel { display: none; }
+
+    /* Date bar compact */
+    .date-bar {
+      padding: 0.75rem;
+      gap: 0.5rem;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .date-bar > div:first-child { width: 100%; }
+    .date-bar > div:last-child {
+      margin-left: 0;
+      justify-content: stretch;
+    }
+    .date-bar > div:last-child .btn { flex: 1; font-size: 0.72rem; padding: 0.4rem 0.5rem; }
+
+    /* Stats compact */
+    .stats-row { gap: 0.4rem; margin-bottom: 0.75rem; }
+    .stat-card { min-width: 0; padding: 0.5rem 0.6rem; flex: 1 1 0; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.62rem; }
+
+    /* Schedule table → mobile card layout */
+    .schedule-table { font-size: 0.8rem; }
+    .schedule-table thead { display: none; }
+    .schedule-table tbody tr {
+      display: block;
+      border-bottom: 1px solid var(--border);
+      padding: 0.6rem 0.75rem;
+    }
+    .schedule-table tbody tr:last-child { border-bottom: none; }
+    .schedule-table tbody td {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.2rem 0;
+      border: none;
+      text-align: left;
+    }
+    .schedule-table tbody td::before {
+      content: attr(data-label);
+      font-family: var(--mono);
+      font-size: 0.58rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      min-width: 55px;
+      padding-top: 0.15rem;
+      flex-shrink: 0;
+    }
+    .schedule-table tbody td:first-child { margin-bottom: 0.15rem; }
+    .schedule-table tbody td:last-child {
+      margin-top: 0.3rem;
+      padding-top: 0.3rem;
+      border-top: 1px dashed var(--border);
+    }
+    .schedule-table tbody td:last-child::before { display: none; }
+
+    /* Dept header compact */
+    .dept-header { padding: 0.5rem 0.75rem; }
+    .dept-name { font-size: 0.82rem; }
+
+    /* Cards */
+    .card { margin-bottom: 0.75rem; }
+
+    /* Section header */
+    .section-header { margin-bottom: 0.75rem; }
+    .section-title { font-size: 0.9rem; }
+
+    /* Mobile bottom toolbar */
     .mobile-fab {
       display: flex !important;
       position: fixed;
@@ -532,8 +663,100 @@ if (FIREBASE_ENABLED) {
       box-shadow: 0 4px 16px rgba(0,0,0,0.2);
       cursor: pointer;
     }
+
+    /* Mobile sidebar toggle panel */
+    .mobile-sidebar-panel {
+      display: block !important;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 0.75rem;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .mobile-sidebar-panel .sidebar-section { padding: 0.25rem 0; border: none; }
+    .mobile-sidebar-panel .sidebar-label { padding: 0.3rem 0.75rem; font-size: 0.6rem; }
+    .mobile-sidebar-panel .sidebar-item { padding: 0.35rem 0.75rem; font-size: 0.78rem; }
+
+    /* Modal full-width on mobile */
+    .modal-overlay { padding: 0.5rem; align-items: flex-start; }
+    .modal { max-width: 100%; }
+    .modal-body { padding: 0.9rem; }
+    .modal-header { padding: 0.75rem 0.9rem; }
+    .modal-footer { padding: 0.6rem 0.9rem; }
+
+    /* Worker pills wrap better */
+    .worker-pill { font-size: 0.72rem; padding: 0.2rem 0.4rem; }
+
+    /* Category cards: horizontal scroll strip */
+    .category-grid {
+      display: flex;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      gap: 0.4rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.25rem;
+    }
+    .category-grid::-webkit-scrollbar { display: none; }
+    .category-card {
+      min-width: 100px;
+      flex-shrink: 0;
+      padding: 0.45rem 0.6rem;
+      border-radius: 6px;
+    }
+    .category-card-icon { font-size: 0.9rem; }
+    .category-card-count { font-size: 1rem; }
+    .category-card-label { font-size: 0.6rem; margin-top: 0.1rem; }
+
+    /* Worker cards: compact list on mobile */
+    .worker-cards-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .worker-card { border-radius: 6px !important; }
+    .worker-card-stripe { height: 3px !important; }
+    .worker-card-body { padding: 0.5rem 0.6rem !important; }
+    .worker-card-top { margin-bottom: 0.3rem !important; gap: 0.35rem !important; }
+    .worker-card-avatar { width: 30px !important; height: 30px !important; font-size: 1rem !important; border-radius: 6px !important; }
+    .worker-card-name { font-size: 0.82rem !important; }
+    .worker-card-stats {
+      display: flex !important;
+      gap: 0.3rem !important;
+      margin-bottom: 0.3rem !important;
+    }
+    .worker-card-stats > div { padding: 0.2rem 0.4rem !important; flex: 1; }
+    .worker-card-stats > div > div:first-child { font-size: 0.82rem !important; }
+    .worker-card-actions { margin-top: 0.3rem !important; padding-top: 0.3rem !important; gap: 0.2rem !important; }
+    .worker-card-actions .btn-sm { font-size: 0.68rem; padding: 0.25rem 0.35rem; }
+    .worker-card-transfer { font-size: 0.65rem !important; }
+
+    /* Filter bar responsive */
+    .form-input[placeholder*="Pretraži"] { max-width: 100% !important; flex: 1 1 100% !important; }
+    .filter-chip { font-size: 0.7rem; padding: 0.3rem 0.5rem; }
+
+    /* Šihtarica mobile: hide desktop table, show cards */
+    .siht-desktop-table { display: none !important; }
+    .siht-mobile-cards { display: block !important; }
+    .spisak-desktop { display: none !important; }
+    .spisak-mobile { display: block !important; }
+    .siht-godisnji-desktop { display: none !important; }
+    .siht-godisnji-mobile { display: block !important; }
+    .siht-radnik-desktop { display: none !important; }
+    .siht-radnik-mobile { display: block !important; }
+
+    /* Šihtarica legenda compact */
+    .siht-legenda { gap: 0.25rem !important; margin-bottom: 0.5rem !important; }
   }
   .mobile-fab { display: none; }
+  .mobile-sidebar-panel { display: none; }
+  .mobile-right-panel { display: none; }
+  .siht-mobile-cards { display: none; }
+  .spisak-mobile { display: none; }
+  .siht-godisnji-mobile { display: none; }
+  .siht-radnik-mobile { display: none; }
+  .siht-desktop-table { display: block; }
 
   /* PRINT */
   @media print {
@@ -633,3187 +856,7 @@ if (FIREBASE_ENABLED) {
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useCallback, useMemo } = React;
-
-// ─── DEMO DATA ───────────────────────────────────────────────────────────────
-// Kategorije radnika u šumariji
-const WORKER_CATEGORIES = [
-  { id: 'primac_panj',      label: 'Primači na šuma panju',        short: 'Primač',      icon: '🌳', color: '#2d5a27', pale: '#e8f0e6', border: '#9bc492' },
-  { id: 'poslovoda_isk',    label: 'Poslovođa iskorištavanja šuma', short: 'Posl/Isk',    icon: '🪵', color: '#7a3b00', pale: '#fdf0e0', border: '#e8c17a' },
-  { id: 'poslovoda_uzg',    label: 'Poslovođa uzgoja',             short: 'Posl/Uzg',    icon: '🌱', color: '#1a5a2d', pale: '#e6f5ea', border: '#7bc492' },
-  { id: 'otpremac',         label: 'Otpremač',                     short: 'Otpremač',    icon: '🚛', color: '#6b3080', pale: '#f0e8f5', border: '#c4a0d8' },
-  { id: 'radnik_primka',    label: 'Radnici u primci',             short: 'Radnik/P',    icon: '📋', color: '#b5620a', pale: '#fdf0e0', border: '#e8c17a' },
-  { id: 'pomocni',          label: 'Pomoćni radnici',              short: 'Pomoćni',     icon: '🔧', color: '#1a3d5c', pale: '#e4edf5', border: '#9bbfd9' },
-  { id: 'vlastita_rezija',  label: 'Vlastita režija',              short: 'Vlast.Režija', icon: '⚙️', color: '#5a3d00', pale: '#fdf5e8', border: '#d4b06a' },
-  // legacy — kept for backwards compat
-  { id: 'poslovoda',        label: 'Poslovođa',                    short: 'Poslovođa',   icon: '📎', color: '#5a4a00', pale: '#fdf8e0', border: '#d4c060' },
-];
-
-// Columns shown in the Spisak tab (ordered)
-const SPISAK_COLUMNS = [
-  'primac_panj', 'poslovoda_isk', 'poslovoda_uzg', 'otpremac', 'radnik_primka', 'pomocni', 'vlastita_rezija'
-];
-
-const getCatById = id => WORKER_CATEGORIES.find(c => c.id === id);
-
-const INITIAL_WORKERS = [
-  // PRIMAČI (kolona B)
-  { id: 'w1',  name: 'Tulić Amir',            status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  { id: 'w2',  name: 'Sefić Almir',           status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  { id: 'w3',  name: 'Velagić Jasmin',        status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  { id: 'w4',  name: 'Čehić Nedžad',          status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  { id: 'w5',  name: 'Duraković Arslan',      status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  { id: 'w6',  name: 'Musić Adnan',           status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  { id: 'w7',  name: 'Salkić Adnan',          status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  { id: 'w8',  name: 'Salkić Jasmin',         status: 'aktivan',   category: 'primac_panj',   phone: '', note: '' },
-  // OTPREMAČI (kolona C)
-  { id: 'w9',  name: 'Arnautović Almir',      status: 'aktivan',   category: 'otpremac',      phone: '', note: '' },
-  { id: 'w10', name: 'Čehajić Hasan',         status: 'aktivan',   category: 'otpremac',      phone: '', note: '' },
-  { id: 'w11', name: 'Šabić Reuf',            status: 'aktivan',   category: 'otpremac',      phone: '', note: '' },
-  { id: 'w12', name: 'Alidžanović Elvis',     status: 'aktivan',   category: 'otpremac',      phone: '', note: '' },
-  { id: 'w13', name: 'Hadžipašić Ibrahim',    status: 'aktivan',   category: 'otpremac',      phone: '', note: '' },
-  // POSLOVOĐE (kolona D)
-  { id: 'w14', name: 'Porić Jasmin',          status: 'aktivan',   category: 'poslovoda_isk', phone: '', note: '' },
-  { id: 'w15', name: 'Harbaš Mehmedalija',    status: 'aktivan',   category: 'poslovoda_isk', phone: '', note: '' },
-  { id: 'w16', name: 'Hadžipašić Irfan',      status: 'aktivan',   category: 'poslovoda_isk', phone: '', note: '' },
-  { id: 'w17', name: 'Eljazović Amir',        status: 'aktivan',   category: 'poslovoda_isk', phone: '', note: '' },
-  { id: 'w18', name: 'Kovačević Nurija',      status: 'aktivan',   category: 'poslovoda_isk', phone: '', note: '' },
-  { id: 'w19', name: 'Bećirević Omer',        status: 'aktivan',   category: 'poslovoda_isk', phone: '', note: '' },
-  { id: 'w20', name: 'Arnautović Mustafa',    status: 'aktivan',   category: 'poslovoda_isk', phone: '', note: '' },
-  // RADNICI U PRIMCI (kolona E - idu sa primačem)
-  { id: 'w21', name: 'Đulić Jasmin',          status: 'aktivan',   category: 'radnik_primka', phone: '', note: '' },
-  { id: 'w22', name: 'Mahmutović Mirza',      status: 'aktivan',   category: 'radnik_primka', phone: '', note: '' },
-  { id: 'w23', name: 'Jezerkić Reonaldo',     status: 'aktivan',   category: 'radnik_primka', phone: '', note: '' },
-  { id: 'w24', name: 'Hajrudinović Ajdin',    status: 'aktivan',   category: 'radnik_primka', phone: '', note: '' },
-  { id: 'w25', name: 'Došen Goran',           status: 'aktivan',   category: 'radnik_primka', phone: '', note: '' },
-  // POMOĆNI RADNICI
-  { id: 'w26', name: 'Hadžić Jasmin',         status: 'aktivan',   category: 'pomocni',       phone: '', note: '' },
-  { id: 'w27', name: 'Arnautović Samir',      status: 'aktivan',   category: 'pomocni',       phone: '', note: '' },
-  { id: 'w28', name: 'Rekić Emir',            status: 'aktivan',   category: 'pomocni',       phone: '', note: '' },
-  { id: 'w29', name: 'Rekić Ahmet Kubi',      status: 'aktivan',   category: 'pomocni',       phone: '', note: '' },
-  { id: 'w30', name: 'Gerzić Sabit',          status: 'aktivan',   category: 'pomocni',       phone: '', note: '' },
-];
-
-const GOSPODARSKE_JEDINICE = [
-  'RISOVAC KRUPA',
-  'GRMEČ JASENICA',
-  'VOJSKOVA',
-  'BAŠTRA ĆORKOVAČA',
-  'GOMILA',
-];
-
-const INITIAL_DEPARTMENTS = [];
-
-const JOB_TYPES = ['Primka', 'Priprema proizvodnje', 'Pošumljavanje', 'Prerada', 'Otprema', 'Sektor ekologije', 'Kancelarija', 'Teren', 'Ostalo'];
-
-const today = () => new Date().toISOString().split('T')[0];
-const yesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; };
-const uid = () => Math.random().toString(36).slice(2,10);
-
-function makeInitialSchedules() {
-  return [];
-}
-
-// ─── STORAGE ─────────────────────────────────────────────────────────────────
-const DATA_VERSION = 'v5';
-
-// Firebase ref helper
-const fbRef = (key) => FIREBASE_ENABLED ? firebase.database().ref('sumarija/' + key) : null;
-
-// useStorage: ako je Firebase dostupan, sync s Firebase; inače localStorage
-function useStorage(key, init) {
-  const [val, setVal] = useState(() => {
-    try {
-      if (key === 'sumarija_workers') {
-        const savedVer = localStorage.getItem('sumarija_data_version');
-        if (savedVer !== DATA_VERSION) {
-          localStorage.setItem('sumarija_data_version', DATA_VERSION);
-          localStorage.removeItem('sumarija_workers');
-          return init;
-        }
-      }
-      const s = localStorage.getItem(key);
-      return s ? JSON.parse(s) : init;
-    } catch { return init; }
-  });
-
-  // Firebase real-time listener
-  useEffect(() => {
-    if (!FIREBASE_ENABLED) return;
-    const ref = fbRef(key);
-    const handler = ref.on('value', snap => {
-      const data = snap.val();
-      if (data !== null && data !== undefined) {
-        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-        setVal(parsed);
-        try { localStorage.setItem(key, JSON.stringify(parsed)); } catch {}
-      }
-    });
-    return () => ref.off('value', handler);
-  }, [key]);
-
-  // Write to Firebase + localStorage on change
-  const setValAndSync = useCallback((updater) => {
-    setVal(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      // Write to localStorage always
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
-      // Write to Firebase if enabled
-      if (FIREBASE_ENABLED) {
-        fbRef(key).set(JSON.stringify(next)).catch(e => console.warn('Firebase write error:', e));
-      }
-      return next;
-    });
-  }, [key]);
-
-  return [val, FIREBASE_ENABLED ? setValAndSync : (updater) => {
-    setVal(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
-      return next;
-    });
-  }];
-}
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-const jobBadgeClass = t => {
-  if (t === 'Primka') return 'badge badge-primka';
-  if (t === 'Priprema proizvodnje') return 'badge badge-priprema';
-  if (t === 'Pošumljavanje') return 'badge badge-posumljavanje';
-  if (t === 'Prerada') return 'badge badge-prerada';
-  if (t === 'Otprema') return 'badge badge-otprema';
-  if (t === 'Sektor ekologije') return 'badge badge-ekologija';
-  if (t === 'Kancelarija') return 'badge badge-kancelarija';
-  if (t === 'Teren') return 'badge badge-teren';
-  return 'badge badge-ostalo';
-};
-
-const fmtDate = d => {
-  if (!d) return '';
-  const [y,m,dd] = d.split('-');
-  return `${dd}.${m}.${y}`;
-};
-const fmtTime = ts => {
-  const d = new Date(ts);
-  return d.toLocaleTimeString('bs-BA', { hour:'2-digit', minute:'2-digit' });
-};
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-function App() {
-  const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
-  const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
-  const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
-  const [history, setHistory] = useStorage('sumarija_history', []);
-
-  const [activeTab, setActiveTab] = useState('radnici');
-  const [selectedDate, setSelectedDate] = useState(today());
-  const [sidebarFilter, setSidebarFilter] = useState(null);
-  const [modal, setModal] = useState(null);
-  const [historyModal, setHistoryModal] = useState(null);
-  const [quickModal, setQuickModal] = useState(null); // { worker }
-  const [filterTab, setFilterTab] = useState('dan');
-  const [filterWorker, setFilterWorker] = useState('');
-  const [filterDept, setFilterDept] = useState('');
-  const [filterJob, setFilterJob] = useState('');
-  // Ekipa: { [date]: { primac_panj: [{workerId, note}], radnik_primka: [...], pomocni: [...], otpremac: [...] } }
-  const [ekipa, setEkipa] = useStorage('sumarija_ekipa', {});
-  // godisnji: { workerId: [ { date, type, note } ] }
-  const [godisnji, setGodisnji] = useStorage('sumarija_godisnji', {});
-
-  const addHistory = (action, scheduleId, oldData, newData) => {
-    setHistory(h => [{
-      id: uid(), timestamp: Date.now(), action, scheduleId,
-      date: newData?.date || oldData?.date, oldData, newData
-    }, ...h].slice(0, 200));
-  };
-
-  // Day schedules
-  const daySchedules = useMemo(() =>
-    schedules.filter(s => s.date === selectedDate &&
-      (!sidebarFilter || s.deptId === sidebarFilter)),
-    [schedules, selectedDate, sidebarFilter]);
-
-  // Dept summary for sidebar
-  const deptCounts = useMemo(() => {
-    const counts = {};
-    schedules.filter(s => s.date === selectedDate).forEach(s => {
-      counts[s.deptId] = (counts[s.deptId] || 0) + s.allWorkers.length;
-    });
-    return counts;
-  }, [schedules, selectedDate]);
-
-  // Stats
-  const totalToday = useMemo(() =>
-    new Set(daySchedules.flatMap(s => s.allWorkers)).size,
-    [daySchedules]);
-
-  const statsByJob = useMemo(() => {
-    const m = {};
-    daySchedules.forEach(s => {
-      if (!m[s.jobType]) m[s.jobType] = new Set();
-      s.allWorkers.forEach(w => m[s.jobType].add(w));
-    });
-    return m;
-  }, [daySchedules]);
-
-  const statsByDept = useMemo(() => {
-    const m = {};
-    daySchedules.forEach(s => {
-      if (!m[s.deptId]) m[s.deptId] = new Set();
-      s.allWorkers.forEach(w => m[s.deptId].add(w));
-    });
-    return m;
-  }, [daySchedules]);
-
-  // Conflict check
-  const checkConflict = (newSched, excludeId = null) => {
-    const conflicts = [];
-    newSched.allWorkers.forEach(wId => {
-      const existing = schedules.find(s =>
-        s.date === newSched.date && s.id !== excludeId &&
-        s.allWorkers.includes(wId)
-      );
-      if (existing) conflicts.push(wId);
-    });
-    return conflicts;
-  };
-
-  const wName = id => workers.find(w => w.id === id)?.name || id;
-  const dName = id => { const d = departments.find(d => d.id === id); return d ? `${d.gospodarskaJedinica} — Odjel ${d.brojOdjela}` : id; };
-
-  // Save schedule
-  const saveSchedule = (data, isEdit) => {
-    if (isEdit) {
-      const old = schedules.find(s => s.id === data.id);
-      setSchedules(prev => prev.map(s => s.id === data.id ? data : s));
-      addHistory('edit', data.id, old, data);
-    } else {
-      const newId = uid();
-      const nd = { ...data, id: newId };
-      setSchedules(prev => [...prev, nd]);
-      addHistory('create', newId, null, nd);
-    }
-  };
-
-  const deleteSchedule = id => {
-    const old = schedules.find(s => s.id === id);
-    setSchedules(prev => prev.filter(s => s.id !== id));
-    addHistory('delete', id, old, null);
-  };
-
-  const restoreVersion = (histItem) => {
-    if (!histItem.oldData) return;
-    const exists = schedules.find(s => s.id === histItem.scheduleId);
-    if (exists) {
-      setSchedules(prev => prev.map(s => s.id === histItem.scheduleId ? histItem.oldData : s));
-    } else {
-      setSchedules(prev => [...prev, histItem.oldData]);
-    }
-    addHistory('restore', histItem.scheduleId, exists, histItem.oldData);
-    setHistoryModal(null);
-  };
-
-  const copyFromDate = (fromDate) => {
-    const source = schedules.filter(s => s.date === fromDate);
-    const newOnes = source.map(s => ({ ...s, id: uid(), date: selectedDate }));
-    setSchedules(prev => {
-      const cleaned = prev.filter(s => s.date !== selectedDate);
-      return [...cleaned, ...newOnes];
-    });
-    newOnes.forEach(s => addHistory('create', s.id, null, s));
-  };
-
-  const prevDay = () => {
-    const d = new Date(selectedDate); d.setDate(d.getDate()-1);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-  const nextDay = () => {
-    const d = new Date(selectedDate); d.setDate(d.getDate()+1);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-
-  // Print
-  const handlePrint = () => window.print();
-
-  // Quick assign from panel click
-  const onWorkerClick = (worker) => setQuickModal({ worker });
-
-  return (
-    <div>
-      {/* HEADER */}
-      <header className="app-header">
-        <div className="app-title">
-          <span className="icon">🌲</span>
-          <span>Šumarija Raspored</span>
-          {FIREBASE_ENABLED
-            ? <span style={{fontSize:'0.65rem',background:'rgba(255,255,255,0.15)',padding:'0.15rem 0.5rem',borderRadius:10,marginLeft:'0.25rem',fontFamily:'var(--mono)'}}>🔴 live sync</span>
-            : <span style={{fontSize:'0.65rem',background:'rgba(255,255,255,0.1)',padding:'0.15rem 0.5rem',borderRadius:10,marginLeft:'0.25rem',fontFamily:'var(--mono)',opacity:0.6}}>💾 lokalno</span>
-          }
-        </div>
-        <nav className="nav-tabs">
-          {[['raspored','📋 Raspored'],['ekipa','👥 Ekipa'],['radnici','👷 Radnici'],['spisak','📊 Spisak'],['odjeli','🏕️ Odjeli'],['sihtarica','📄 Šihtarica'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
-            <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
-          )}
-        </nav>
-      </header>
-
-      <div className="app-layout">
-        {/* SIDEBAR */}
-        {activeTab === 'raspored' && (
-          <aside className="sidebar">
-            <div className="sidebar-section">
-              <div className="sidebar-label">Odjeli</div>
-              <button className={`sidebar-item ${!sidebarFilter?'active':''}`} onClick={() => setSidebarFilter(null)}>
-                <span>Svi odjeli</span>
-                <span className="count">{Object.values(statsByDept).reduce((a,s)=>a+s.size,0)}</span>
-              </button>
-              {departments.map(d => (
-                <button key={d.id} className={`sidebar-item ${sidebarFilter===d.id?'active':''}`} onClick={() => setSidebarFilter(d.id)}>
-                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.name}</span>
-                  <span className="count">{statsByDept[d.id]?.size || 0}</span>
-                </button>
-              ))}
-            </div>
-            <div className="sidebar-section">
-              <div className="sidebar-label">Vrste posla</div>
-              {JOB_TYPES.map(jt => (
-                <div key={jt} className="sidebar-item" style={{cursor:'default'}}>
-                  <span className={jobBadgeClass(jt)} style={{fontSize:'0.65rem'}}>{jt}</span>
-                  <span className="count">{statsByJob[jt]?.size || 0}</span>
-                </div>
-              ))}
-            </div>
-          </aside>
-        )}
-
-        {/* MAIN */}
-        <main className="main-content">
-          {activeTab === 'raspored' && (
-            <ScheduleView
-              selectedDate={selectedDate} setSelectedDate={setSelectedDate}
-              daySchedules={daySchedules} schedules={schedules}
-              workers={workers} departments={departments}
-              wName={wName} dName={dName}
-              totalToday={totalToday} statsByJob={statsByJob} statsByDept={statsByDept}
-              prevDay={prevDay} nextDay={nextDay}
-              onAdd={() => setModal({type:'entry', data:{date:selectedDate}})}
-              onEdit={s => setModal({type:'entry', data:s, isEdit:true})}
-              onDelete={id => { if (confirm('Obrisati ovaj zapis?')) deleteSchedule(id); }}
-              onHistory={s => setHistoryModal(s)}
-              copyFromDate={copyFromDate}
-              handlePrint={handlePrint}
-              yesterday={yesterday()}
-            />
-          )}
-          {activeTab === 'ekipa' && (
-            <EkipaView
-              workers={workers}
-              departments={departments}
-              ekipa={ekipa}
-              setEkipa={setEkipa}
-              selectedDate={selectedDate}
-              setSelectedDate={setSelectedDate}
-              prevDay={prevDay}
-              nextDay={nextDay}
-              yesterday={yesterday()}
-            />
-          )}
-          {activeTab === 'radnici' && (
-            <WorkersView workers={workers} setWorkers={setWorkers} schedules={schedules} />
-          )}
-          {activeTab === 'odjeli' && (
-            <DepartmentsView departments={departments} setDepartments={setDepartments} schedules={schedules} dName={dName} />
-          )}
-          {activeTab === 'spisak' && (
-            <SpisakView workers={workers} setWorkers={setWorkers} />
-          )}
-          {activeTab === 'sihtarica' && (
-            <SihtaricaView
-              schedules={schedules} workers={workers} departments={departments}
-              godisnji={godisnji} setGodisnji={setGodisnji}
-              wName={wName} dName={dName}
-            />
-          )}
-          {activeTab === 'pregled' && (
-            <PregledView schedules={schedules} workers={workers} departments={departments}
-              wName={wName} dName={dName}
-              filterWorker={filterWorker} setFilterWorker={setFilterWorker}
-              filterDept={filterDept} setFilterDept={setFilterDept}
-              filterJob={filterJob} setFilterJob={setFilterJob}
-            />
-          )}
-          {activeTab === 'historija' && (
-            <HistorijaView history={history} wName={wName} dName={dName} restoreVersion={restoreVersion} schedules={schedules} />
-          )}
-        </main>
-
-        {/* RIGHT PANEL (schedule tab only) */}
-        {activeTab === 'raspored' && (
-          <RightPanel
-            selectedDate={selectedDate}
-            daySchedules={daySchedules}
-            schedules={schedules}
-            workers={workers}
-            departments={departments}
-            wName={wName}
-            dName={dName}
-            statsByJob={statsByJob}
-            statsByDept={statsByDept}
-            onAdd={() => setModal({type:'entry', data:{date:selectedDate}})}
-            copyFromDate={copyFromDate}
-            yesterday={yesterday()}
-            onWorkerClick={onWorkerClick}
-        />
-        )}
-      </div>
-
-      {/* MOBILE FAB */}
-      {activeTab === 'raspored' && (
-        <button className="mobile-fab" onClick={() => setModal({type:'entry', data:{date:selectedDate}})}>+</button>
-      )}
-
-      {/* MODALS */}
-      {quickModal && (
-        <QuickModal
-          worker={quickModal.worker}
-          workers={workers}
-          departments={departments}
-          setDepartments={setDepartments}
-          selectedDate={selectedDate}
-          schedules={schedules}
-          checkConflict={checkConflict}
-          onSave={(d) => { saveSchedule(d, false); setQuickModal(null); }}
-          onClose={() => setQuickModal(null)}
-          wName={wName}
-          godisnji={godisnji}
-          setGodisnji={setGodisnji}
-        />
-      )}
-      {modal?.type === 'entry' && (
-        <EntryModal
-          data={modal.data}
-          isEdit={modal.isEdit}
-          workers={workers}
-          departments={departments}
-          setDepartments={setDepartments}
-          schedules={schedules}
-          checkConflict={checkConflict}
-          onSave={(d) => { saveSchedule(d, modal.isEdit); setModal(null); }}
-          onClose={() => setModal(null)}
-          wName={wName}
-        />
-      )}
-
-      {historyModal && (
-        <HistoryDetailModal
-          schedule={historyModal}
-          history={history.filter(h => h.scheduleId === historyModal.id)}
-          workers={workers}
-          wName={wName}
-          dName={dName}
-          restoreVersion={restoreVersion}
-          onClose={() => setHistoryModal(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── SCHEDULE VIEW ────────────────────────────────────────────────────────────
-function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, workers, departments,
-  wName, dName, totalToday, statsByJob, statsByDept,
-  prevDay, nextDay, onAdd, onEdit, onDelete, onHistory, copyFromDate, handlePrint, yesterday }) {
-
-  const isToday = selectedDate === new Date().toISOString().split('T')[0];
-
-  // Group by dept
-  const byDept = useMemo(() => {
-    const m = {};
-    daySchedules.forEach(s => {
-      if (!m[s.deptId]) m[s.deptId] = [];
-      m[s.deptId].push(s);
-    });
-    return m;
-  }, [daySchedules]);
-
-  return (
-    <div>
-      {/* DATE BAR */}
-      <div className="date-bar">
-        <div>
-          <div className="date-label">DATUM</div>
-          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.25rem'}}>
-            <button className="date-nav-btn" onClick={prevDay}>‹</button>
-            <input type="date" className="date-input" value={selectedDate}
-              onChange={e => setSelectedDate(e.target.value)} />
-            <button className="date-nav-btn" onClick={nextDay}>›</button>
-            {isToday && <span className="today-chip">DANAS</span>}
-          </div>
-        </div>
-        <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
-          <button className="btn btn-secondary btn-sm no-print" onClick={() => copyFromDate(yesterday)}>
-            📋 Kopiraj jučer
-          </button>
-          <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>
-            🖨️ Print
-          </button>
-          <button className="btn btn-primary btn-sm no-print" onClick={onAdd}>
-            + Novi unos
-          </button>
-        </div>
-      </div>
-
-      {/* STATS */}
-      <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-value">{totalToday}</div>
-          <div className="stat-label">Ukupno radnika</div>
-        </div>
-        {Object.entries(statsByJob).map(([jt, ws]) => (
-          <div className="stat-card" key={jt}>
-            <div className="stat-value" style={{fontSize:'1.2rem'}}>{ws.size}</div>
-            <div className="stat-label">{jt}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* SECTION TITLE */}
-      <div className="section-header">
-        <div className="section-title">Raspored za {fmtDate(selectedDate)}</div>
-        <span className="tag">{daySchedules.length} {daySchedules.length===1?'stavka':'stavki'}</span>
-      </div>
-
-      {daySchedules.length === 0 ? (
-        <div className="empty-state">
-          <span className="icon">📋</span>
-          <p>Nema unesenog rasporeda za ovaj dan.</p>
-          <button className="btn btn-primary" onClick={onAdd}>+ Dodaj prvi unos</button>
-        </div>
-      ) : (
-        Object.entries(byDept).map(([deptId, rows]) => (
-          <div className="card" key={deptId}>
-            <div className="dept-header">
-              <span>🏕️</span>
-              <span className="dept-name">{dName(deptId)}</span>
-              <span className="dept-count">{new Set(rows.flatMap(r => r.allWorkers)).size} radnika</span>
-            </div>
-            <table className="schedule-table">
-              <thead>
-                <tr>
-                  <th>Vrsta posla</th>
-                  <th>Radnici</th>
-                  <th>Napomena</th>
-                  <th className="no-print" style={{width:'90px'}}>Akcije</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(row => (
-                  <tr key={row.id}>
-                    <td><span className={jobBadgeClass(row.jobType)}>{row.jobType}</span></td>
-                    <td>
-                      <div style={{display:'flex',flexWrap:'wrap',gap:'2px'}}>
-                        {row.jobType === 'Primka' ? (
-                          <>
-                            {row.primatWorker && <span className="worker-pill primac"><span className="role-dot"/>P: {wName(row.primatWorker)}</span>}
-                            {row.helper1Worker && <span className="worker-pill"><span className="role-dot"/>{wName(row.helper1Worker)}</span>}
-                            {row.helper2Worker && <span className="worker-pill"><span className="role-dot"/>{wName(row.helper2Worker)}</span>}
-                            {(row.extraWorkers||[]).map(w => <span key={w} className="worker-pill"><span className="role-dot"/>{wName(w)}</span>)}
-                          </>
-                        ) : (
-                          row.allWorkers.map(w => <span key={w} className="worker-pill"><span className="role-dot"/>{wName(w)}</span>)
-                        )}
-                      </div>
-                    </td>
-                    <td style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{row.note || '—'}</td>
-                    <td className="no-print">
-                      <div style={{display:'flex',gap:'0.25rem'}}>
-                        <button className="btn btn-ghost btn-icon btn-sm" title="Historija" onClick={() => onHistory(row)}>📜</button>
-                        <button className="btn btn-ghost btn-icon btn-sm" title="Uredi" onClick={() => onEdit(row)}>✏️</button>
-                        <button className="btn btn-danger btn-icon btn-sm" title="Briši" onClick={() => onDelete(row.id)}>🗑️</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-// ─── RIGHT PANEL ──────────────────────────────────────────────────────────────
-function RightPanel({ selectedDate, daySchedules, schedules, workers, departments, wName, dName,
-  statsByJob, statsByDept, onAdd, copyFromDate, yesterday, onWorkerClick }) {
-
-  const [copyDate, setCopyDate] = useState('');
-  const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
-  const activeWorkers = workers.filter(w => w.status === 'aktivan');
-  const unassigned = activeWorkers.filter(w => !assignedWorkers.has(w.id));
-
-  // Group unassigned by category
-  const unassignedByCat = WORKER_CATEGORIES.filter(c => c.id !== 'poslovoda').map(cat => ({
-    cat,
-    workers: unassigned.filter(w => w.category === cat.id),
-  })).filter(g => g.workers.length > 0);
-
-  return (
-    <aside className="right-panel">
-      <div style={{marginBottom:'1rem'}}>
-        <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.5rem'}}>Brzi unos</div>
-        <button className="btn btn-primary" style={{width:'100%',marginBottom:'0.5rem'}} onClick={onAdd}>+ Novi unos</button>
-        <button className="btn btn-secondary" style={{width:'100%',marginBottom:'0.5rem'}} onClick={() => copyFromDate(yesterday)}>
-          📋 Kopiraj jučer
-        </button>
-        <div style={{display:'flex',gap:'0.5rem'}}>
-          <input type="date" className="form-input" value={copyDate} onChange={e => setCopyDate(e.target.value)} style={{flex:1,fontSize:'0.78rem'}} />
-          <button className="btn btn-secondary btn-sm" disabled={!copyDate} onClick={() => { copyFromDate(copyDate); setCopyDate(''); }}>Kopiraj</button>
-        </div>
-      </div>
-      <div className="divider"/>
-
-      {/* By dept */}
-      <div style={{marginBottom:'1rem'}}>
-        <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.6rem'}}>Po odjelu</div>
-        {Object.keys(statsByDept).length === 0 && <div style={{fontSize:'0.8rem',color:'var(--text-light)'}}>Nema podataka</div>}
-        {Object.entries(statsByDept).map(([dId, ws]) => (
-          <div key={dId} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.35rem 0',borderBottom:'1px solid var(--border)',fontSize:'0.82rem'}}>
-            <span style={{color:'var(--text-muted)'}}>{dName(dId)}</span>
-            <span style={{fontFamily:'var(--mono)',fontWeight:600,color:'var(--green)'}}>{ws.size}</span>
-          </div>
-        ))}
-      </div>
-      <div className="divider"/>
-
-      {/* Unassigned — clickable */}
-      <div>
-        <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',color:'var(--text-light)',textTransform:'uppercase',marginBottom:'0.6rem'}}>
-          Neraspoređeni ({unassigned.length}) <span style={{opacity:0.6,fontWeight:400,fontSize:'0.55rem'}}>↙ klikni</span>
-        </div>
-        {unassigned.length === 0 ? (
-          <div style={{fontSize:'0.8rem',color:'var(--green)',fontWeight:500}}>✓ Svi raspoređeni</div>
-        ) : (
-          unassignedByCat.map(({ cat, workers: ws }) => (
-            <div key={cat.id} style={{marginBottom:'0.5rem'}}>
-              <div style={{fontSize:'0.62rem',fontWeight:700,color:cat.color,letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.2rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
-                <span>{cat.icon}</span>{cat.short}
-              </div>
-              {ws.map(w => (
-                <div key={w.id}
-                  onClick={() => onWorkerClick(w)}
-                  style={{
-                    display:'flex',alignItems:'center',gap:'0.4rem',
-                    padding:'0.3rem 0.5rem',marginBottom:'0.15rem',
-                    fontSize:'0.8rem',fontWeight:500,
-                    background: cat.pale,
-                    border:`1px solid ${cat.border}`,
-                    borderLeft:`3px solid ${cat.color}`,
-                    borderRadius:4,
-                    cursor:'pointer',
-                    transition:'all 0.1s',
-                    color: cat.color,
-                  }}
-                  onMouseEnter={e=>e.currentTarget.style.background=cat.border}
-                  onMouseLeave={e=>e.currentTarget.style.background=cat.pale}
-                >
-                  <span style={{fontSize:'0.85rem'}}>{cat.icon}</span>
-                  <span style={{flex:1}}>{w.name}</span>
-                  <span style={{fontSize:'0.6rem',opacity:0.6}}>→</span>
-                </div>
-              ))}
-            </div>
-          ))
-        )}
-      </div>
-    </aside>
-  );
-}
-
-
-// ─── QUICK ASSIGN MODAL ───────────────────────────────────────────────────────
-function QuickModal({ worker, workers, departments, setDepartments, selectedDate, schedules, checkConflict, onSave, onClose, wName, godisnji, setGodisnji }) {
-  const cat = getCatById(worker.category);
-  const isPrimac = worker.category === 'primac_panj';
-
-  // Two modes: 'rad' or 'odsutnost'
-  const [mode, setMode] = useState('rad');
-
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
-  const ODSUTNOST_COLOR = {
-    'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO', icon:'🏖️' },
-    'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B',  icon:'🏥' },
-    'Slobodan dan':   { bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a', short:'SD', icon:'☀️' },
-    'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N',  icon:'📋' },
-  };
-
-  const QUICK_STATUSES = [
-    { id: 'kancelarija', label: 'Kancelarija', icon: '🏢', bg:'#e8eaf6', color:'#3949ab', border:'#9fa8da' },
-    { id: 'teren',       label: 'Teren',       icon: '🌿', bg:'#e8f5e9', color:'#2e7d32', border:'#81c784' },
-  ];
-
-  // Determine jobType default based on category
-  const defaultJob = () => {
-    if (worker.category === 'primac_panj') return 'Primka';
-    if (worker.category === 'otpremac')    return 'Otprema';
-    if (worker.category === 'poslovoda_isk' || worker.category === 'poslovoda_uzg') return 'Priprema proizvodnje';
-    if (worker.category === 'vlastita_rezija') return 'Ostalo';
-    return 'Ostalo';
-  };
-
-  const [deptId, setDeptId]         = useState(departments[0]?.id || '');
-  const [newGJ, setNewGJ]           = useState('');
-  const [newBroj, setNewBroj]       = useState('');
-  const [jobType, setJobType]       = useState(defaultJob());
-  const [quickStatus, setQuickStatus] = useState(null); // 'kancelarija' | 'teren' | null
-  const [odsutnostType, setOdsType] = useState('Godišnji odmor');
-  const [note, setNote]             = useState('');
-  const [extraWorkers, setExtra]    = useState([]);
-  const [forceOverride, setForce]   = useState(false);
-  const [conflicts, setConflicts]   = useState([]);
-
-  const activeWorkers = workers.filter(w => w.status === 'aktivan');
-
-  const companions = activeWorkers.filter(w =>
-    w.id !== worker.id &&
-    (w.category === 'radnik_primka' || w.category === 'pomocni' || w.category === 'primac_panj')
-  );
-  const companionGroups = [
-    { label: 'Radnici u primci', workers: companions.filter(w => w.category === 'radnik_primka') },
-    { label: 'Pomoćni radnici',  workers: companions.filter(w => w.category === 'pomocni') },
-    { label: 'Primači (opciono)',workers: companions.filter(w => w.category === 'primac_panj') },
-  ].filter(g => g.workers.length > 0);
-
-  const toggleExtra = (wId) => setExtra(prev =>
-    prev.includes(wId) ? prev.filter(x => x !== wId) : [...prev, wId]
-  );
-
-  const allWorkers = isPrimac
-    ? [worker.id, ...extraWorkers].filter(Boolean)
-    : [worker.id];
-
-  const addDept = () => {
-    if (!newGJ) return alert('Odaberi gospodarsku jedinicu!');
-    if (!newBroj.trim()) return alert('Unesi broj odjela!');
-    const exists = departments.find(d => d.gospodarskaJedinica === newGJ && d.brojOdjela === newBroj.trim());
-    if (exists) { setDeptId(exists.id); return; }
-    const nd = { id: uid(), gospodarskaJedinica: newGJ, brojOdjela: newBroj.trim(), note: '' };
-    setDepartments(ds => [...ds, nd]);
-    setDeptId(nd.id);
-    setNewGJ(''); setNewBroj('');
-  };
-
-  const handleSaveOdsutnost = () => {
-    setGodisnji(g => {
-      const prev = g[worker.id] || [];
-      const filtered = prev.filter(e => e.date !== selectedDate);
-      return { ...g, [worker.id]: [...filtered, { date: selectedDate, type: odsutnostType, note }] };
-    });
-    onClose();
-  };
-
-  const handleSaveKancelarijaOrTeren = () => {
-    const entry = {
-      id: uid(), date: selectedDate,
-      deptId: deptId || 'kancelarija_teren',
-      jobType: quickStatus === 'kancelarija' ? 'Kancelarija' : 'Teren',
-      primatWorker: null, helper1Worker: null, helper2Worker: null,
-      extraWorkers: [], allWorkers: [worker.id], note, overrides: [],
-    };
-    onSave(entry);
-  };
-
-  const handleSaveRad = () => {
-    if (!deptId) return alert('Odaberi odjel!');
-    const entry = {
-      id: uid(), date: selectedDate, deptId,
-      jobType: quickStatus === 'kancelarija' ? 'Kancelarija' : quickStatus === 'teren' ? 'Teren' : jobType,
-      primatWorker: isPrimac ? worker.id : null,
-      helper1Worker: null, helper2Worker: null,
-      extraWorkers: isPrimac ? extraWorkers : [],
-      allWorkers, note, overrides: [],
-    };
-    const c = checkConflict(entry, null);
-    if (c.length > 0 && !forceOverride) { setConflicts(c); return; }
-    onSave({...entry, overrides: forceOverride ? c : []});
-  };
-
-  const oc = ODSUTNOST_COLOR[odsutnostType];
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
-      <div className="modal" style={{maxWidth: isPrimac && mode==='rad' ? 520 : 400}}>
-        {/* Header */}
-        <div className="modal-header" style={{background: cat?.pale, borderBottom: `2px solid ${cat?.border}`}}>
-          <span style={{fontSize:'1.5rem'}}>{cat?.icon}</span>
-          <div style={{flex:1}}>
-            <div className="modal-title" style={{color: cat?.color}}>{worker.name}</div>
-            <div style={{fontSize:'0.72rem',color:cat?.color,opacity:0.8,fontWeight:600}}>{cat?.label}</div>
-          </div>
-          <div style={{fontFamily:'var(--mono)',fontSize:'0.75rem',color:'var(--text-muted)',background:'var(--bg)',border:'1px solid var(--border)',borderRadius:4,padding:'0.2rem 0.5rem'}}>{selectedDate}</div>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button>
-        </div>
-
-        {/* Mode selector */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',borderBottom:'1px solid var(--border)'}}>
-          <button onClick={()=>setMode('rad')} style={{
-            padding:'0.6rem',border:'none',cursor:'pointer',fontWeight:600,fontSize:'0.82rem',
-            background: mode==='rad' ? 'var(--green-pale)' : 'var(--bg)',
-            color: mode==='rad' ? 'var(--green)' : 'var(--text-muted)',
-            borderBottom: mode==='rad' ? '2px solid var(--green)' : '2px solid transparent',
-          }}>💼 Rasporedi na posao</button>
-          <button onClick={()=>setMode('odsutnost')} style={{
-            padding:'0.6rem',border:'none',cursor:'pointer',fontWeight:600,fontSize:'0.82rem',
-            background: mode==='odsutnost' ? '#fde8e8' : 'var(--bg)',
-            color: mode==='odsutnost' ? '#8b2020' : 'var(--text-muted)',
-            borderBottom: mode==='odsutnost' ? '2px solid #8b2020' : '2px solid transparent',
-          }}>🏖️ Odsutnost</button>
-        </div>
-
-        <div className="modal-body" style={{maxHeight:'68vh',overflowY:'auto'}}>
-          {/* ── ODSUTNOST MODE ── */}
-          {mode === 'odsutnost' && (
-            <div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem',marginBottom:'0.75rem'}}>
-                {ODSUTNOST_TYPES.map(t => {
-                  const o = ODSUTNOST_COLOR[t];
-                  return (
-                    <button key={t} type="button" onClick={()=>setOdsType(t)} style={{
-                      padding:'0.65rem 0.5rem',border:`2px solid ${odsutnostType===t ? o.color : o.border}`,
-                      borderRadius:8,background:odsutnostType===t ? o.bg : 'var(--bg)',
-                      color:odsutnostType===t ? o.color : 'var(--text-muted)',
-                      fontWeight:odsutnostType===t ? 700 : 400,
-                      fontSize:'0.82rem',cursor:'pointer',
-                      display:'flex',flexDirection:'column',alignItems:'center',gap:'0.2rem',
-                    }}>
-                      <span style={{fontSize:'1.3rem'}}>{o.icon}</span>
-                      <span>{t}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="form-group" style={{marginBottom:0}}>
-                <label className="form-label">Napomena</label>
-                <input className="form-input" placeholder="Opcionalno..." value={note} onChange={e=>setNote(e.target.value)} />
-              </div>
-            </div>
-          )}
-
-          {/* ── RAD MODE ── */}
-          {mode === 'rad' && (
-            <div>
-              {conflicts.length > 0 && !forceOverride && (
-                <div className="alert alert-warning" style={{marginBottom:'0.75rem'}}>
-                  ⚠️ Konflikt: <strong>{conflicts.map(wName).join(', ')}</strong> već raspoređeni.
-                  <div style={{marginTop:'0.4rem'}}>
-                    <button className="btn btn-secondary btn-sm" onClick={()=>setForce(true)}>Ipak sačuvaj</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Kancelarija / Teren brze opcije */}
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.4rem',marginBottom:'0.75rem'}}>
-                {QUICK_STATUSES.map(qs => (
-                  <button key={qs.id} type="button" onClick={()=>setQuickStatus(quickStatus===qs.id ? null : qs.id)} style={{
-                    padding:'0.5rem',border:`2px solid ${quickStatus===qs.id ? qs.color : qs.border}`,
-                    borderRadius:8,background:quickStatus===qs.id ? qs.bg : 'var(--bg)',
-                    color:quickStatus===qs.id ? qs.color : 'var(--text-muted)',
-                    fontWeight:quickStatus===qs.id ? 700 : 400,
-                    fontSize:'0.82rem',cursor:'pointer',
-                    display:'flex',alignItems:'center',justifyContent:'center',gap:'0.4rem',
-                  }}>
-                    <span style={{fontSize:'1.1rem'}}>{qs.icon}</span>{qs.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Vrsta posla — hide if kancelarija/teren selected */}
-              {!quickStatus && (
-                <div className="form-group">
-                  <label className="form-label">Vrsta posla</label>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
-                    {JOB_TYPES.map(jt => (
-                      <button key={jt} type="button"
-                        onClick={() => setJobType(jt)}
-                        className={jobBadgeClass(jt)}
-                        style={{
-                          cursor:'pointer',
-                          border: jobType===jt ? '2px solid #333' : '2px solid transparent',
-                          opacity: jobType===jt ? 1 : 0.55,
-                          fontSize:'0.75rem', padding:'0.25rem 0.6rem',
-                        }}>{jt}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Odjel — hide for kancelarija */}
-              {quickStatus !== 'kancelarija' && (
-                <div className="form-group">
-                  <label className="form-label">Odjel / Radilište</label>
-                  {departments.length > 0 && (
-                    <select className="form-select" value={deptId} onChange={e=>setDeptId(e.target.value)} style={{marginBottom:'0.4rem'}}>
-                      <option value="">— Odaberi postojeći —</option>
-                      {departments.map(d => <option key={d.id} value={d.id}>{d.gospodarskaJedinica} — Odjel {d.brojOdjela}</option>)}
-                    </select>
-                  )}
-                  <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end'}}>
-                    <div style={{flex:2}}>
-                      <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem'}}>Gospodarska jedinica</div>
-                      <select className="form-select" value={newGJ} onChange={e=>setNewGJ(e.target.value)} style={{fontSize:'0.82rem'}}>
-                        <option value="">— Odaberi —</option>
-                        {GOSPODARSKE_JEDINICE.map(g => <option key={g} value={g}>{g}</option>)}
-                      </select>
-                    </div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem'}}>Br. odjela</div>
-                      <input className="form-input" placeholder="npr. 54" value={newBroj} onChange={e=>setNewBroj(e.target.value)} style={{fontSize:'0.82rem'}} onKeyDown={e=>e.key==='Enter'&&addDept()} />
-                    </div>
-                    <button className="btn btn-secondary btn-sm" style={{whiteSpace:'nowrap',flexShrink:0}} onClick={addDept}>+ Dodaj</button>
-                  </div>
-                  {deptId && departments.find(d=>d.id===deptId) && (
-                    <div style={{marginTop:'0.3rem',fontSize:'0.75rem',color:'var(--green)',fontWeight:600}}>
-                      ✓ {departments.find(d=>d.id===deptId).gospodarskaJedinica} — Odjel {departments.find(d=>d.id===deptId).brojOdjela}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Companions for primac */}
-              {isPrimac && !quickStatus && (
-                <div className="form-group">
-                  <label className="form-label">Pratioci (opciono)</label>
-                  <div className="worker-selector">
-                    {companionGroups.map(g => (
-                      <div key={g.label}>
-                        <div style={{padding:'0.25rem 0.7rem',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',background:'var(--bg)',borderBottom:'1px solid var(--border)'}}>
-                          {g.label}
-                        </div>
-                        {g.workers.filter(w => !extraWorkers.includes(w.id)).map(w => {
-                          const wcat = getCatById(w.category);
-                          return (
-                            <div key={w.id} className="worker-option" onClick={() => toggleExtra(w.id)}>
-                              <span style={{fontSize:'0.85rem'}}>{wcat?.icon}</span>
-                              {w.name}
-                              <span style={{marginLeft:'auto',fontSize:'0.65rem',color:wcat?.color,background:wcat?.pale,border:`1px solid ${wcat?.border}`,padding:'0.1rem 0.3rem',borderRadius:3,fontFamily:'var(--mono)'}}>{wcat?.short}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                  {extraWorkers.length > 0 && (
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem',marginTop:'0.4rem'}}>
-                      {extraWorkers.map(wId => {
-                        const w = workers.find(x=>x.id===wId);
-                        return (
-                          <span key={wId} style={{display:'inline-flex',alignItems:'center',gap:'0.3rem',background:'white',border:'1px solid var(--border)',borderRadius:20,padding:'0.2rem 0.4rem 0.2rem 0.6rem',fontSize:'0.78rem'}}>
-                            {w?.name}
-                            <button onClick={()=>toggleExtra(wId)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',fontSize:'0.75rem',padding:'0 0.1rem'}}>✕</button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="form-group" style={{marginBottom:0}}>
-                <label className="form-label">Napomena</label>
-                <input className="form-input" placeholder="Opcionalno..." value={note} onChange={e=>setNote(e.target.value)} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Odustani</button>
-          {mode === 'odsutnost' ? (
-            <button className="btn btn-primary" style={{background: oc?.color, borderColor: oc?.color}} onClick={handleSaveOdsutnost}>
-              {oc?.icon} Sačuvaj {odsutnostType}
-            </button>
-          ) : quickStatus === 'kancelarija' ? (
-            <button className="btn btn-primary" style={{background:'#3949ab',borderColor:'#3949ab'}} onClick={handleSaveKancelarijaOrTeren}>
-              🏢 Kancelarija
-            </button>
-          ) : quickStatus === 'teren' ? (
-            <button className="btn btn-primary" style={{background:'#2e7d32',borderColor:'#2e7d32'}} onClick={handleSaveRad}>
-              🌿 Teren
-            </button>
-          ) : (
-            <button className="btn btn-primary" style={{background:cat?.color,borderColor:cat?.color}} onClick={handleSaveRad}>
-              ✓ Rasporedi {worker.name.split(' ')[0]}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
-function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, onSave, onClose, wName }) {
-  const [form, setForm] = useState({
-    id: data.id || uid(),
-    date: data.date || today(),
-    deptId: data.deptId || departments[0]?.id || '',
-    jobType: data.jobType || JOB_TYPES[0],
-    primatWorker: data.primatWorker || '',
-    helper1Worker: data.helper1Worker || '',
-    helper2Worker: data.helper2Worker || '',
-    extraWorkers: data.extraWorkers || [],
-    allWorkers: data.allWorkers || [],
-    note: data.note || '',
-    overrides: data.overrides || [],
-  });
-  const [conflicts, setConflicts] = useState([]);
-  const [forceOverride, setForceOverride] = useState(false);
-
-  const activeWorkers = workers.filter(w => w.status === 'aktivan');
-  const isPrimka = form.jobType === 'Primka';
-
-  useEffect(() => {
-    if (isPrimka) {
-      const ws = [form.primatWorker, ...(form.extraWorkers||[])].filter(Boolean);
-      setForm(f => ({...f, allWorkers: ws}));
-    }
-  }, [form.primatWorker, form.extraWorkers, form.jobType]);
-
-  const toggleWorker = (wId) => {
-    setForm(f => {
-      const ws = f.allWorkers.includes(wId) ? f.allWorkers.filter(w=>w!==wId) : [...f.allWorkers, wId];
-      return {...f, allWorkers: ws};
-    });
-  };
-
-  const toggleExtra = (wId) => {
-    setForm(f => {
-      const ws = f.extraWorkers.includes(wId) ? f.extraWorkers.filter(w=>w!==wId) : [...f.extraWorkers, wId];
-      return {...f, extraWorkers: ws};
-    });
-  };
-
-  const handleSubmit = () => {
-    if (!form.deptId) return alert('Odaberite odjel!');
-    if (form.allWorkers.length === 0) return alert('Odaberite barem jednog radnika!');
-    const c = checkConflict(form, isEdit ? form.id : null);
-    if (c.length > 0 && !forceOverride) {
-      setConflicts(c);
-      return;
-    }
-    onSave({...form, overrides: forceOverride ? c : []});
-  };
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <span style={{fontSize:'1.2rem'}}>{isEdit ? '✏️' : '+'}</span>
-          <div className="modal-title">{isEdit ? 'Uredi unos' : 'Novi raspored'}</div>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body" style={{maxHeight:'70vh',overflowY:'auto'}}>
-          {conflicts.length > 0 && !forceOverride && (
-            <div className="alert alert-warning" style={{marginBottom:'1rem'}}>
-              ⚠️ Konflikt! Radnici su već raspoređeni za ovaj datum: <strong>{conflicts.map(wName).join(', ')}</strong>
-              <div style={{marginTop:'0.5rem'}}>
-                <button className="btn btn-secondary btn-sm" onClick={() => setForceOverride(true)}>
-                  Ipak sačuvaj (override)
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem'}}>
-            <div className="form-group">
-              <label className="form-label">Datum</label>
-              <input type="date" className="form-input" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Odjel / Radilište</label>
-              {departments.length > 0 && (
-                <select className="form-select" value={form.deptId} onChange={e=>setForm(f=>({...f,deptId:e.target.value}))} style={{marginBottom:'0.4rem'}}>
-                  <option value="">— Odaberi postojeći —</option>
-                  {departments.map(d => <option key={d.id} value={d.id}>{d.gospodarskaJedinica} — Odjel {d.brojOdjela}</option>)}
-                </select>
-              )}
-              <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end'}}>
-                <div style={{flex:2}}>
-                  <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem'}}>Gospodarska jedinica</div>
-                  <select className="form-select" id="newDeptGJ" style={{fontSize:'0.82rem'}}>
-                    <option value="">— Odaberi —</option>
-                    {GOSPODARSKE_JEDINICE.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem'}}>Br. odjela</div>
-                  <input className="form-input" id="newDeptBroj" placeholder="npr. 54" style={{fontSize:'0.82rem'}} />
-                </div>
-                <button className="btn btn-secondary btn-sm" style={{whiteSpace:'nowrap',flexShrink:0}}
-                  onClick={() => {
-                    const gj = document.getElementById('newDeptGJ').value;
-                    const br = document.getElementById('newDeptBroj').value.trim();
-                    if (!gj) return alert('Odaberi gospodarsku jedinicu!');
-                    if (!br) return alert('Unesi broj odjela!');
-                    const exists = departments.find(d => d.gospodarskaJedinica===gj && d.brojOdjela===br);
-                    if (exists) { setForm(f=>({...f,deptId:exists.id})); return; }
-                    const nd = { id: uid(), gospodarskaJedinica: gj, brojOdjela: br, note: '' };
-                    setDepartments(ds => [...ds, nd]);
-                    setForm(f=>({...f,deptId:nd.id}));
-                    document.getElementById('newDeptGJ').value='';
-                    document.getElementById('newDeptBroj').value='';
-                  }}>
-                  + Dodaj odjel
-                </button>
-              </div>
-              {form.deptId && departments.find(d=>d.id===form.deptId) && (
-                <div style={{marginTop:'0.3rem',fontSize:'0.75rem',color:'var(--green)',fontWeight:600}}>
-                  ✓ {departments.find(d=>d.id===form.deptId).gospodarskaJedinica} — Odjel {departments.find(d=>d.id===form.deptId).brojOdjela}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Vrsta posla</label>
-            <select className="form-select" value={form.jobType} onChange={e=>setForm(f=>({...f,jobType:e.target.value,allWorkers:[],primatWorker:'',helper1Worker:'',helper2Worker:'',extraWorkers:[]}))}>
-              {JOB_TYPES.map(jt => <option key={jt}>{jt}</option>)}
-            </select>
-          </div>
-
-          {isPrimka ? (
-            <div className="primka-section">
-              <div className="primka-title">⚖️ Primka — posebna raspodjela</div>
-              <div className="form-group">
-                <label className="form-label">Primač na šuma panju</label>
-                <select className="form-select" value={form.primatWorker} onChange={e=>setForm(f=>({...f,primatWorker:e.target.value}))}>
-                  <option value="">— Odaberi primača —</option>
-                  {activeWorkers.filter(w => w.category==='primac_panj').map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Pratioci primača</label>
-                <div className="worker-selector">
-                  {(() => {
-                    const selectedPrimac = form.primatWorker;
-                    const selected12 = [form.helper1Worker, form.helper2Worker].filter(Boolean);
-                    const radniciPrimka = activeWorkers.filter(w => w.category==='radnik_primka' && w.id!==selectedPrimac);
-                    const pomocni = activeWorkers.filter(w => w.category==='pomocni' && w.id!==selectedPrimac);
-                    const ostaliPrimaci = activeWorkers.filter(w => w.category==='primac_panj' && w.id!==selectedPrimac);
-                    const allOptions = [
-                      ...radniciPrimka.map(w=>({...w,_group:'Radnici u primci'})),
-                      ...pomocni.map(w=>({...w,_group:'Pomoćni radnici'})),
-                      ...ostaliPrimaci.map(w=>({...w,_group:'Primači (opciono)'})),
-                    ];
-                    let lastGroup = null;
-                    return allOptions.map(w => {
-                      const cat = getCatById(w.category);
-                      const isSelected = form.extraWorkers.includes(w.id);
-                      const groupHeader = w._group !== lastGroup ? (lastGroup = w._group, (
-                        <div key={'grp-'+w._group} style={{padding:'0.3rem 0.7rem',fontSize:'0.65rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',background:'var(--bg)',borderBottom:'1px solid var(--border)'}}>
-                          {w._group}
-                        </div>
-                      )) : null;
-                      if (isSelected) return [null, null];
-                      return [groupHeader, (
-                        <div key={w.id} className="worker-option" onClick={() => toggleExtra(w.id)}>
-                          <span style={{fontSize:'0.9rem'}}>{cat?.icon||'👤'}</span>
-                          {w.name}
-                          <span style={{marginLeft:'auto',fontSize:'0.65rem',color:cat?.color,background:cat?.pale,border:`1px solid ${cat?.border}`,padding:'0.1rem 0.3rem',borderRadius:3,fontFamily:'var(--mono)'}}>{cat?.short}</span>
-                        </div>
-                      )];
-                    });
-                  })()}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="form-group">
-              <label className="form-label">Radnici</label>
-              <div className="worker-selector">
-                {activeWorkers.filter(w => !form.allWorkers.includes(w.id)).map(w => {
-                  const cat = getCatById(w.category);
-                  return (
-                    <div key={w.id} className="worker-option"
-                      onClick={() => toggleWorker(w.id)}>
-                      <span style={{fontSize:'0.9rem'}}>{cat?.icon||'👤'}</span>
-                      {w.name}
-                      {w.category && <span style={{marginLeft:'auto',fontSize:'0.65rem',color: cat?.color, background: cat?.pale, border:`1px solid ${cat?.border}`, padding:'0.1rem 0.3rem', borderRadius:3, fontFamily:'var(--mono)'}}>{cat?.short}</span>}
-                    </div>
-                  );
-                })}
-                {activeWorkers.filter(w => !form.allWorkers.includes(w.id)).length === 0 && (
-                  <div style={{padding:'0.6rem 0.75rem',fontSize:'0.78rem',color:'var(--text-muted)',fontStyle:'italic'}}>Svi radnici su odabrani.</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ODABRANI RADNICI — s brisanjem */}
-          {form.allWorkers.length > 0 && (
-            <div style={{background:'var(--green-pale)',border:'1px solid #9bc492',borderRadius:'var(--radius)',padding:'0.6rem 0.75rem',marginBottom:'0.75rem'}}>
-              <div style={{fontSize:'0.7rem',fontWeight:700,color:'var(--green)',letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.4rem'}}>
-                Odabrani radnici ({form.allWorkers.length})
-              </div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem'}}>
-                {form.allWorkers.map(wId => {
-                  const w = workers.find(x => x.id === wId);
-                  const isPrimac = isPrimka && wId === form.primatWorker;
-                  const cat = getCatById(w?.category);
-                  return (
-                    <span key={wId} style={{
-                      display:'inline-flex',alignItems:'center',gap:'0.3rem',
-                      background: isPrimac ? 'var(--amber-pale)' : 'white',
-                      border: `1px solid ${isPrimac ? '#e8c17a' : 'var(--border)'}`,
-                      borderRadius:20, padding:'0.2rem 0.4rem 0.2rem 0.6rem',
-                      fontSize:'0.78rem', fontWeight: isPrimac ? 700 : 400,
-                      color: isPrimac ? 'var(--amber)' : 'var(--text)',
-                    }}>
-                      {isPrimac && '👑 '}{w?.name}
-                      {!isPrimac && (
-                        <button onClick={() => {
-                          if (isPrimka) {
-                            setForm(f => ({...f, extraWorkers: f.extraWorkers.filter(id => id !== wId)}));
-                          } else {
-                            setForm(f => ({...f, allWorkers: f.allWorkers.filter(id => id !== wId)}));
-                          }
-                        }} style={{
-                          background:'none',border:'none',cursor:'pointer',
-                          color:'var(--text-muted)',fontSize:'0.75rem',lineHeight:1,
-                          padding:'0 0.1rem',display:'flex',alignItems:'center',
-                        }} title="Ukloni">✕</button>
-                      )}
-                      {isPrimac && (
-                        <button onClick={() => setForm(f=>({...f,primatWorker:'',allWorkers:f.allWorkers.filter(id=>id!==wId),extraWorkers:f.extraWorkers.filter(id=>id!==wId)}))}
-                          style={{background:'none',border:'none',cursor:'pointer',color:'var(--amber)',fontSize:'0.75rem',lineHeight:1,padding:'0 0.1rem',display:'flex',alignItems:'center'}}
-                          title="Ukloni primača">✕</button>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="form-group">
-            <label className="form-label">Napomena</label>
-            <textarea className="form-input" rows={2} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="Opcionalna napomena..." style={{resize:'vertical'}} />
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Odustani</button>
-          <button className="btn btn-primary" onClick={handleSubmit}>
-            {isEdit ? '💾 Spremi izmjenu' : '+ Dodaj unos'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── HISTORY DETAIL MODAL ─────────────────────────────────────────────────────
-function HistoryDetailModal({ schedule, history, workers, wName, dName, restoreVersion, onClose }) {
-  return (
-    <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <span>📜</span>
-          <div className="modal-title">Historija izmjena</div>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body" style={{maxHeight:'60vh',overflowY:'auto'}}>
-          {history.length === 0 ? (
-            <div style={{color:'var(--text-muted)',fontSize:'0.85rem',textAlign:'center',padding:'2rem'}}>Nema historije za ovaj zapis.</div>
-          ) : (
-            history.map(h => (
-              <div className="history-item" key={h.id}>
-                <div className="history-header">
-                  <span className={`history-action ${h.action}`}>
-                    {h.action==='create'?'✅ Kreiran':h.action==='edit'?'✏️ Izmjenjen':h.action==='delete'?'🗑️ Obrisan':'↩️ Vraćen'}
-                  </span>
-                  <span className="history-time">{fmtTime(h.timestamp)}</span>
-                  {h.oldData && (
-                    <button className="btn btn-secondary btn-sm" style={{marginLeft:'auto'}} onClick={() => restoreVersion(h)}>
-                      ↩ Vrati
-                    </button>
-                  )}
-                </div>
-                {h.oldData && h.newData && (
-                  <div className="diff-row">
-                    <div className="diff-old">
-                      {h.oldData.allWorkers?.map(wName).join(', ')}
-                    </div>
-                    <div>→</div>
-                    <div className="diff-new">
-                      {h.newData.allWorkers?.map(wName).join(', ')}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Zatvori</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── EKIPA VIEW ───────────────────────────────────────────────────────────────
-// Data shape per day:
-//   primci:    [ { id, primatId, radnici:[wId,...], pomocni:[wId,...], note } ]
-//   otpremaci: [ { id, workerId, deptId, note } ]
-function EkipaView({ workers, ekipa, setEkipa, selectedDate, setSelectedDate,
-                     prevDay, nextDay, yesterday, departments }) {
-  const isToday = selectedDate === new Date().toISOString().split('T')[0];
-
-  const emptyDay = () => ({ primci: [], otpremaci: [] });
-  const dayData  = ekipa[selectedDate] || emptyDay();
-
-  const save = (newData) => setEkipa(e => ({ ...e, [selectedDate]: newData }));
-
-  // ── all assigned worker IDs today ──────────────────────────────────────────
-  const assignedIds = useMemo(() => {
-    const s = new Set();
-    (dayData.primci || []).forEach(p => {
-      if (p.primatId) s.add(p.primatId);
-      (p.radnici  || []).forEach(id => s.add(id));
-      (p.pomocni  || []).forEach(id => s.add(id));
-    });
-    (dayData.otpremaci || []).forEach(o => { if (o.workerId) s.add(o.workerId); });
-    return s;
-  }, [dayData]);
-
-  const activeWorkers  = workers.filter(w => w.status === 'aktivan');
-  const unassigned     = activeWorkers.filter(w => !assignedIds.has(w.id));
-  const totalAssigned  = assignedIds.size;
-
-  const wName = id => workers.find(w => w.id === id)?.name || '—';
-  const dName = id => (departments||[]).find(d => d.id === id)?.name || '—';
-
-  // Available workers for a picker (excluding already-taken ones, optionally allowing current)
-  const available = (excludeIds = []) =>
-    activeWorkers.filter(w => !assignedIds.has(w.id) || excludeIds.includes(w.id));
-
-  // ── Primci operations ──────────────────────────────────────────────────────
-  const addPrimac = () => {
-    const row = { id: uid(), primatId: '', radnici: [''], pomocni: [''], note: '' };
-    save({ ...dayData, primci: [...(dayData.primci||[]), row] });
-  };
-  const removePrimac = (id) =>
-    save({ ...dayData, primci: dayData.primci.filter(p => p.id !== id) });
-
-  const updatePrimac = (id, patch) =>
-    save({ ...dayData, primci: dayData.primci.map(p => p.id === id ? { ...p, ...patch } : p) });
-
-  // Add/remove a slot in radnici or pomocni arrays
-  const addSlot = (primacId, field) =>
-    updatePrimac(primacId, { [field]: [...(dayData.primci.find(p=>p.id===primacId)[field]||[]), ''] });
-
-  const removeSlot = (primacId, field, idx) => {
-    const arr = [...(dayData.primci.find(p=>p.id===primacId)[field]||[])];
-    arr.splice(idx, 1);
-    updatePrimac(primacId, { [field]: arr });
-  };
-
-  const setSlotWorker = (primacId, field, idx, wId) => {
-    const arr = [...(dayData.primci.find(p=>p.id===primacId)[field]||[])];
-    arr[idx] = wId;
-    updatePrimac(primacId, { [field]: arr });
-  };
-
-  // ── Otpremaci operations ──────────────────────────────────────────────────
-  const addOtpremac = () => {
-    const row = { id: uid(), workerId: '', deptId: (departments||[])[0]?.id || '', note: '' };
-    save({ ...dayData, otpremaci: [...(dayData.otpremaci||[]), row] });
-  };
-  const removeOtpremac = (id) =>
-    save({ ...dayData, otpremaci: dayData.otpremaci.filter(o => o.id !== id) });
-  const updateOtpremac = (id, patch) =>
-    save({ ...dayData, otpremaci: dayData.otpremaci.map(o => o.id === id ? { ...o, ...patch } : o) });
-
-  // ── Copy from yesterday ───────────────────────────────────────────────────
-  const copyFromYesterday = () => {
-    const src = ekipa[yesterday];
-    if (!src || (!src.primci?.length && !src.otpremaci?.length))
-      return alert('Nema unesenih podataka za jučer.');
-    if (confirm('Kopirati ekipu od jučer? Trenutni unosi bit će zamijenjeni.'))
-      save(JSON.parse(JSON.stringify(src)));
-  };
-
-  // ── Colours ───────────────────────────────────────────────────────────────
-  const C = {
-    panj:    { color:'#2d5a27', pale:'#e8f0e6', border:'#9bc492' },
-    radnik:  { color:'#b5620a', pale:'#fdf0e0', border:'#e8c17a' },
-    pomocni: { color:'#1a3d5c', pale:'#e4edf5', border:'#9bbfd9' },
-    otpr:    { color:'#6b3080', pale:'#f0e8f5', border:'#c4a0d8' },
-  };
-
-  // ── Worker picker (inline select) ─────────────────────────────────────────
-  const WorkerSelect = ({ value, onChange, extraAllow=[], placeholder='— Odaberi —', style={} }) => {
-    const opts = activeWorkers.filter(w => !assignedIds.has(w.id) || w.id === value || extraAllow.includes(w.id));
-    return (
-      <select
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        style={{
-          border:'1px solid var(--border)', borderRadius:5,
-          padding:'0.38rem 0.6rem', fontSize:'0.82rem',
-          background:'var(--bg)', color: value ? 'var(--text)' : 'var(--text-light)',
-          fontFamily:'var(--sans)', width:'100%', ...style,
-        }}
-      >
-        <option value=''>{placeholder}</option>
-        {opts.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-        {/* show already-taken worker if currently selected */}
-        {value && !opts.find(w=>w.id===value) && (
-          <option value={value}>⚠ {wName(value)}</option>
-        )}
-      </select>
-    );
-  };
-
-  // ── Summary stats ─────────────────────────────────────────────────────────
-  const numPrimaci   = (dayData.primci||[]).filter(p=>p.primatId).length;
-  const numRadnici   = (dayData.primci||[]).reduce((s,p)=>s+(p.radnici||[]).filter(Boolean).length,0);
-  const numPomocni   = (dayData.primci||[]).reduce((s,p)=>s+(p.pomocni||[]).filter(Boolean).length,0);
-  const numOtpremaci = (dayData.otpremaci||[]).filter(o=>o.workerId).length;
-
-  return (
-    <div>
-      {/* ── DATE BAR ────────────────────────────────────────────────────── */}
-      <div className="date-bar">
-        <div>
-          <div className="date-label">DATUM — DNEVNA EKIPA</div>
-          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.25rem'}}>
-            <button className="date-nav-btn" onClick={prevDay}>‹</button>
-            <input type="date" className="date-input" value={selectedDate}
-              onChange={e=>setSelectedDate(e.target.value)}/>
-            <button className="date-nav-btn" onClick={nextDay}>›</button>
-            {isToday && <span className="today-chip">DANAS</span>}
-          </div>
-        </div>
-
-        {/* mini stats */}
-        <div style={{display:'flex',gap:'1.2rem',alignItems:'center',flexWrap:'wrap'}}>
-          {[
-            {label:'Primači',   val:numPrimaci,   c:C.panj},
-            {label:'Radnici/primka', val:numRadnici, c:C.radnik},
-            {label:'Pomoćni',   val:numPomocni,   c:C.pomocni},
-            {label:'Otpremači', val:numOtpremaci, c:C.otpr},
-          ].map(({label,val,c}) => (
-            <div key={label} style={{textAlign:'center'}}>
-              <div style={{fontFamily:'var(--mono)',fontSize:'1.15rem',fontWeight:700,color:c.color}}>{val}</div>
-              <div style={{fontSize:'0.6rem',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{label}</div>
-            </div>
-          ))}
-          <div style={{width:1,height:32,background:'var(--border)'}}/>
-          <div style={{textAlign:'center'}}>
-            <div style={{fontFamily:'var(--mono)',fontSize:'1.3rem',fontWeight:700,color:'var(--green)'}}>{totalAssigned}</div>
-            <div style={{fontSize:'0.6rem',color:'var(--text-muted)'}}>UKUPNO</div>
-          </div>
-        </div>
-
-        <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
-          <button className="btn btn-secondary btn-sm no-print" onClick={copyFromYesterday}>📋 Kopiraj jučer</button>
-          <button className="btn btn-secondary btn-sm no-print" onClick={()=>window.print()}>🖨️ Print</button>
-        </div>
-      </div>
-
-      {/* ── NERASPOREĐENI warning ───────────────────────────────────────── */}
-      {unassigned.length > 0 && (
-        <div style={{background:'var(--amber-pale)',border:'1px solid #e8c17a',borderRadius:6,
-          padding:'0.55rem 1rem',fontSize:'0.8rem',color:'var(--amber)',
-          marginBottom:'1rem',display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
-          <span style={{fontWeight:700}}>⚠ Neraspoređeni:</span>
-          {unassigned.map(w=>(
-            <span key={w.id} style={{background:'white',border:'1px solid #e8c17a',
-              borderRadius:12,padding:'0.1rem 0.5rem',fontSize:'0.75rem'}}>{w.name}</span>
-          ))}
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════
-          SEKCIJA 1 — PRIMACI NA ŠUMA PANJU
-      ══════════════════════════════════════════════════════════════════ */}
-      <div className="card" style={{marginBottom:'1rem'}}>
-        {/* card header */}
-        <div style={{
-          background:`linear-gradient(135deg,${C.panj.color},${C.panj.color}bb)`,
-          color:'white', padding:'0.75rem 1rem',
-          display:'flex',alignItems:'center',gap:'0.75rem',
-        }}>
-          <span style={{fontSize:'1.4rem'}}>🌳</span>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:'0.95rem'}}>Primaci na šuma panju</div>
-            <div style={{fontSize:'0.7rem',opacity:0.8}}>Svaki primač ima vlastiti tim: radnici u primci + pomoćni radnici</div>
-          </div>
-          <button
-            onClick={addPrimac}
-            style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',
-              color:'white',borderRadius:6,padding:'0.35rem 0.8rem',fontSize:'0.8rem',
-              fontWeight:600,cursor:'pointer'}}>
-            + Dodaj primača
-          </button>
-        </div>
-
-        {(dayData.primci||[]).length === 0 && (
-          <div style={{padding:'2rem',textAlign:'center',color:'var(--text-light)',fontSize:'0.85rem'}}>
-            Nema unesenih primača za ovaj dan.
-            <br/><button onClick={addPrimac}
-              style={{marginTop:'0.75rem',background:C.panj.color,color:'white',border:'none',
-                borderRadius:6,padding:'0.4rem 1rem',fontSize:'0.82rem',fontWeight:600,cursor:'pointer'}}>
-              + Dodaj prvog primača
-            </button>
-          </div>
-        )}
-
-        {(dayData.primci||[]).map((primac, pi) => (
-          <div key={primac.id} style={{
-            borderTop: pi===0 ? 'none' : '2px solid var(--bg)',
-            padding:'1rem',
-          }}>
-            {/* ── ROW HEADER: primač number + delete ── */}
-            <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.8rem'}}>
-              <div style={{
-                width:28,height:28,borderRadius:'50%',
-                background:C.panj.color,color:'white',
-                display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:'0.8rem',fontWeight:700,fontFamily:'var(--mono)',flexShrink:0,
-              }}>{pi+1}</div>
-              <span style={{fontWeight:700,fontSize:'0.85rem',color:C.panj.color}}>Primač #{pi+1}</span>
-              <button
-                onClick={()=>removePrimac(primac.id)}
-                style={{marginLeft:'auto',background:'transparent',border:'1px solid #e0a0a0',
-                  color:'var(--red)',borderRadius:5,padding:'0.2rem 0.5rem',
-                  fontSize:'0.75rem',cursor:'pointer'}}>
-                🗑 Ukloni
-              </button>
-            </div>
-
-            {/* ── THREE COLUMNS: primač | radnici u primci | pomoćni ── */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'0.75rem',alignItems:'start'}}>
-
-              {/* COL 1 — PRIMAČ NA PANJU */}
-              <div style={{
-                background:C.panj.pale,border:`1px solid ${C.panj.border}`,
-                borderRadius:8,padding:'0.65rem',
-              }}>
-                <div style={{fontSize:'0.67rem',fontWeight:700,color:C.panj.color,
-                  textTransform:'uppercase',letterSpacing:'0.08em',
-                  fontFamily:'var(--mono)',marginBottom:'0.45rem'}}>
-                  🌳 Primač na panju
-                </div>
-                <WorkerSelect
-                  value={primac.primatId}
-                  onChange={wId => updatePrimac(primac.id, {primatId:wId})}
-                  extraAllow={primac.primatId?[primac.primatId]:[]}
-                  placeholder='— Odaberi primača —'
-                  style={{background:'white'}}
-                />
-                <input
-                  value={primac.note||''}
-                  onChange={e=>updatePrimac(primac.id,{note:e.target.value})}
-                  placeholder='Napomena...'
-                  style={{marginTop:'0.4rem',width:'100%',fontSize:'0.72rem',
-                    border:'1px solid var(--border)',borderRadius:4,
-                    padding:'0.25rem 0.4rem',fontFamily:'var(--sans)',background:'white'}}
-                />
-              </div>
-
-              {/* COL 2 — RADNICI U PRIMCI */}
-              <div style={{
-                background:C.radnik.pale,border:`1px solid ${C.radnik.border}`,
-                borderRadius:8,padding:'0.65rem',
-              }}>
-                <div style={{display:'flex',alignItems:'center',marginBottom:'0.45rem',gap:'0.4rem'}}>
-                  <div style={{fontSize:'0.67rem',fontWeight:700,color:C.radnik.color,
-                    textTransform:'uppercase',letterSpacing:'0.08em',
-                    fontFamily:'var(--mono)',flex:1}}>
-                    📋 Radnici u primci
-                  </div>
-                  <button onClick={()=>addSlot(primac.id,'radnici')}
-                    style={{background:C.radnik.color,color:'white',border:'none',
-                      borderRadius:4,padding:'0.15rem 0.45rem',fontSize:'0.7rem',
-                      fontWeight:700,cursor:'pointer'}}>+</button>
-                </div>
-                {(primac.radnici||['']).map((wId,ri)=>(
-                  <div key={ri} style={{display:'flex',gap:'0.3rem',marginBottom:'0.3rem',alignItems:'center'}}>
-                    <WorkerSelect
-                      value={wId}
-                      onChange={v=>setSlotWorker(primac.id,'radnici',ri,v)}
-                      extraAllow={wId?[wId]:[]}
-                      placeholder={`— Radnik ${ri+1} —`}
-                      style={{flex:1,background:'white'}}
-                    />
-                    {(primac.radnici||[]).length > 1 && (
-                      <button onClick={()=>removeSlot(primac.id,'radnici',ri)}
-                        style={{background:'transparent',border:'none',
-                          color:'#c0392b',cursor:'pointer',fontSize:'0.9rem',
-                          padding:'0 0.2rem',lineHeight:1,flexShrink:0}}>✕</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* COL 3 — POMOĆNI RADNICI */}
-              <div style={{
-                background:C.pomocni.pale,border:`1px solid ${C.pomocni.border}`,
-                borderRadius:8,padding:'0.65rem',
-              }}>
-                <div style={{display:'flex',alignItems:'center',marginBottom:'0.45rem',gap:'0.4rem'}}>
-                  <div style={{fontSize:'0.67rem',fontWeight:700,color:C.pomocni.color,
-                    textTransform:'uppercase',letterSpacing:'0.08em',
-                    fontFamily:'var(--mono)',flex:1}}>
-                    🔧 Pomoćni radnici
-                  </div>
-                  <button onClick={()=>addSlot(primac.id,'pomocni')}
-                    style={{background:C.pomocni.color,color:'white',border:'none',
-                      borderRadius:4,padding:'0.15rem 0.45rem',fontSize:'0.7rem',
-                      fontWeight:700,cursor:'pointer'}}>+</button>
-                </div>
-                {(primac.pomocni||['']).map((wId,hi)=>(
-                  <div key={hi} style={{display:'flex',gap:'0.3rem',marginBottom:'0.3rem',alignItems:'center'}}>
-                    <WorkerSelect
-                      value={wId}
-                      onChange={v=>setSlotWorker(primac.id,'pomocni',hi,v)}
-                      extraAllow={wId?[wId]:[]}
-                      placeholder={`— Pomoćni ${hi+1} —`}
-                      style={{flex:1,background:'white'}}
-                    />
-                    {(primac.pomocni||[]).length > 1 && (
-                      <button onClick={()=>removeSlot(primac.id,'pomocni',hi)}
-                        style={{background:'transparent',border:'none',
-                          color:'#c0392b',cursor:'pointer',fontSize:'0.9rem',
-                          padding:'0 0.2rem',lineHeight:1,flexShrink:0}}>✕</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-            </div>{/* end 3-col grid */}
-          </div>
-        ))}
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════════════
-          SEKCIJA 2 — OTPREMAČI
-      ══════════════════════════════════════════════════════════════════ */}
-      <div className="card" style={{marginBottom:'1.5rem'}}>
-        <div style={{
-          background:`linear-gradient(135deg,${C.otpr.color},${C.otpr.color}bb)`,
-          color:'white',padding:'0.75rem 1rem',
-          display:'flex',alignItems:'center',gap:'0.75rem',
-        }}>
-          <span style={{fontSize:'1.4rem'}}>🚛</span>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:'0.95rem'}}>Otpremači</div>
-            <div style={{fontSize:'0.7rem',opacity:0.8}}>Raspoređuju se na odjel / radilište</div>
-          </div>
-          <button onClick={addOtpremac}
-            style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',
-              color:'white',borderRadius:6,padding:'0.35rem 0.8rem',fontSize:'0.8rem',
-              fontWeight:600,cursor:'pointer'}}>
-            + Dodaj otpremača
-          </button>
-        </div>
-
-        {(dayData.otpremaci||[]).length === 0 ? (
-          <div style={{padding:'1.5rem',textAlign:'center',color:'var(--text-light)',fontSize:'0.85rem'}}>
-            Nema unesenih otpremača za ovaj dan.
-          </div>
-        ) : (
-          <div style={{padding:'0.75rem',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
-            {(dayData.otpremaci||[]).map((otr, oi) => (
-              <div key={otr.id} style={{
-                display:'grid',
-                gridTemplateColumns:'auto 1fr 1fr auto',
-                gap:'0.6rem',alignItems:'center',
-                background:C.otpr.pale,border:`1px solid ${C.otpr.border}`,
-                borderRadius:8,padding:'0.6rem 0.8rem',
-              }}>
-                {/* index */}
-                <div style={{
-                  width:26,height:26,borderRadius:'50%',
-                  background:C.otpr.color,color:'white',
-                  display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:'0.75rem',fontWeight:700,fontFamily:'var(--mono)',flexShrink:0,
-                }}>{oi+1}</div>
-
-                {/* worker */}
-                <div>
-                  <div style={{fontSize:'0.65rem',fontWeight:700,color:C.otpr.color,
-                    textTransform:'uppercase',letterSpacing:'0.06em',
-                    fontFamily:'var(--mono)',marginBottom:'0.25rem'}}>Otpremač</div>
-                  <WorkerSelect
-                    value={otr.workerId}
-                    onChange={wId=>updateOtpremac(otr.id,{workerId:wId})}
-                    extraAllow={otr.workerId?[otr.workerId]:[]}
-                    placeholder='— Odaberi otpremača —'
-                    style={{background:'white'}}
-                  />
-                </div>
-
-                {/* dept */}
-                <div>
-                  <div style={{fontSize:'0.65rem',fontWeight:700,color:C.otpr.color,
-                    textTransform:'uppercase',letterSpacing:'0.06em',
-                    fontFamily:'var(--mono)',marginBottom:'0.25rem'}}>Odjel / Radilište</div>
-                  <select
-                    value={otr.deptId||''}
-                    onChange={e=>updateOtpremac(otr.id,{deptId:e.target.value})}
-                    style={{border:'1px solid var(--border)',borderRadius:5,
-                      padding:'0.38rem 0.6rem',fontSize:'0.82rem',
-                      background:'white',fontFamily:'var(--sans)',width:'100%'}}>
-                    <option value=''>— Odaberi odjel —</option>
-                    {(departments||[]).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
-
-                {/* delete */}
-                <button onClick={()=>removeOtpremac(otr.id)}
-                  style={{background:'transparent',border:'1px solid #e0a0a0',
-                    color:'var(--red)',borderRadius:5,padding:'0.3rem 0.5rem',
-                    fontSize:'0.75rem',cursor:'pointer',alignSelf:'flex-end'}}>
-                  🗑
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════════════
-          SUMMARY TABLE (print-friendly)
-      ══════════════════════════════════════════════════════════════════ */}
-      <div className="card">
-        <div className="card-header">
-          <span>📊</span>
-          <div className="card-title">Pregled ekipe — {fmtDate(selectedDate)}</div>
-        </div>
-        <table className="schedule-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Uloga</th>
-              <th>Radnik</th>
-              <th>Tim / Odjel</th>
-              <th>Napomena</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(dayData.primci||[]).flatMap((p,pi) => {
-              const rows = [];
-              // primač row
-              rows.push(
-                <tr key={`p${pi}-prim`}>
-                  <td style={{fontFamily:'var(--mono)',color:'var(--text-muted)',fontSize:'0.72rem'}}>{pi+1}</td>
-                  <td><span style={{display:'inline-flex',alignItems:'center',gap:'0.25rem',
-                    background:C.panj.pale,color:C.panj.color,border:`1px solid ${C.panj.border}`,
-                    borderRadius:4,padding:'0.15rem 0.5rem',fontSize:'0.68rem',fontWeight:700,fontFamily:'var(--mono)'}}>
-                    🌳 Primač/panj</span></td>
-                  <td style={{fontWeight:700}}>{p.primatId ? wName(p.primatId) : <span style={{color:'var(--text-light)'}}>—</span>}</td>
-                  <td style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>
-                    <div>📋 {(p.radnici||[]).filter(Boolean).map(wName).join(', ') || '—'}</div>
-                    <div>🔧 {(p.pomocni||[]).filter(Boolean).map(wName).join(', ') || '—'}</div>
-                  </td>
-                  <td style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>{p.note||'—'}</td>
-                </tr>
-              );
-              return rows;
-            })}
-            {(dayData.otpremaci||[]).map((o,oi) => (
-              <tr key={`o${oi}`}>
-                <td style={{fontFamily:'var(--mono)',color:'var(--text-muted)',fontSize:'0.72rem'}}>{oi+1}</td>
-                <td><span style={{display:'inline-flex',alignItems:'center',gap:'0.25rem',
-                  background:C.otpr.pale,color:C.otpr.color,border:`1px solid ${C.otpr.border}`,
-                  borderRadius:4,padding:'0.15rem 0.5rem',fontSize:'0.68rem',fontWeight:700,fontFamily:'var(--mono)'}}>
-                  🚛 Otpremač</span></td>
-                <td style={{fontWeight:700}}>{o.workerId ? wName(o.workerId) : <span style={{color:'var(--text-light)'}}>—</span>}</td>
-                <td style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>{o.deptId ? dName(o.deptId) : '—'}</td>
-                <td style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>{o.note||'—'}</td>
-              </tr>
-            ))}
-            {totalAssigned === 0 && (
-              <tr><td colSpan={5} style={{textAlign:'center',padding:'2rem',color:'var(--text-light)'}}>
-                Nema unesenih radnika za ovaj dan.
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ─── WORKER CATEGORY BADGE ────────────────────────────────────────────────────
-function CatBadge({ catId, size = 'normal' }) {
-  const cat = getCatById(catId);
-  if (!cat) return null;
-  const small = size === 'small';
-  return (
-    <span style={{
-      display:'inline-flex', alignItems:'center', gap: small ? '0.2rem' : '0.3rem',
-      background: cat.pale, color: cat.color, border: `1px solid ${cat.border}`,
-      borderRadius: 4, padding: small ? '0.1rem 0.4rem' : '0.25rem 0.6rem',
-      fontSize: small ? '0.65rem' : '0.72rem', fontWeight: 600,
-      fontFamily: 'var(--mono)', whiteSpace: 'nowrap',
-    }}>
-      {cat.icon} {small ? cat.short : cat.label}
-    </span>
-  );
-}
-
-// ─── WORKERS VIEW ─────────────────────────────────────────────────────────────
-function WorkersView({ workers, setWorkers, schedules }) {
-  const [modal, setModal]           = useState(null);
-  const [search, setSearch]         = useState('');
-  const [activeCat, setActiveCat]   = useState('sve');   // 'sve' | catId
-  const [statusFilter, setStatus]   = useState('sve');   // 'sve'|'aktivan'|'neaktivan'
-  const [viewMode, setViewMode]     = useState('kartice'); // 'kartice' | 'tabela'
-  const [detailWorker, setDetail]   = useState(null);
-
-  // ── filter ──
-  const filtered = useMemo(() => workers.filter(w => {
-    const matchSearch = w.name.toLowerCase().includes(search.toLowerCase()) ||
-      (w.phone||'').includes(search) || (w.note||'').toLowerCase().includes(search.toLowerCase());
-    const matchCat    = activeCat === 'sve' || w.category === activeCat;
-    const matchStatus = statusFilter === 'sve' || w.status === statusFilter;
-    return matchSearch && matchCat && matchStatus;
-  }), [workers, search, activeCat, statusFilter]);
-
-  // ── stats per category ──
-  const catCounts = useMemo(() => {
-    const m = { sve: workers.length };
-    WORKER_CATEGORIES.forEach(c => { m[c.id] = workers.filter(w => w.category === c.id).length; });
-    return m;
-  }, [workers]);
-
-  // ── schedules count per worker ──
-  const workerSchedCount = useMemo(() => {
-    const m = {};
-    schedules.forEach(s => s.allWorkers.forEach(wId => { m[wId] = (m[wId]||0)+1; }));
-    return m;
-  }, [schedules]);
-
-  // ── last seen ──
-  const workerLastSeen = useMemo(() => {
-    const m = {};
-    schedules.forEach(s => s.allWorkers.forEach(wId => {
-      if (!m[wId] || s.date > m[wId]) m[wId] = s.date;
-    }));
-    return m;
-  }, [schedules]);
-
-  const handleDelete = (w) => {
-    if (confirm(`Obrisati radnika "${w.name}"?\n\nOvo ne briše historiju rasporeda.`))
-      setWorkers(ws => ws.filter(x => x.id !== w.id));
-  };
-
-  // ── WORKER MODAL ──
-  const WorkerModal = ({ worker, onClose }) => {
-    const blank = { id: uid(), name: '', status: 'aktivan', category: WORKER_CATEGORIES[0].id, phone: '', note: '' };
-    const [form, setForm] = useState(worker ? {...worker} : blank);
-    const [errors, setErrors] = useState({});
-
-    const validate = () => {
-      const e = {};
-      if (!form.name.trim()) e.name = 'Ime je obavezno';
-      if (!form.category) e.category = 'Kategorija je obavezna';
-      setErrors(e);
-      return Object.keys(e).length === 0;
-    };
-
-    const save = () => {
-      if (!validate()) return;
-      if (worker) setWorkers(ws => ws.map(w => w.id === form.id ? form : w));
-      else setWorkers(ws => [...ws, form]);
-      onClose();
-    };
-
-    const selCat = getCatById(form.category);
-
-    return (
-      <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
-        <div className="modal" style={{maxWidth:560}}>
-          <div className="modal-header" style={{background: selCat ? selCat.pale : undefined, borderBottom:`2px solid ${selCat?.border||'var(--border)'}`}}>
-            <span style={{fontSize:'1.4rem'}}>{selCat?.icon || '👷'}</span>
-            <div>
-              <div className="modal-title">{worker ? 'Uredi radnika' : 'Novi radnik'}</div>
-              {selCat && <div style={{fontSize:'0.72rem',color:selCat.color,fontWeight:600}}>{selCat.label}</div>}
-            </div>
-            <button className="btn btn-ghost btn-icon" style={{marginLeft:'auto'}} onClick={onClose}>✕</button>
-          </div>
-
-          <div className="modal-body" style={{maxHeight:'72vh',overflowY:'auto'}}>
-
-            {/* KATEGORIJA – prominentno na vrhu */}
-            <div style={{marginBottom:'1.1rem'}}>
-              <label className="form-label">Kategorija radnika *</label>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem'}}>
-                {WORKER_CATEGORIES.map(cat => (
-                  <button key={cat.id}
-                    type="button"
-                    onClick={() => setForm(f=>({...f,category:cat.id}))}
-                    style={{
-                      display:'flex', alignItems:'center', gap:'0.5rem',
-                      padding:'0.6rem 0.8rem',
-                      border: `2px solid ${form.category===cat.id ? cat.color : 'var(--border)'}`,
-                      borderRadius: 6,
-                      background: form.category===cat.id ? cat.pale : 'var(--bg)',
-                      color: form.category===cat.id ? cat.color : 'var(--text-muted)',
-                      fontWeight: form.category===cat.id ? 700 : 400,
-                      fontSize: '0.82rem', cursor:'pointer', transition:'all 0.12s',
-                      textAlign:'left',
-                    }}>
-                    <span style={{fontSize:'1.1rem'}}>{cat.icon}</span>
-                    <div>
-                      <div style={{fontWeight:600,fontSize:'0.78rem'}}>{cat.short}</div>
-                      <div style={{fontSize:'0.65rem',opacity:0.7,marginTop:1}}>{cat.label}</div>
-                    </div>
-                    {form.category===cat.id && <span style={{marginLeft:'auto',fontSize:'0.9rem'}}>✓</span>}
-                  </button>
-                ))}
-              </div>
-              {errors.category && <div style={{color:'var(--red)',fontSize:'0.75rem',marginTop:'0.3rem'}}>⚠ {errors.category}</div>}
-            </div>
-
-            <div className="divider"/>
-
-            {/* IME */}
-            <div className="form-group">
-              <label className="form-label">Ime i prezime *</label>
-              <input className="form-input" value={form.name}
-                onChange={e=>setForm(f=>({...f,name:e.target.value}))}
-                placeholder="npr. Amer Hodžić"
-                style={errors.name ? {borderColor:'var(--red)'} : {}} />
-              {errors.name && <div style={{color:'var(--red)',fontSize:'0.75rem',marginTop:'0.3rem'}}>⚠ {errors.name}</div>}
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem'}}>
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select className="form-select" value={form.status}
-                  onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                  <option value="aktivan">✅ Aktivan</option>
-                  <option value="neaktivan">⛔ Neaktivan</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Telefon</label>
-                <input className="form-input" value={form.phone||''}
-                  onChange={e=>setForm(f=>({...f,phone:e.target.value}))}
-                  placeholder="061-xxx-xxx" />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Napomena</label>
-              <textarea className="form-input" rows={2} value={form.note||''}
-                onChange={e=>setForm(f=>({...f,note:e.target.value}))}
-                placeholder="Bolovanje, posebne napomene, kvalifikacije..."
-                style={{resize:'vertical'}} />
-            </div>
-
-          </div>
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose}>Odustani</button>
-            <button className="btn btn-primary" onClick={save}>
-              {worker ? '💾 Spremi izmjenu' : '+ Dodaj radnika'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── DETAIL MODAL ──
-  const DetailModal = ({ worker, onClose }) => {
-    const cat = getCatById(worker.category);
-    const sc = workerSchedCount[worker.id] || 0;
-    const ls = workerLastSeen[worker.id];
-    const recentSched = schedules
-      .filter(s => s.allWorkers.includes(worker.id))
-      .sort((a,b) => b.date.localeCompare(a.date))
-      .slice(0, 5);
-
-    return (
-      <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
-        <div className="modal" style={{maxWidth:480}}>
-          <div className="modal-header" style={{background: cat?.pale, borderBottom:`2px solid ${cat?.border}`}}>
-            <span style={{fontSize:'2rem'}}>{cat?.icon}</span>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:'1rem'}}>{worker.name}</div>
-              <div style={{fontSize:'0.75rem',color:cat?.color,fontWeight:600}}>{cat?.label}</div>
-            </div>
-            <span style={{
-              padding:'0.2rem 0.6rem', borderRadius:12, fontSize:'0.72rem',fontWeight:700,
-              background: worker.status==='aktivan' ? '#d4edda' : '#f8d7da',
-              color: worker.status==='aktivan' ? '#155724' : '#721c24',
-            }}>{worker.status==='aktivan' ? '✅ Aktivan' : '⛔ Neaktivan'}</span>
-            <button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button>
-          </div>
-          <div className="modal-body">
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem',marginBottom:'1rem'}}>
-              <div style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:6,padding:'0.75rem'}}>
-                <div style={{fontFamily:'var(--mono)',fontSize:'1.4rem',fontWeight:700,color:'var(--green)'}}>{sc}</div>
-                <div style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>Ukupno rasporeda</div>
-              </div>
-              <div style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:6,padding:'0.75rem'}}>
-                <div style={{fontFamily:'var(--mono)',fontSize:'0.9rem',fontWeight:700,color:'var(--green)'}}>{ls ? fmtDate(ls) : '—'}</div>
-                <div style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>Posljednji raspored</div>
-              </div>
-            </div>
-            {worker.phone && (
-              <div style={{marginBottom:'0.75rem',fontSize:'0.85rem'}}>
-                <span style={{color:'var(--text-muted)'}}>📞 </span>{worker.phone}
-              </div>
-            )}
-            {worker.note && (
-              <div style={{background:'var(--amber-pale)',border:'1px solid #e8c17a',borderRadius:6,padding:'0.6rem 0.75rem',fontSize:'0.82rem',marginBottom:'1rem'}}>
-                📝 {worker.note}
-              </div>
-            )}
-            {recentSched.length > 0 && (
-              <div>
-                <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.4rem'}}>NEDAVNI RASPOREDI</div>
-                {recentSched.map(s => (
-                  <div key={s.id} style={{display:'flex',gap:'0.5rem',alignItems:'center',padding:'0.3rem 0',borderBottom:'1px solid var(--border)',fontSize:'0.8rem'}}>
-                    <span style={{fontFamily:'var(--mono)',color:'var(--text-muted)',fontSize:'0.75rem'}}>{fmtDate(s.date)}</span>
-                    <span className={jobBadgeClass(s.jobType)} style={{fontSize:'0.65rem'}}>{s.jobType}</span>
-                    <span style={{color:'var(--text-muted)',fontSize:'0.75rem',marginLeft:'auto'}}>
-                      {/* dept name handled by parent — just show deptId here */}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose}>Zatvori</button>
-            <button className="btn btn-primary" onClick={() => { onClose(); setTimeout(()=>setModal(worker),50); }}>✏️ Uredi</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      {/* HEADER ROW */}
-      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
-        <div className="section-title">Evidencija radnika</div>
-        <span className="tag" style={{marginRight:'auto'}}>{workers.filter(w=>w.status==='aktivan').length} aktivnih / {workers.length} ukupno</span>
-        <div style={{display:'flex',gap:'0.5rem'}}>
-          <button className={`btn btn-sm ${viewMode==='kartice'?'btn-primary':'btn-secondary'}`} onClick={()=>setViewMode('kartice')}>⊞ Kartice</button>
-          <button className={`btn btn-sm ${viewMode==='tabela'?'btn-primary':'btn-secondary'}`}  onClick={()=>setViewMode('tabela')}>≡ Tabela</button>
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setModal({})}>+ Novi radnik</button>
-      </div>
-
-      {/* CATEGORY SUMMARY CARDS */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'0.6rem',marginBottom:'1.1rem'}}>
-        {WORKER_CATEGORIES.map(cat => {
-          const cnt     = catCounts[cat.id] || 0;
-          const active  = activeCat === cat.id;
-          return (
-            <button key={cat.id}
-              onClick={() => setActiveCat(active ? 'sve' : cat.id)}
-              style={{
-                border:`2px solid ${active ? cat.color : 'var(--border)'}`,
-                borderRadius:8, padding:'0.7rem 0.9rem',
-                background: active ? cat.pale : 'var(--surface)',
-                cursor:'pointer', textAlign:'left',
-                boxShadow: active ? `0 0 0 1px ${cat.border}` : 'var(--shadow)',
-                transition:'all 0.12s',
-              }}>
-              <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.3rem'}}>
-                <span style={{fontSize:'1.2rem'}}>{cat.icon}</span>
-                <span style={{fontFamily:'var(--mono)',fontSize:'1.4rem',fontWeight:700,color:cat.color}}>{cnt}</span>
-              </div>
-              <div style={{fontSize:'0.75rem',fontWeight:600,color: active ? cat.color : 'var(--text-muted)'}}>{cat.label}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* FILTER BAR */}
-      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1rem',flexWrap:'wrap',alignItems:'center'}}>
-        <input className="form-input" placeholder="🔍 Pretraži ime, telefon..."
-          value={search} onChange={e=>setSearch(e.target.value)}
-          style={{maxWidth:240,flex:'0 0 auto'}} />
-        <div style={{display:'flex',gap:'0.3rem'}}>
-          {['sve','aktivan','neaktivan'].map(s => (
-            <button key={s} className={`filter-chip ${statusFilter===s?'active':''}`}
-              onClick={() => setStatus(s)}>
-              {s==='sve'?'Svi':s==='aktivan'?'✅ Aktivni':'⛔ Neaktivni'}
-            </button>
-          ))}
-        </div>
-        {(activeCat!=='sve'||statusFilter!=='sve'||search) && (
-          <button className="btn btn-ghost btn-sm" onClick={()=>{setActiveCat('sve');setStatus('sve');setSearch('');}}>✕ Resetuj</button>
-        )}
-        <span style={{marginLeft:'auto',fontSize:'0.78rem',color:'var(--text-muted)'}}>{filtered.length} radnika</span>
-      </div>
-
-      {/* VIEW: KARTICE */}
-      {viewMode === 'kartice' && (
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:'0.75rem'}}>
-          {filtered.length === 0 && (
-            <div className="empty-state" style={{gridColumn:'1/-1'}}>
-              <span className="icon">👷</span><p>Nema radnika za odabrane filtere.</p>
-            </div>
-          )}
-          {filtered.map(w => {
-            const cat = getCatById(w.category);
-            const sc  = workerSchedCount[w.id] || 0;
-            const ls  = workerLastSeen[w.id];
-            return (
-              <div key={w.id} style={{
-                background:'var(--surface)', border:`1px solid ${w.status==='aktivan'?'var(--border)':'#f0c0c0'}`,
-                borderRadius:8, overflow:'hidden', boxShadow:'var(--shadow)',
-                opacity: w.status==='aktivan' ? 1 : 0.72,
-                transition:'box-shadow 0.12s',
-              }}>
-                {/* category stripe */}
-                <div style={{
-                  height:4, background:`linear-gradient(90deg,${cat?.color||'#999'},${cat?.border||'#ccc'})`,
-                }}/>
-                <div style={{padding:'0.9rem'}}>
-                  {/* top row */}
-                  <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem',marginBottom:'0.6rem'}}>
-                    <div style={{
-                      width:38,height:38,borderRadius:8,
-                      background: cat?.pale||'#f0f0f0',
-                      display:'flex',alignItems:'center',justifyContent:'center',
-                      fontSize:'1.3rem',flexShrink:0,
-                      border:`1px solid ${cat?.border||'#ccc'}`,
-                    }}>{cat?.icon||'👤'}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:'0.88rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</div>
-                      <CatBadge catId={w.category} size="small" />
-                    </div>
-                    <span style={{
-                      fontSize:'0.65rem',fontWeight:700,padding:'0.15rem 0.4rem',borderRadius:10,
-                      background: w.status==='aktivan'?'#d4edda':'#f8d7da',
-                      color: w.status==='aktivan'?'#155724':'#721c24',
-                      flexShrink:0,
-                    }}>{w.status==='aktivan'?'AKT':'NEA'}</span>
-                  </div>
-
-                  {/* info */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.4rem',marginBottom:'0.6rem'}}>
-                    <div style={{background:'var(--bg)',borderRadius:4,padding:'0.3rem 0.5rem',textAlign:'center'}}>
-                      <div style={{fontFamily:'var(--mono)',fontSize:'1rem',fontWeight:700,color:'var(--green)'}}>{sc}</div>
-                      <div style={{fontSize:'0.62rem',color:'var(--text-light)'}}>rasporeda</div>
-                    </div>
-                    <div style={{background:'var(--bg)',borderRadius:4,padding:'0.3rem 0.5rem',textAlign:'center'}}>
-                      <div style={{fontFamily:'var(--mono)',fontSize:'0.72rem',fontWeight:600,color:'var(--green)'}}>{ls?fmtDate(ls):'—'}</div>
-                      <div style={{fontSize:'0.62rem',color:'var(--text-light)'}}>posljednji</div>
-                    </div>
-                  </div>
-
-                  {w.phone && <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:'0.3rem'}}>📞 {w.phone}</div>}
-                  {w.note  && <div style={{fontSize:'0.72rem',color:'var(--text-muted)',fontStyle:'italic',marginBottom:'0.4rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.note}</div>}
-
-                  {/* actions */}
-                  <div style={{display:'flex',gap:'0.3rem',marginTop:'0.5rem',borderTop:'1px solid var(--border)',paddingTop:'0.5rem',flexWrap:'wrap'}}>
-                    <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={() => setDetail(w)}>👁 Detalji</button>
-                    {w.category === 'primac_panj' && (
-                      <button className="btn btn-sm" title="Prebaci u pomoćnog radnika"
-                        style={{flex:'1 0 100%',background:'#e4edf5',color:'#1a3d5c',border:'1px solid #9bbfd9',fontSize:'0.72rem'}}
-                        onClick={() => { if(confirm(`Prebaciti "${w.name}" u Pomoćnog radnika?`)) setWorkers(ws => ws.map(x => x.id===w.id ? {...x, category:'pomocni'} : x)); }}>
-                        🔄 Prebaci u pomoćnog
-                      </button>
-                    )}
-                    {w.category === 'pomocni' && (
-                      <button className="btn btn-sm" title="Vrati u primača"
-                        style={{flex:'1 0 100%',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',fontSize:'0.72rem'}}
-                        onClick={() => { if(confirm(`Vratiti "${w.name}" u Primača na šuma panju?`)) setWorkers(ws => ws.map(x => x.id===w.id ? {...x, category:'primac_panj'} : x)); }}>
-                        🔄 Vrati u primača
-                      </button>
-                    )}
-                    <button className="btn btn-ghost btn-icon btn-sm" title="Uredi" onClick={() => setModal(w)}>✏️</button>
-                    <button className="btn btn-danger btn-icon btn-sm" title="Briši" onClick={() => handleDelete(w)}>🗑️</button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* VIEW: TABELA */}
-      {viewMode === 'tabela' && (
-        <div className="card">
-          {filtered.length === 0 ? (
-            <div className="empty-state"><span className="icon">👷</span><p>Nema radnika za odabrane filtere.</p></div>
-          ) : (
-            <table className="schedule-table">
-              <thead>
-                <tr>
-                  <th>Ime i prezime</th>
-                  <th>Kategorija</th>
-                  <th>Status</th>
-                  <th>Telefon</th>
-                  <th>Rasporeda</th>
-                  <th>Posljednji</th>
-                  <th>Napomena</th>
-                  <th>Akcije</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(w => (
-                  <tr key={w.id} style={{opacity:w.status==='aktivan'?1:0.65}}>
-                    <td style={{fontWeight:600}}>{w.name}</td>
-                    <td><CatBadge catId={w.category} size="small"/></td>
-                    <td>
-                      <span style={{
-                        display:'inline-block',padding:'0.15rem 0.5rem',borderRadius:10,fontSize:'0.72rem',fontWeight:700,
-                        background: w.status==='aktivan'?'#d4edda':'#f8d7da',
-                        color: w.status==='aktivan'?'#155724':'#721c24',
-                      }}>{w.status==='aktivan'?'✅ Aktivan':'⛔ Neaktivan'}</span>
-                    </td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:'0.78rem',color:'var(--text-muted)'}}>{w.phone||'—'}</td>
-                    <td style={{textAlign:'center'}}>
-                      <span className="tag">{workerSchedCount[w.id]||0}</span>
-                    </td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:'0.75rem',color:'var(--text-muted)'}}>
-                      {workerLastSeen[w.id] ? fmtDate(workerLastSeen[w.id]) : '—'}
-                    </td>
-                    <td style={{fontSize:'0.78rem',color:'var(--text-muted)',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.note||'—'}</td>
-                    <td>
-                      <div style={{display:'flex',gap:'0.2rem',flexWrap:'wrap'}}>
-                        <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setDetail(w)}>👁</button>
-                        <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModal(w)}>✏️</button>
-                        {w.category === 'primac_panj' && (
-                          <button className="btn btn-sm" title="Prebaci u pomoćnog"
-                            style={{background:'#e4edf5',color:'#1a3d5c',border:'1px solid #9bbfd9',fontSize:'0.7rem',padding:'0.2rem 0.4rem'}}
-                            onClick={() => { if(confirm(`Prebaciti "${w.name}" u Pomoćnog?`)) setWorkers(ws => ws.map(x => x.id===w.id ? {...x, category:'pomocni'} : x)); }}>
-                            🔄
-                          </button>
-                        )}
-                        {w.category === 'pomocni' && (
-                          <button className="btn btn-sm" title="Vrati u primača"
-                            style={{background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',fontSize:'0.7rem',padding:'0.2rem 0.4rem'}}
-                            onClick={() => { if(confirm(`Vratiti "${w.name}" u Primača?`)) setWorkers(ws => ws.map(x => x.id===w.id ? {...x, category:'primac_panj'} : x)); }}>
-                            🔄
-                          </button>
-                        )}
-                        <button className="btn btn-danger btn-icon btn-sm" onClick={() => handleDelete(w)}>🗑️</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {/* MODALS */}
-      {modal    !== null && <WorkerModal worker={Object.keys(modal).length ? modal : null} onClose={() => setModal(null)} />}
-      {detailWorker      && <DetailModal worker={detailWorker} onClose={() => setDetail(null)} />}
-    </div>
-  );
-}
-
-// ─── DEPARTMENTS VIEW ─────────────────────────────────────────────────────────
-function DepartmentsView({ departments, setDepartments, schedules, dName }) {
-  const [modal, setModal] = useState(null);
-
-  const DeptModal = ({ dept, onClose }) => {
-    const [form, setForm] = useState(dept || { id: uid(), gospodarskaJedinica: '', brojOdjela: '', note: '' });
-    const save = () => {
-      if (!form.gospodarskaJedinica) return alert('Odaberite gospodarsku jedinicu!');
-      if (!form.brojOdjela.trim()) return alert('Unesite broj odjela!');
-      if (dept) setDepartments(ds => ds.map(d => d.id === form.id ? form : d));
-      else setDepartments(ds => [...ds, form]);
-      onClose();
-    };
-    return (
-      <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&onClose()}>
-        <div className="modal">
-          <div className="modal-header">
-            <span>🏕️</span>
-            <div className="modal-title">{dept ? 'Uredi odjel' : 'Novi odjel'}</div>
-            <button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button>
-          </div>
-          <div className="modal-body">
-            <div className="form-group">
-              <label className="form-label">Gospodarska jedinica *</label>
-              <select className="form-select" value={form.gospodarskaJedinica} onChange={e=>setForm(f=>({...f,gospodarskaJedinica:e.target.value}))}>
-                <option value="">— Odaberi —</option>
-                {GOSPODARSKE_JEDINICE.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Broj odjela *</label>
-              <input className="form-input" placeholder="npr. 54 ili 5/2" value={form.brojOdjela} onChange={e=>setForm(f=>({...f,brojOdjela:e.target.value}))} />
-            </div>
-            <div className="form-group"><label className="form-label">Napomena</label>
-              <textarea className="form-input" rows={2} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} style={{resize:'vertical'}} /></div>
-          </div>
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose}>Odustani</button>
-            <button className="btn btn-primary" onClick={save}>Spremi</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      <div className="section-header">
-        <div className="section-title">Odjeli i radilišta</div>
-        <button className="btn btn-primary btn-sm" onClick={() => setModal({})}>+ Novi odjel</button>
-      </div>
-      <div className="card">
-        <table className="schedule-table">
-          <thead><tr><th>Gospodarska jedinica</th><th>Broj odjela</th><th>Napomena</th><th>Rasporeda</th><th>Akcije</th></tr></thead>
-          <tbody>
-            {departments.map(d => {
-              const cnt = schedules.filter(s => s.deptId === d.id).length;
-              return (
-                <tr key={d.id}>
-                  <td style={{fontWeight:600}}>{d.gospodarskaJedinica}</td>
-                  <td style={{fontFamily:'var(--mono)',fontWeight:600}}>{d.brojOdjela}</td>
-                  <td style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{d.note || '—'}</td>
-                  <td><span className="tag">{cnt}</span></td>
-                  <td>
-                    <div style={{display:'flex',gap:'0.25rem'}}>
-                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModal(d)}>✏️</button>
-                      <button className="btn btn-danger btn-icon btn-sm" onClick={() => {
-                        if (cnt > 0) return alert('Ne možete obrisati odjel koji ima unose u rasporedu!');
-                        if (confirm(`Obrisati ${d.name}?`)) setDepartments(ds => ds.filter(x => x.id !== d.id));
-                      }}>🗑️</button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {modal !== null && <DeptModal dept={Object.keys(modal).length ? modal : null} onClose={() => setModal(null)} />}
-    </div>
-  );
-}
-
-// ─── PREGLED VIEW ─────────────────────────────────────────────────────────────
-function PregledView({ schedules, workers, departments, wName, dName, filterWorker, setFilterWorker, filterDept, setFilterDept, filterJob, setFilterJob }) {
-  const [tab, setTab] = useState('radnik');
-
-  const filtered = useMemo(() => schedules.filter(s =>
-    (!filterWorker || s.allWorkers.includes(filterWorker)) &&
-    (!filterDept || s.deptId === filterDept) &&
-    (!filterJob || s.jobType === filterJob)
-  ).sort((a,b) => b.date.localeCompare(a.date)), [schedules, filterWorker, filterDept, filterJob]);
-
-  // Worker stats
-  const workerStats = useMemo(() => {
-    if (!filterWorker) return null;
-    const byJob = {};
-    filtered.forEach(s => { byJob[s.jobType] = (byJob[s.jobType]||0)+1; });
-    return byJob;
-  }, [filtered, filterWorker]);
-
-  return (
-    <div>
-      <div className="section-header"><div className="section-title">Pregled i filtriranje</div></div>
-
-      <div className="card" style={{marginBottom:'1rem'}}>
-        <div className="card-body">
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'0.75rem'}}>
-            <div className="form-group" style={{margin:0}}>
-              <label className="form-label">Radnik</label>
-              <select className="form-select" value={filterWorker} onChange={e=>setFilterWorker(e.target.value)}>
-                <option value="">Svi radnici</option>
-                {workers.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-            <div className="form-group" style={{margin:0}}>
-              <label className="form-label">Odjel</label>
-              <select className="form-select" value={filterDept} onChange={e=>setFilterDept(e.target.value)}>
-                <option value="">Svi odjeli</option>
-                {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-            <div className="form-group" style={{margin:0}}>
-              <label className="form-label">Vrsta posla</label>
-              <select className="form-select" value={filterJob} onChange={e=>setFilterJob(e.target.value)}>
-                <option value="">Sve vrste</option>
-                {JOB_TYPES.map(jt=><option key={jt}>{jt}</option>)}
-              </select>
-            </div>
-            <div style={{display:'flex',alignItems:'flex-end'}}>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setFilterWorker(''); setFilterDept(''); setFilterJob(''); }}>
-                ✕ Resetuj
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {filterWorker && workerStats && (
-        <div className="stats-row" style={{marginBottom:'1rem'}}>
-          <div className="stat-card"><div className="stat-value">{filtered.length}</div><div className="stat-label">Ukupno smjena</div></div>
-          {Object.entries(workerStats).map(([jt,cnt]) => (
-            <div className="stat-card" key={jt}><div className="stat-value" style={{fontSize:'1.2rem'}}>{cnt}</div><div className="stat-label">{jt}</div></div>
-          ))}
-        </div>
-      )}
-
-      <div style={{fontSize:'0.8rem',color:'var(--text-muted)',marginBottom:'0.5rem'}}>{filtered.length} zapisa</div>
-
-      <div className="card">
-        {filtered.length === 0 ? (
-          <div className="empty-state"><span className="icon">🔍</span><p>Nema rezultata za odabrane filtere.</p></div>
-        ) : (
-          <table className="schedule-table">
-            <thead><tr><th>Datum</th><th>Odjel</th><th>Vrsta posla</th><th>Radnici</th><th>Napomena</th></tr></thead>
-            <tbody>
-              {filtered.map(s => (
-                <tr key={s.id}>
-                  <td style={{fontFamily:'var(--mono)',fontSize:'0.8rem',whiteSpace:'nowrap'}}>{fmtDate(s.date)}</td>
-                  <td style={{fontSize:'0.83rem',fontWeight:500}}>{dName(s.deptId)}</td>
-                  <td><span className={jobBadgeClass(s.jobType)}>{s.jobType}</span></td>
-                  <td>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'2px'}}>
-                      {s.allWorkers.map(wId => (
-                        <span key={wId} className={`worker-pill ${s.jobType==='Primka'&&wId===s.primatWorker?'primac':''}`}>
-                          {wName(wId)}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{s.note||'—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── HISTORIJA VIEW ───────────────────────────────────────────────────────────
-function HistorijaView({ history, wName, dName, restoreVersion, schedules }) {
-  const grouped = useMemo(() => {
-    const m = {};
-    history.forEach(h => {
-      const d = new Date(h.timestamp).toISOString().split('T')[0];
-      if (!m[d]) m[d] = [];
-      m[d].push(h);
-    });
-    return Object.entries(m).sort((a,b) => b[0].localeCompare(a[0]));
-  }, [history]);
-
-  return (
-    <div>
-      <div className="section-header">
-        <div className="section-title">Historija izmjena</div>
-        <span className="tag">{history.length} zapisa</span>
-      </div>
-      {history.length === 0 ? (
-        <div className="empty-state"><span className="icon">📜</span><p>Historija je prazna.</p></div>
-      ) : (
-        grouped.map(([date, items]) => (
-          <div key={date} style={{marginBottom:'1.25rem'}}>
-            <div style={{fontFamily:'var(--mono)',fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'0.5rem',paddingLeft:'0.25rem'}}>
-              {fmtDate(date)}
-            </div>
-            {items.map(h => (
-              <div className="history-item" key={h.id}>
-                <div className="history-header">
-                  <span className={`history-action ${h.action}`}>
-                    {h.action==='create'?'✅ Kreiran':h.action==='edit'?'✏️ Izmjenjen':h.action==='delete'?'🗑️ Obrisan':'↩️ Vraćen'}
-                  </span>
-                  <span style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>
-                    Raspored: {fmtDate(h.date)} — {h.newData?.deptId || h.oldData?.deptId ? dName(h.newData?.deptId || h.oldData?.deptId) : ''}
-                    {' '}<span className={jobBadgeClass(h.newData?.jobType||h.oldData?.jobType)} style={{fontSize:'0.65rem'}}>
-                      {h.newData?.jobType||h.oldData?.jobType}
-                    </span>
-                  </span>
-                  <span className="history-time">{fmtTime(h.timestamp)}</span>
-                  {h.oldData && (
-                    <button className="btn btn-secondary btn-sm" style={{marginLeft:'auto'}} onClick={() => {
-                      if (confirm('Vratiti ovo stanje?')) restoreVersion(h);
-                    }}>↩ Vrati</button>
-                  )}
-                </div>
-                {h.oldData && h.newData && (
-                  <div className="diff-row">
-                    <div className="diff-old">{h.oldData.allWorkers?.map(wName).join(', ')}</div>
-                    <div style={{color:'var(--text-muted)'}}>→</div>
-                    <div className="diff-new">{h.newData.allWorkers?.map(wName).join(', ')}</div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-
-
-// ─── SPISAK VIEW ──────────────────────────────────────────────────────────────
-function SpisakView({ workers, setWorkers }) {
-  // editing: { workerId, field } | null
-  const [editing, setEditing] = useState(null);
-  const [editVal, setEditVal] = useState('');
-  // adding: catId | null
-  const [adding, setAdding] = useState(null);
-  const [addName, setAddName] = useState('');
-
-  const workersByCat = catId => workers.filter(w => w.category === catId);
-
-  const startEdit = (w, field) => {
-    setEditing({ workerId: w.id, field });
-    setEditVal(w[field] || '');
-  };
-
-  const commitEdit = () => {
-    if (!editing) return;
-    setWorkers(ws => ws.map(w =>
-      w.id === editing.workerId ? { ...w, [editing.field]: editVal } : w
-    ));
-    setEditing(null);
-    setEditVal('');
-  };
-
-  const handleKeyDown = e => {
-    if (e.key === 'Enter') commitEdit();
-    if (e.key === 'Escape') { setEditing(null); setEditVal(''); }
-  };
-
-  const deleteWorker = (w) => {
-    if (confirm(`Obrisati radnika "${w.name}"?`))
-      setWorkers(ws => ws.filter(x => x.id !== w.id));
-  };
-
-  const toggleStatus = (w) => {
-    setWorkers(ws => ws.map(x =>
-      x.id === w.id ? { ...x, status: x.status === 'aktivan' ? 'neaktivan' : 'aktivan' } : x
-    ));
-  };
-
-  const addWorker = (catId) => {
-    const name = addName.trim();
-    if (!name) return;
-    const newW = { id: uid(), name, category: catId, status: 'aktivan', phone: '', note: '' };
-    setWorkers(ws => [...ws, newW]);
-    setAddName('');
-    setAdding(null);
-  };
-
-  const moveWorker = (wId, newCat) => {
-    setWorkers(ws => ws.map(w => w.id === wId ? { ...w, category: newCat } : w));
-  };
-
-  const CAT_COLS = SPISAK_COLUMNS.map(cid => WORKER_CATEGORIES.find(c => c.id === cid)).filter(Boolean);
-  // max rows needed
-  const maxRows = Math.max(0, ...CAT_COLS.map(c => workersByCat(c.id).length));
-
-  return (
-    <div>
-      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
-        <div className="section-title">📊 Spisak radnika po kategorijama</div>
-        <span style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>{workers.filter(w=>w.status==='aktivan').length} aktivnih / {workers.length} ukupno</span>
-      </div>
-
-      <div style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',width:'100%',minWidth:'max-content'}}>
-          <thead>
-            <tr>
-              {CAT_COLS.map(cat => (
-                <th key={cat.id} style={{
-                  background: cat.pale,
-                  border: `2px solid ${cat.border}`,
-                  padding: '0.6rem 0.75rem',
-                  minWidth: 190,
-                  verticalAlign: 'bottom',
-                }}>
-                  <div style={{display:'flex',alignItems:'center',gap:'0.4rem',justifyContent:'space-between'}}>
-                    <div>
-                      <span style={{fontSize:'1.1rem'}}>{cat.icon}</span>
-                      <div style={{fontWeight:700,fontSize:'0.8rem',color:cat.color,marginTop:'0.2rem',lineHeight:1.2}}>{cat.label}</div>
-                      <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',color:cat.color,opacity:0.7,marginTop:'0.15rem'}}>
-                        {workersByCat(cat.id).filter(w=>w.status==='aktivan').length} aktivnih
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => { setAdding(cat.id); setAddName(''); }}
-                      style={{background:cat.color,color:'white',border:'none',borderRadius:4,width:24,height:24,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontWeight:700}}
-                      title="Dodaj radnika">+
-                    </button>
-                  </div>
-                  {/* Add row */}
-                  {adding === cat.id && (
-                    <div style={{marginTop:'0.4rem',display:'flex',gap:'0.3rem'}}>
-                      <input
-                        autoFocus
-                        className="form-input"
-                        placeholder="Ime i prezime..."
-                        value={addName}
-                        onChange={e=>setAddName(e.target.value)}
-                        onKeyDown={e=>{ if(e.key==='Enter') addWorker(cat.id); if(e.key==='Escape'){setAdding(null);setAddName('');} }}
-                        style={{fontSize:'0.78rem',padding:'0.3rem 0.5rem',flex:1}}
-                      />
-                      <button onClick={()=>addWorker(cat.id)} style={{background:cat.color,color:'white',border:'none',borderRadius:4,padding:'0.3rem 0.5rem',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>✓</button>
-                      <button onClick={()=>{setAdding(null);setAddName('');}} style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:4,padding:'0.3rem 0.5rem',cursor:'pointer',fontSize:'0.75rem',color:'var(--text-muted)'}}>✕</button>
-                    </div>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({length: maxRows + 0}, (_,i) => (
-              <tr key={i}>
-                {CAT_COLS.map(cat => {
-                  const ws = workersByCat(cat.id);
-                  const w = ws[i];
-                  if (!w) return <td key={cat.id} style={{border:`1px solid ${cat.border}`,background:cat.pale,opacity:0.3,minHeight:36}}></td>;
-                  const isInactive = w.status !== 'aktivan';
-                  const isEditingName = editing?.workerId === w.id && editing?.field === 'name';
-                  const isEditingPhone = editing?.workerId === w.id && editing?.field === 'phone';
-
-                  return (
-                    <td key={cat.id} style={{
-                      border:`1px solid ${cat.border}`,
-                      padding:'0.3rem 0.5rem',
-                      verticalAlign:'top',
-                      background: isInactive ? '#fafafa' : 'white',
-                      opacity: isInactive ? 0.55 : 1,
-                    }}>
-                      <div style={{display:'flex',alignItems:'center',gap:'0.25rem'}}>
-                        {/* Row number */}
-                        <span style={{fontFamily:'var(--mono)',fontSize:'0.6rem',color:'var(--text-light)',minWidth:14,textAlign:'right',flexShrink:0}}>{i+1}</span>
-
-                        {/* Name — click to edit */}
-                        <div style={{flex:1,minWidth:0}}>
-                          {isEditingName ? (
-                            <input
-                              autoFocus
-                              className="form-input"
-                              value={editVal}
-                              onChange={e=>setEditVal(e.target.value)}
-                              onBlur={commitEdit}
-                              onKeyDown={handleKeyDown}
-                              style={{fontSize:'0.82rem',padding:'0.2rem 0.4rem',width:'100%'}}
-                            />
-                          ) : (
-                            <span
-                              onClick={() => startEdit(w, 'name')}
-                              title="Klikni za editovanje"
-                              style={{
-                                fontSize:'0.85rem', fontWeight:600, cursor:'text',
-                                display:'block',
-                                textDecoration: isInactive ? 'line-through' : 'none',
-                                color: isInactive ? 'var(--text-light)' : 'var(--text)',
-                              }}>{w.name}</span>
-                          )}
-                          {/* Phone — smaller, editable */}
-                          {isEditingPhone ? (
-                            <input
-                              autoFocus
-                              className="form-input"
-                              value={editVal}
-                              onChange={e=>setEditVal(e.target.value)}
-                              onBlur={commitEdit}
-                              onKeyDown={handleKeyDown}
-                              placeholder="Telefon..."
-                              style={{fontSize:'0.7rem',padding:'0.15rem 0.3rem',width:'100%',marginTop:'0.15rem'}}
-                            />
-                          ) : (
-                            <span
-                              onClick={() => startEdit(w, 'phone')}
-                              title="Klikni za editovanje telefona"
-                              style={{fontSize:'0.7rem',color:'var(--text-muted)',cursor:'text',display:'block',marginTop:'0.1rem'}}>
-                              {w.phone || <span style={{opacity:0.35,fontStyle:'italic'}}>+ telefon</span>}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Actions */}
-                        <div style={{display:'flex',flexDirection:'column',gap:'0.15rem',flexShrink:0}}>
-                          {/* Toggle active */}
-                          <button onClick={() => toggleStatus(w)}
-                            title={isInactive ? 'Aktiviraj' : 'Deaktiviraj'}
-                            style={{background:'none',border:'none',cursor:'pointer',fontSize:'0.75rem',padding:'0.1rem',lineHeight:1}}>
-                            {isInactive ? '⛔' : '✅'}
-                          </button>
-                          {/* Move to another cat */}
-                          <select
-                            value={w.category}
-                            onChange={e=>moveWorker(w.id, e.target.value)}
-                            title="Premjesti u drugu kategoriju"
-                            style={{fontSize:'0.6rem',border:'1px solid var(--border)',borderRadius:3,padding:'0.1rem',background:'var(--bg)',color:'var(--text-muted)',cursor:'pointer',maxWidth:70}}>
-                            {WORKER_CATEGORIES.filter(c=>c.id!=='poslovoda').map(c=>(
-                              <option key={c.id} value={c.id}>{c.short}</option>
-                            ))}
-                          </select>
-                          {/* Delete */}
-                          <button onClick={() => deleteWorker(w)}
-                            title="Obriši"
-                            style={{background:'none',border:'none',cursor:'pointer',fontSize:'0.7rem',padding:'0.1rem',color:'var(--red)',lineHeight:1}}>🗑</button>
-                        </div>
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-            {/* Empty add row at bottom */}
-            <tr>
-              {CAT_COLS.map(cat => (
-                <td key={cat.id} style={{border:`1px solid ${cat.border}`,background:cat.pale,padding:'0.3rem 0.5rem',opacity:0.6}}>
-                  {adding !== cat.id && (
-                    <button
-                      onClick={() => { setAdding(cat.id); setAddName(''); }}
-                      style={{background:'none',border:`1px dashed ${cat.border}`,borderRadius:4,color:cat.color,width:'100%',padding:'0.3rem',fontSize:'0.75rem',cursor:'pointer',textAlign:'left'}}>
-                      + dodaj radnika
-                    </button>
-                  )}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{marginTop:'0.75rem',fontSize:'0.72rem',color:'var(--text-muted)'}}>
-        💡 Klikni na ime ili telefon za direktno editovanje · Klikni ✅/⛔ za aktivaciju · Koristite dropdown za premještanje u drugu kategoriju
-      </div>
-    </div>
-  );
-}
-
-// ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, wName, dName }) {
-  const now = new Date();
-  const [selYear,  setSelYear]  = useState(now.getFullYear());
-  const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
-  const [selWorker, setSelWorker] = useState('');
-  const [goModal, setGoModal] = useState(null); // { workerId } or null
-  const [goForm, setGoForm] = useState({ date:'', type:'Godišnji odmor', note:'' });
-  const [dayPicker, setDayPicker] = useState(null); // { workerId, date, x, y }
-
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno','Teren','Kancelarija'];
-  const ODSUTNOST_COLOR = {
-    'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO', icon:'🌴' },
-    'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B',  icon:'🏥' },
-    'Slobodan dan':   { bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a', short:'SD', icon:'☀️' },
-    'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N',  icon:'🚫' },
-    'Teren':          { bg:'#e8f4e0', color:'#2d6617', border:'#7abc5a', short:'T',  icon:'🏕️' },
-    'Kancelarija':    { bg:'#e8edf8', color:'#1a3a7a', border:'#7a9ae0', short:'K',  icon:'🏢' },
-  };
-
-  const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
-  const days = Array.from({length: daysInMonth}, (_,i) => i+1);
-  const isoDate = d => `${selYear}-${String(selMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  const dayOfWeek = d => new Date(selYear, selMonth, d).getDay(); // 0=Sun,6=Sat
-  const isWeekend = d => { const dw = dayOfWeek(d); return dw===0||dw===6; };
-  const MONTH_NAMES = ['Januar','Februar','Mart','April','Maj','Juni','Juli','August','Septembar','Oktobar','Novembar','Decembar'];
-
-  // Build map: workerId -> date -> { type: 'rad'|odsutnost }
-  const workerDayMap = useMemo(() => {
-    const m = {};
-    workers.forEach(w => { m[w.id] = {}; });
-    // Radni dani iz rasporeda
-    schedules.forEach(s => {
-      s.allWorkers.forEach(wId => {
-        if (m[wId]) m[wId][s.date] = { type: 'rad', jobType: s.jobType };
-      });
-    });
-    // Odsutnost
-    Object.entries(godisnji).forEach(([wId, entries]) => {
-      if (!m[wId]) return;
-      entries.forEach(e => {
-        m[wId][e.date] = { type: 'odsutnost', oType: e.type, note: e.note };
-      });
-    });
-    return m;
-  }, [schedules, godisnji, workers]);
-
-  // Stats per worker for selected month
-  const workerStats = useMemo(() => {
-    return workers.map(w => {
-      let radnih = 0, odsutnih = 0, vikenda = 0, praznih = 0;
-      const odsutTypes = {};
-      days.forEach(d => {
-        const date = isoDate(d);
-        const entry = workerDayMap[w.id]?.[date];
-        if (isWeekend(d)) { vikenda++; return; }
-        if (!entry) { praznih++; return; }
-        if (entry.type === 'rad') radnih++;
-        else { odsutnih++; odsutTypes[entry.oType] = (odsutTypes[entry.oType]||0)+1; }
-      });
-      return { ...w, radnih, odsutnih, vikenda, praznih, odsutTypes };
-    });
-  }, [workerDayMap, days, selYear, selMonth]);
-
-  // Add odsutnost
-  const saveGodisnji = () => {
-    if (!goForm.date) return alert('Odaberi datum!');
-    const wId = goModal.workerId;
-    setGodisnji(g => {
-      const prev = g[wId] || [];
-      const filtered = prev.filter(e => e.date !== goForm.date);
-      return { ...g, [wId]: [...filtered, { date: goForm.date, type: goForm.type, note: goForm.note }] };
-    });
-    setGoModal(null);
-    setGoForm({ date:'', type:'Godišnji odmor', note:'' });
-  };
-
-  const deleteGodisnji = (wId, date) => {
-    setGodisnji(g => ({ ...g, [wId]: (g[wId]||[]).filter(e => e.date !== date) }));
-  };
-
-  const handleDayClick = (e, workerId, date) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.min(rect.left, window.innerWidth - 230);
-    const y = rect.bottom + window.scrollY + 4;
-    setDayPicker({ workerId, date, x, y });
-  };
-
-  const saveDayType = (type) => {
-    if (!dayPicker) return;
-    const { workerId, date } = dayPicker;
-    setGodisnji(g => {
-      const prev = g[workerId] || [];
-      const filtered = prev.filter(e => e.date !== date);
-      return { ...g, [workerId]: [...filtered, { date, type, note: '' }] };
-    });
-    setDayPicker(null);
-  };
-
-  const clearDay = () => {
-    if (!dayPicker) return;
-    deleteGodisnji(dayPicker.workerId, dayPicker.date);
-    setDayPicker(null);
-  };
-
-  const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
-
-  return (
-    <div style={{position:'relative'}}>
-      {/* HEADER */}
-      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
-        <div className="section-title">📄 Šihtarica</div>
-
-        {/* Month/Year nav */}
-        <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
-          <button className="date-nav-btn" onClick={() => { if(selMonth===0){setSelMonth(11);setSelYear(y=>y-1);}else setSelMonth(m=>m-1); }}>◀</button>
-          <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.9rem',minWidth:140,textAlign:'center'}}>
-            {MONTH_NAMES[selMonth]} {selYear}
-          </span>
-          <button className="date-nav-btn" onClick={() => { if(selMonth===11){setSelMonth(0);setSelYear(y=>y+1);}else setSelMonth(m=>m+1); }}>▶</button>
-        </div>
-
-        {/* Worker filter */}
-        <select className="form-select" value={selWorker} onChange={e=>setSelWorker(e.target.value)} style={{maxWidth:220}}>
-          <option value="">Svi radnici</option>
-          {workers.filter(w=>w.status==='aktivan').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-
-        <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨️ Štampaj</button>
-      </div>
-
-      {/* LEGENDA */}
-      <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginBottom:'1rem',alignItems:'center'}}>
-        <span style={{fontSize:'0.72rem',color:'var(--text-muted)',fontWeight:700}}>Kategorije:</span>
-        {WORKER_CATEGORIES.filter(c=>c.id!=='poslovoda').map(c=>(
-          <span key={c.id} style={{display:'inline-flex',alignItems:'center',gap:'0.2rem',fontSize:'0.72rem',background:c.pale,color:c.color,border:`1px solid ${c.border}`,borderRadius:3,padding:'0.15rem 0.5rem',fontWeight:600}}>
-            {c.icon} {c.short}
-          </span>
-        ))}
-        <span style={{margin:'0 0.3rem',color:'var(--border)'}}>|</span>
-        <span style={{fontSize:'0.72rem',color:'var(--text-muted)',fontWeight:700}}>Status/Odsutnost:</span>
-        {Object.entries(ODSUTNOST_COLOR).map(([k,v])=>(
-          <span key={k} style={{display:'inline-flex',alignItems:'center',gap:'0.2rem'}}>
-            <span style={{fontSize:'0.72rem',background:v.bg,color:v.color,border:`1px solid ${v.border}`,borderRadius:3,padding:'0.1rem 0.4rem',fontFamily:'var(--mono)',fontWeight:700}}>{v.short}</span>
-            <span style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>{v.icon} {k}</span>
-          </span>
-        ))}
-        <span style={{fontSize:'0.72rem',background:'#f0ede6',color:'#9e9589',border:'1px solid #d4cfc4',borderRadius:3,padding:'0.1rem 0.4rem',fontFamily:'var(--mono)'}}>—</span>
-        <span style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>Vikend</span>
-      </div>
-
-      {/* TABLE */}
-      <div style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',fontSize:'0.75rem',minWidth:'max-content',width:'100%'}}>
-          <thead>
-            <tr>
-              <th style={{background:'#f0ede6',padding:'0.5rem 0.75rem',textAlign:'left',border:'1px solid var(--border)',minWidth:160,position:'sticky',left:0,zIndex:2,fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.08em'}}>RADNIK</th>
-              {days.map(d => (
-                <th key={d} style={{
-                  background: isWeekend(d) ? '#ece9e2' : '#f0ede6',
-                  padding:'0.3rem 0.2rem', textAlign:'center', border:'1px solid var(--border)',
-                  minWidth:28, fontFamily:'var(--mono)', fontSize:'0.65rem',
-                  color: isWeekend(d) ? 'var(--text-light)' : 'var(--text-muted)',
-                }}>
-                  <div>{d}</div>
-                  <div style={{fontSize:'0.55rem',opacity:0.7}}>{'NPUSČPS'[dayOfWeek(d)]}</div>
-                </th>
-              ))}
-              <th style={{background:'#f0ede6',padding:'0.3rem 0.5rem',border:'1px solid var(--border)',fontFamily:'var(--mono)',fontSize:'0.6rem',minWidth:36,textAlign:'center'}}>R</th>
-              <th style={{background:'#fdf0e0',padding:'0.3rem 0.5rem',border:'1px solid var(--border)',fontFamily:'var(--mono)',fontSize:'0.6rem',minWidth:36,textAlign:'center'}}>GO</th>
-              <th style={{background:'#fde8e8',padding:'0.3rem 0.5rem',border:'1px solid var(--border)',fontFamily:'var(--mono)',fontSize:'0.6rem',minWidth:36,textAlign:'center'}}>B</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayWorkers.map(w => {
-              const stats = workerStats.find(s => s.id === w.id) || w;
-              const cat = getCatById(w.category);
-              const catColor = cat?.color || '#2d5a27';
-              const catPale  = cat?.pale  || '#e8f0e6';
-              const catBorder= cat?.border|| '#9bc492';
-              return (
-                <tr key={w.id} style={{opacity:w.status==='aktivan'?1:0.5}}>
-                  <td style={{
-                    padding:'0.35rem 0.6rem',
-                    border:`2px solid ${catBorder}`,
-                    borderLeft:`4px solid ${catColor}`,
-                    fontWeight:600,
-                    background: catPale,
-                    position:'sticky',left:0,zIndex:1,
-                    display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.3rem',
-                  }}>
-                    <div style={{display:'flex',alignItems:'center',gap:'0.3rem',minWidth:0,flex:1}}>
-                      <span style={{fontSize:'0.8rem',flexShrink:0}}>{cat?.icon||'👤'}</span>
-                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:catColor}}>{w.name}</span>
-                    </div>
-                    <button
-                      onClick={() => { setGoModal({workerId:w.id}); setGoForm({date:isoDate(new Date().getDate()), type:'Godišnji odmor', note:''}); }}
-                      style={{background:catColor,color:'white',border:'none',borderRadius:4,padding:'0.15rem 0.35rem',fontSize:'0.65rem',cursor:'pointer',flexShrink:0,fontWeight:700}}
-                      title="Dodaj odsutnost">+GO
-                    </button>
-                  </td>
-                  {days.map(d => {
-                    const date = isoDate(d);
-                    const entry = workerDayMap[w.id]?.[date];
-                    const wknd = isWeekend(d);
-                    let cellBg = wknd ? '#f0ede6' : 'white';
-                    let cellBorderColor = wknd ? '#ddd9d0' : '#ece9e2';
-                    let cellText = wknd ? <span style={{color:'#ccc8c0',fontSize:'0.55rem'}}>—</span> : null;
-                    let title = 'Klikni za unos';
-                    if (entry?.type === 'rad') {
-                      cellBg = catPale;
-                      cellBorderColor = catBorder;
-                      cellText = <span style={{color:catColor,fontWeight:700,fontSize:'0.65rem',fontFamily:'var(--mono)'}}>{cat?.icon||'R'}</span>;
-                      title = (cat?.short||'Rad') + ' · ' + entry.jobType;
-                    } else if (entry?.type === 'odsutnost') {
-                      const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
-                      cellBg = oc.bg;
-                      cellBorderColor = oc.border;
-                      cellText = <span style={{color:oc.color,fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>{oc.short}</span>;
-                      title = entry.oType + (entry.note ? ' — '+entry.note : '');
-                    }
-                    return (
-                      <td key={d} title={title}
-                        onClick={e => !wknd && handleDayClick(e, w.id, date)}
-                        style={{
-                          padding:'0.25rem 0.15rem',
-                          border:`1px solid ${cellBorderColor}`,
-                          textAlign:'center',
-                          background: cellBg,
-                          cursor: wknd ? 'default' : 'pointer',
-                        }}>{cellText}</td>
-                    );
-                  })}
-                  <td style={{textAlign:'center',border:`1px solid ${catBorder}`,background:catPale,fontFamily:'var(--mono)',fontWeight:700,color:catColor,padding:'0.25rem 0.4rem'}}>{stats.radnih||0}</td>
-                  <td style={{textAlign:'center',border:'1px solid var(--border)',background:'#fdf0e0',fontFamily:'var(--mono)',fontWeight:700,color:'#b5620a',padding:'0.25rem 0.4rem'}}>{(stats.odsutTypes||{})['Godišnji odmor']||0}</td>
-                  <td style={{textAlign:'center',border:'1px solid var(--border)',background:'#fde8e8',fontFamily:'var(--mono)',fontWeight:700,color:'#8b2020',padding:'0.25rem 0.4rem'}}>{(stats.odsutTypes||{})['Bolovanje']||0}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* SUMMARY CARDS */}
-      <div style={{marginTop:'1.5rem'}}>
-        <div style={{fontFamily:'var(--mono)',fontSize:'0.65rem',letterSpacing:'0.1em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.75rem'}}>
-          Pregled po radniku — {MONTH_NAMES[selMonth]} {selYear}
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'0.5rem'}}>
-          {displayWorkers.filter(w=>w.status==='aktivan').map(w => {
-            const stats = workerStats.find(s=>s.id===w.id)||{radnih:0,odsutnih:0,praznih:0};
-            const goUpcoming = (godisnji[w.id]||[]).filter(e => e.date >= today()).sort((a,b)=>a.date.localeCompare(b.date));
-            return (
-              <div key={w.id} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:'0.75rem',boxShadow:'var(--shadow)'}}>
-                <div style={{fontWeight:700,fontSize:'0.82rem',marginBottom:'0.4rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.name}</div>
-                <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'0.3rem'}}>
-                  <span style={{fontFamily:'var(--mono)',fontSize:'0.75rem',background:'#e8f0e6',color:'#2d5a27',border:'1px solid #9bc492',borderRadius:3,padding:'0.1rem 0.4rem'}}>{stats.radnih} rad</span>
-                  {Object.entries(stats.odsutTypes||{}).map(([k,v])=>{
-                    const oc = ODSUTNOST_COLOR[k]||{bg:'#f0f0f0',color:'#555',border:'#ccc'};
-                    return <span key={k} style={{fontFamily:'var(--mono)',fontSize:'0.75rem',background:oc.bg,color:oc.color,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.1rem 0.4rem'}}>{v} {k.split(' ')[0].toLowerCase()}</span>;
-                  })}
-                </div>
-                {goUpcoming.length > 0 && (
-                  <div style={{marginTop:'0.3rem'}}>
-                    {goUpcoming.slice(0,3).map(e=>{
-                      const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc'};
-                      return (
-                        <div key={e.date} style={{display:'flex',alignItems:'center',gap:'0.3rem',fontSize:'0.72rem',marginBottom:'0.15rem'}}>
-                          <span style={{fontFamily:'var(--mono)',color:oc.color,background:oc.bg,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',fontSize:'0.65rem',fontWeight:700}}>{ODSUTNOST_COLOR[e.type]?.short}</span>
-                          <span style={{fontFamily:'var(--mono)',color:'var(--text-muted)'}}>{fmtDate(e.date)}</span>
-                          {e.note && <span style={{color:'var(--text-light)',fontStyle:'italic',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.note}</span>}
-                          <button onClick={()=>deleteGodisnji(w.id,e.date)} style={{marginLeft:'auto',background:'none',border:'none',color:'var(--text-light)',cursor:'pointer',fontSize:'0.7rem',padding:0}}>✕</button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* DAY PICKER POPUP */}
-      {dayPicker && (
-        <>
-          <div style={{position:'fixed',inset:0,zIndex:999}} onClick={()=>setDayPicker(null)} />
-          <div style={{
-            position:'absolute',
-            top: dayPicker.y,
-            left: dayPicker.x,
-            zIndex:1000,
-            background:'white',
-            border:'1px solid var(--border)',
-            borderRadius:8,
-            boxShadow:'0 4px 24px rgba(0,0,0,0.18)',
-            padding:'0.5rem',
-            minWidth:210,
-          }} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:'0.65rem',fontFamily:'var(--mono)',color:'var(--text-light)',marginBottom:'0.5rem',padding:'0.1rem 0.3rem',fontWeight:700,borderBottom:'1px solid var(--border)',paddingBottom:'0.4rem'}}>
-              {workers.find(w=>w.id===dayPicker.workerId)?.name}<br/>
-              <span style={{color:'var(--text-muted)'}}>{fmtDate(dayPicker.date)}</span>
-            </div>
-            {ODSUTNOST_TYPES.map(t => {
-              const oc = ODSUTNOST_COLOR[t];
-              const current = workerDayMap[dayPicker.workerId]?.[dayPicker.date];
-              const isActive = current?.type === 'odsutnost' && current?.oType === t;
-              return (
-                <button key={t} type="button"
-                  onClick={() => saveDayType(t)}
-                  style={{
-                    display:'flex',alignItems:'center',gap:'0.5rem',
-                    width:'100%',padding:'0.4rem 0.5rem',
-                    border: isActive ? `2px solid ${oc.color}` : '2px solid transparent',
-                    borderRadius:6,
-                    background: isActive ? oc.bg : 'transparent',
-                    cursor:'pointer',fontSize:'0.8rem',
-                    fontWeight: isActive ? 700 : 400,
-                    color: isActive ? oc.color : 'var(--text)',
-                    textAlign:'left',
-                    marginBottom:'0.1rem',
-                  }}>
-                  <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.63rem',background:oc.bg,color:oc.color,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',minWidth:22,textAlign:'center',flexShrink:0}}>{oc.short}</span>
-                  <span>{oc.icon} {t}</span>
-                  {isActive && <span style={{marginLeft:'auto',fontSize:'0.65rem'}}>✓</span>}
-                </button>
-              );
-            })}
-            {workerDayMap[dayPicker.workerId]?.[dayPicker.date]?.type === 'odsutnost' && (
-              <>
-                <div style={{borderTop:'1px solid var(--border)',margin:'0.3rem 0'}} />
-                <button type="button" onClick={clearDay}
-                  style={{display:'flex',alignItems:'center',gap:'0.5rem',width:'100%',padding:'0.4rem 0.5rem',border:'2px solid transparent',borderRadius:6,background:'transparent',cursor:'pointer',fontSize:'0.8rem',color:'#c0392b',textAlign:'left'}}>
-                  ✕ Ukloni unos
-                </button>
-              </>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* MODAL — dodaj odsutnost */}
-      {goModal && (
-        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setGoModal(null)}>
-          <div className="modal" style={{maxWidth:400}}>
-            <div className="modal-header">
-              <span>📅</span>
-              <div className="modal-title">
-                Dodaj odsutnost — {workers.find(w=>w.id===goModal.workerId)?.name}
-              </div>
-              <button className="btn btn-ghost btn-icon" onClick={()=>setGoModal(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Datum *</label>
-                <input type="date" className="form-input" value={goForm.date} onChange={e=>setGoForm(f=>({...f,date:e.target.value}))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vrsta odsutnosti</label>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.4rem'}}>
-                  {ODSUTNOST_TYPES.map(t => {
-                    const oc = ODSUTNOST_COLOR[t];
-                    return (
-                      <button key={t} type="button"
-                        onClick={()=>setGoForm(f=>({...f,type:t}))}
-                        style={{
-                          padding:'0.5rem 0.6rem',border:`2px solid ${goForm.type===t?oc.color:oc.border}`,
-                          borderRadius:6,background:goForm.type===t?oc.bg:'var(--bg)',
-                          color:goForm.type===t?oc.color:'var(--text-muted)',
-                          fontWeight:goForm.type===t?700:400,fontSize:'0.8rem',cursor:'pointer',
-                          display:'flex',alignItems:'center',gap:'0.4rem',
-                        }}>
-                        <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.7rem',background:oc.bg,color:oc.color,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>{oc.short}</span>
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Napomena</label>
-                <input className="form-input" placeholder="npr. najava za prekosutra..." value={goForm.note} onChange={e=>setGoForm(f=>({...f,note:e.target.value}))} />
-              </div>
-              {/* Upcoming for this worker */}
-              {(godisnji[goModal.workerId]||[]).filter(e=>e.date>=today()).length > 0 && (
-                <div style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:6,padding:'0.6rem 0.75rem'}}>
-                  <div style={{fontFamily:'var(--mono)',fontSize:'0.62rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'0.4rem'}}>Planirane odsutnosti</div>
-                  {(godisnji[goModal.workerId]||[]).filter(e=>e.date>=today()).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
-                    const oc = ODSUTNOST_COLOR[e.type]||{bg:'#f0f0f0',color:'#555',border:'#ccc',short:'?'};
-                    return (
-                      <div key={e.date} style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.78rem',marginBottom:'0.2rem'}}>
-                        <span style={{fontFamily:'var(--mono)',color:oc.color,background:oc.bg,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',fontSize:'0.65rem',fontWeight:700}}>{oc.short}</span>
-                        <span style={{fontFamily:'var(--mono)',fontWeight:600}}>{fmtDate(e.date)}</span>
-                        <span style={{color:'var(--text-muted)'}}>{e.type}</span>
-                        {e.note && <span style={{color:'var(--text-light)',fontStyle:'italic'}}>{e.note}</span>}
-                        <button onClick={()=>deleteGodisnji(goModal.workerId,e.date)} style={{marginLeft:'auto',background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:'0.8rem'}}>✕</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={()=>setGoModal(null)}>Odustani</button>
-              <button className="btn btn-primary" onClick={saveGodisnji}>💾 Sačuvaj</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── RENDER ───────────────────────────────────────────────────────────────────
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-</script>
+<script src="app.js"></script>
 
 <script>
 // ── Service Worker registration ─────────────────────────────────────────────
@@ -3827,32 +870,93 @@ if ('serviceWorker' in navigator) {
 
 // ── PWA Install prompt ───────────────────────────────────────────────────────
 let deferredPrompt;
+const PWA_DISMISS_KEY = 'pwa-install-dismissed';
+
+function showInstallBanner() {
+  const banner = document.getElementById('pwa-install-banner');
+  if (!banner) return;
+  // Don't show if user dismissed in the last 3 days
+  const dismissed = localStorage.getItem(PWA_DISMISS_KEY);
+  if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 3 * 24 * 60 * 60 * 1000) return;
+  banner.style.display = 'flex';
+  // Animate in
+  requestAnimationFrame(() => {
+    banner.style.opacity = '1';
+    banner.style.transform = 'translateY(0)';
+  });
+}
+
+function hideInstallBanner() {
+  const banner = document.getElementById('pwa-install-banner');
+  if (!banner) return;
+  banner.style.opacity = '0';
+  banner.style.transform = 'translateY(20px)';
+  setTimeout(() => { banner.style.display = 'none'; }, 300);
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  const btn = document.getElementById('pwa-install-btn');
-  if (btn) btn.style.display = 'flex';
+  showInstallBanner();
 });
+
 window.addEventListener('appinstalled', () => {
-  const btn = document.getElementById('pwa-install-btn');
-  if (btn) btn.style.display = 'none';
+  hideInstallBanner();
   deferredPrompt = null;
+  localStorage.setItem(PWA_DISMISS_KEY, Date.now().toString());
 });
+
 window.triggerInstall = () => {
   if (deferredPrompt) {
     deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+    deferredPrompt.userChoice.then(() => {
+      deferredPrompt = null;
+      hideInstallBanner();
+    });
   }
+};
+
+window.dismissInstall = () => {
+  localStorage.setItem(PWA_DISMISS_KEY, Date.now().toString());
+  hideInstallBanner();
 };
 </script>
 
-<!-- PWA Install button (shown only when installable) -->
-<div id="pwa-install-btn" style="display:none;position:fixed;bottom:1.2rem;right:1.2rem;z-index:9999;
-  background:#2d5a27;color:white;border:none;border-radius:28px;padding:0.6rem 1.1rem;
-  font-family:'IBM Plex Sans',sans-serif;font-size:0.85rem;font-weight:600;
-  box-shadow:0 4px 16px rgba(0,0,0,0.25);cursor:pointer;align-items:center;gap:0.5rem;"
-  onclick="triggerInstall()">
-  📲 Instaliraj aplikaciju
+<!-- PWA Install Banner (shown when installable) -->
+<div id="pwa-install-banner" style="
+  display:none;opacity:0;transform:translateY(20px);
+  transition:opacity 0.3s ease,transform 0.3s ease;
+  position:fixed;bottom:0;left:0;right:0;z-index:10000;
+  background:linear-gradient(135deg,#2d5a27 0%,#3a7233 100%);
+  color:white;padding:1rem 1.2rem;
+  font-family:'IBM Plex Sans',sans-serif;
+  box-shadow:0 -4px 24px rgba(0,0,0,0.3);
+  flex-direction:column;align-items:center;gap:0.6rem;">
+
+  <div style="display:flex;align-items:center;gap:0.8rem;width:100%;max-width:500px;">
+    <div style="flex-shrink:0;width:48px;height:48px;background:rgba(255,255,255,0.15);border-radius:12px;
+      display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🌲</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;font-size:0.95rem;margin-bottom:2px;">Instaliraj aplikaciju</div>
+      <div style="font-size:0.78rem;opacity:0.85;line-height:1.3;">
+        Dodaj Raspored Radnika na početni ekran za brži pristup i rad bez interneta.
+      </div>
+    </div>
+    <button onclick="dismissInstall()" style="
+      flex-shrink:0;background:none;border:none;color:rgba(255,255,255,0.7);
+      font-size:1.3rem;cursor:pointer;padding:4px;line-height:1;" aria-label="Zatvori">&times;</button>
+  </div>
+
+  <div style="display:flex;gap:0.6rem;width:100%;max-width:500px;">
+    <button onclick="dismissInstall()" style="
+      flex:1;padding:0.55rem;border-radius:10px;border:1.5px solid rgba(255,255,255,0.4);
+      background:transparent;color:white;font-family:inherit;font-size:0.82rem;
+      font-weight:600;cursor:pointer;">Ne sada</button>
+    <button onclick="triggerInstall()" style="
+      flex:1;padding:0.55rem;border-radius:10px;border:none;
+      background:white;color:#2d5a27;font-family:inherit;font-size:0.82rem;
+      font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);">📲 Instaliraj</button>
+  </div>
 </div>
 
 </body>

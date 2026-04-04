@@ -1,0 +1,23 @@
+{
+  "name": "raspored-radnika",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sw.js",
+  "scripts": {
+    "build": "cat src/*.jsx > app.jsx && npx babel app.jsx -o app.js",
+    "build:watch": "cat src/*.jsx > app.jsx && npx babel app.jsx -o app.js --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:38721/git/pogonboskrupa/Raspored-radnika"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.2",
+    "@babel/preset-react": "^7.28.5"
+  }
+}
