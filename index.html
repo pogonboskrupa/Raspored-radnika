@@ -3406,13 +3406,18 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [selWorker, setSelWorker] = useState('');
   const [goModal, setGoModal] = useState(null); // { workerId } or null
   const [goForm, setGoForm] = useState({ date:'', type:'Godišnji odmor', note:'' });
+  const [dayPicker, setDayPicker] = useState(null); // { workerId, date, x, y }
 
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno','Teren','Kancelarija','Priprema','Ostalo'];
   const ODSUTNOST_COLOR = {
-    'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO' },
-    'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B'  },
-    'Slobodan dan':   { bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a', short:'SD' },
-    'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N'  },
+    'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO', icon:'🌴' },
+    'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B',  icon:'🏥' },
+    'Slobodan dan':   { bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a', short:'SD', icon:'☀️' },
+    'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N',  icon:'🚫' },
+    'Teren':          { bg:'#e8f4e0', color:'#2d6617', border:'#7abc5a', short:'T',  icon:'🏕️' },
+    'Kancelarija':    { bg:'#e8edf8', color:'#1a3a7a', border:'#7a9ae0', short:'K',  icon:'🏢' },
+    'Priprema':       { bg:'#f3eaff', color:'#5a1a8b', border:'#b07ada', short:'P',  icon:'📋' },
+    'Ostalo':         { bg:'#f5f0e8', color:'#6b5a3a', border:'#c4b48a', short:'O',  icon:'📌' },
   };
 
   const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
@@ -3476,10 +3481,34 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     setGodisnji(g => ({ ...g, [wId]: (g[wId]||[]).filter(e => e.date !== date) }));
   };
 
+  const handleDayClick = (e, workerId, date) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(rect.left, window.innerWidth - 230);
+    const y = rect.bottom + window.scrollY + 4;
+    setDayPicker({ workerId, date, x, y });
+  };
+
+  const saveDayType = (type) => {
+    if (!dayPicker) return;
+    const { workerId, date } = dayPicker;
+    setGodisnji(g => {
+      const prev = g[workerId] || [];
+      const filtered = prev.filter(e => e.date !== date);
+      return { ...g, [workerId]: [...filtered, { date, type, note: '' }] };
+    });
+    setDayPicker(null);
+  };
+
+  const clearDay = () => {
+    if (!dayPicker) return;
+    deleteGodisnji(dayPicker.workerId, dayPicker.date);
+    setDayPicker(null);
+  };
+
   const displayWorkers = selWorker ? workers.filter(w => w.id === selWorker) : workers;
 
   return (
-    <div>
+    <div style={{position:'relative'}}>
       {/* HEADER */}
       <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',flexWrap:'wrap'}}>
         <div className="section-title">📄 Šihtarica</div>
@@ -3511,11 +3540,11 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           </span>
         ))}
         <span style={{margin:'0 0.3rem',color:'var(--border)'}}>|</span>
-        <span style={{fontSize:'0.72rem',color:'var(--text-muted)',fontWeight:700}}>Odsutnost:</span>
+        <span style={{fontSize:'0.72rem',color:'var(--text-muted)',fontWeight:700}}>Status/Odsutnost:</span>
         {Object.entries(ODSUTNOST_COLOR).map(([k,v])=>(
           <span key={k} style={{display:'inline-flex',alignItems:'center',gap:'0.2rem'}}>
             <span style={{fontSize:'0.72rem',background:v.bg,color:v.color,border:`1px solid ${v.border}`,borderRadius:3,padding:'0.1rem 0.4rem',fontFamily:'var(--mono)',fontWeight:700}}>{v.short}</span>
-            <span style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>{k}</span>
+            <span style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>{v.icon} {k}</span>
           </span>
         ))}
         <span style={{fontSize:'0.72rem',background:'#f0ede6',color:'#9e9589',border:'1px solid #d4cfc4',borderRadius:3,padding:'0.1rem 0.4rem',fontFamily:'var(--mono)'}}>—</span>
@@ -3579,7 +3608,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                     let cellBg = wknd ? '#f0ede6' : 'white';
                     let cellBorderColor = wknd ? '#ddd9d0' : '#ece9e2';
                     let cellText = wknd ? <span style={{color:'#ccc8c0',fontSize:'0.55rem'}}>—</span> : null;
-                    let title = '';
+                    let title = 'Klikni za unos';
                     if (entry?.type === 'rad') {
                       cellBg = catPale;
                       cellBorderColor = catBorder;
@@ -3589,21 +3618,19 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       const oc = ODSUTNOST_COLOR[entry.oType] || ODSUTNOST_COLOR['Slobodan dan'];
                       cellBg = oc.bg;
                       cellBorderColor = oc.border;
-                      cellText = (
-                        <span style={{color:oc.color,fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)',cursor:'pointer'}}
-                          onClick={()=>deleteGodisnji(w.id,date)} title={'Klikni za brisanje: '+entry.oType}>
-                          {oc.short}
-                        </span>
-                      );
+                      cellText = <span style={{color:oc.color,fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)'}}>{oc.short}</span>;
                       title = entry.oType + (entry.note ? ' — '+entry.note : '');
                     }
                     return (
-                      <td key={d} title={title} style={{
-                        padding:'0.25rem 0.15rem',
-                        border:`1px solid ${cellBorderColor}`,
-                        textAlign:'center',
-                        background: cellBg,
-                      }}>{cellText}</td>
+                      <td key={d} title={title}
+                        onClick={e => !wknd && handleDayClick(e, w.id, date)}
+                        style={{
+                          padding:'0.25rem 0.15rem',
+                          border:`1px solid ${cellBorderColor}`,
+                          textAlign:'center',
+                          background: cellBg,
+                          cursor: wknd ? 'default' : 'pointer',
+                        }}>{cellText}</td>
                     );
                   })}
                   <td style={{textAlign:'center',border:`1px solid ${catBorder}`,background:catPale,fontFamily:'var(--mono)',fontWeight:700,color:catColor,padding:'0.25rem 0.4rem'}}>{stats.radnih||0}</td>
@@ -3655,6 +3682,64 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           })}
         </div>
       </div>
+
+      {/* DAY PICKER POPUP */}
+      {dayPicker && (
+        <>
+          <div style={{position:'fixed',inset:0,zIndex:999}} onClick={()=>setDayPicker(null)} />
+          <div style={{
+            position:'absolute',
+            top: dayPicker.y,
+            left: dayPicker.x,
+            zIndex:1000,
+            background:'white',
+            border:'1px solid var(--border)',
+            borderRadius:8,
+            boxShadow:'0 4px 24px rgba(0,0,0,0.18)',
+            padding:'0.5rem',
+            minWidth:210,
+          }} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:'0.65rem',fontFamily:'var(--mono)',color:'var(--text-light)',marginBottom:'0.5rem',padding:'0.1rem 0.3rem',fontWeight:700,borderBottom:'1px solid var(--border)',paddingBottom:'0.4rem'}}>
+              {workers.find(w=>w.id===dayPicker.workerId)?.name}<br/>
+              <span style={{color:'var(--text-muted)'}}>{fmtDate(dayPicker.date)}</span>
+            </div>
+            {ODSUTNOST_TYPES.map(t => {
+              const oc = ODSUTNOST_COLOR[t];
+              const current = workerDayMap[dayPicker.workerId]?.[dayPicker.date];
+              const isActive = current?.type === 'odsutnost' && current?.oType === t;
+              return (
+                <button key={t} type="button"
+                  onClick={() => saveDayType(t)}
+                  style={{
+                    display:'flex',alignItems:'center',gap:'0.5rem',
+                    width:'100%',padding:'0.4rem 0.5rem',
+                    border: isActive ? `2px solid ${oc.color}` : '2px solid transparent',
+                    borderRadius:6,
+                    background: isActive ? oc.bg : 'transparent',
+                    cursor:'pointer',fontSize:'0.8rem',
+                    fontWeight: isActive ? 700 : 400,
+                    color: isActive ? oc.color : 'var(--text)',
+                    textAlign:'left',
+                    marginBottom:'0.1rem',
+                  }}>
+                  <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.63rem',background:oc.bg,color:oc.color,border:`1px solid ${oc.border}`,borderRadius:3,padding:'0.05rem 0.3rem',minWidth:22,textAlign:'center',flexShrink:0}}>{oc.short}</span>
+                  <span>{oc.icon} {t}</span>
+                  {isActive && <span style={{marginLeft:'auto',fontSize:'0.65rem'}}>✓</span>}
+                </button>
+              );
+            })}
+            {workerDayMap[dayPicker.workerId]?.[dayPicker.date]?.type === 'odsutnost' && (
+              <>
+                <div style={{borderTop:'1px solid var(--border)',margin:'0.3rem 0'}} />
+                <button type="button" onClick={clearDay}
+                  style={{display:'flex',alignItems:'center',gap:'0.5rem',width:'100%',padding:'0.4rem 0.5rem',border:'2px solid transparent',borderRadius:6,background:'transparent',cursor:'pointer',fontSize:'0.8rem',color:'#c0392b',textAlign:'left'}}>
+                  ✕ Ukloni unos
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       {/* MODAL — dodaj odsutnost */}
       {goModal && (
