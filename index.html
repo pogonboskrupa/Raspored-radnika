@@ -3408,7 +3408,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
   const [goForm, setGoForm] = useState({ date:'', type:'Godišnji odmor', note:'' });
   const [dayPicker, setDayPicker] = useState(null); // { workerId, date, x, y }
 
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno','Teren','Kancelarija','Priprema','Ostalo'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno','Teren','Kancelarija'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO', icon:'🌴' },
     'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B',  icon:'🏥' },
@@ -3416,8 +3416,6 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N',  icon:'🚫' },
     'Teren':          { bg:'#e8f4e0', color:'#2d6617', border:'#7abc5a', short:'T',  icon:'🏕️' },
     'Kancelarija':    { bg:'#e8edf8', color:'#1a3a7a', border:'#7a9ae0', short:'K',  icon:'🏢' },
-    'Priprema':       { bg:'#f3eaff', color:'#5a1a8b', border:'#b07ada', short:'P',  icon:'📋' },
-    'Ostalo':         { bg:'#f5f0e8', color:'#6b5a3a', border:'#c4b48a', short:'O',  icon:'📌' },
   };
 
   const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
