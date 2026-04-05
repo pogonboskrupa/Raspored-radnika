@@ -6,10 +6,11 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   // Two modes: 'rad' or 'odsutnost'
   const [mode, setMode] = useState('rad');
 
-  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Neplaćeno'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor','Bolovanje','Slobodan dan','Neplaćeno'];
   const ODSUTNOST_COLOR = {
-    'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO', icon:'🏖️' },
+    'Godišnji odmor': { bg:'#e4edf5', color:'#1a3d5c', border:'#9bbfd9', short:'GO', icon:'🌴' },
     'Bolovanje':      { bg:'#fde8e8', color:'#8b2020', border:'#e0a0a0', short:'B',  icon:'🏥' },
+    'Slobodan dan':   { bg:'#fdf0e0', color:'#b5620a', border:'#e8c17a', short:'SD', icon:'☀️' },
     'Neplaćeno':      { bg:'#f0f0f0', color:'#555',    border:'#ccc',    short:'N',  icon:'📋' },
   };
 

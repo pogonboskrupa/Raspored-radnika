@@ -2786,14 +2786,14 @@ function QuickModal(_ref12) {
 
   // Two modes: 'rad' or 'odsutnost'
   const [mode, setMode] = useState('rad');
-  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Neplaćeno'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Slobodan dan', 'Neplaćeno'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': {
       bg: '#e4edf5',
       color: '#1a3d5c',
       border: '#9bbfd9',
       short: 'GO',
-      icon: '🏖️'
+      icon: '🌴'
     },
     'Bolovanje': {
       bg: '#fde8e8',
@@ -2801,6 +2801,13 @@ function QuickModal(_ref12) {
       border: '#e0a0a0',
       short: 'B',
       icon: '🏥'
+    },
+    'Slobodan dan': {
+      bg: '#fdf0e0',
+      color: '#b5620a',
+      border: '#e8c17a',
+      short: 'SD',
+      icon: '☀️'
     },
     'Neplaćeno': {
       bg: '#f0f0f0',
@@ -7169,37 +7176,49 @@ function SihtaricaView(_ref31) {
       cb = bi === -1 ? 999 : bi;
     return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
   }), [workers]);
-  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Neplaćeno', 'Službeni put', 'Neopravdan dan'];
+  const ODSUTNOST_TYPES = ['Godišnji odmor', 'Bolovanje', 'Slobodan dan', 'Neplaćeno', 'Službeni put', 'Neopravdan dan'];
   const ODSUTNOST_COLOR = {
     'Godišnji odmor': {
       bg: '#e4edf5',
       color: '#1a3d5c',
       border: '#9bbfd9',
-      short: 'GO'
+      short: 'GO',
+      icon: '🌴'
     },
     'Bolovanje': {
       bg: '#fde8e8',
       color: '#8b2020',
       border: '#e0a0a0',
-      short: 'B'
+      short: 'B',
+      icon: '🏥'
+    },
+    'Slobodan dan': {
+      bg: '#fdf0e0',
+      color: '#b5620a',
+      border: '#e8c17a',
+      short: 'SD',
+      icon: '☀️'
     },
     'Neplaćeno': {
       bg: '#f0f0f0',
       color: '#555',
       border: '#ccc',
-      short: 'N'
+      short: 'N',
+      icon: '🚫'
     },
     'Službeni put': {
       bg: '#edf4fb',
       color: '#0a4b78',
       border: '#7ab8e0',
-      short: 'SP'
+      short: 'SP',
+      icon: '✈️'
     },
     'Neopravdan dan': {
       bg: '#3d0000',
       color: '#fff',
       border: '#8b0000',
-      short: 'ND'
+      short: 'ND',
+      icon: '❌'
     }
   };
 
@@ -7277,12 +7296,19 @@ function SihtaricaView(_ref31) {
       let [wId, entries] = _ref32;
       if (!m[wId]) return;
       entries.forEach(e => {
+        // Backward compat: stari Teren/Kancelarija unosi iz godisnji → radni dan
+        const isRadniTip = e.type === 'Teren' || e.type === 'Kancelarija';
         if (e.open && e.dateOd) {
-          // Open-ended leave: fill from dateOd through end of displayed month
           days.forEach(d => {
             const date = isoDate(d);
             if (date >= e.dateOd && !isWeekend(d)) {
-              m[wId][date] = {
+              m[wId][date] = isRadniTip ? {
+                type: 'rad',
+                jobType: e.type,
+                note: e.note,
+                open: true,
+                dateOd: e.dateOd
+              } : {
                 type: 'odsutnost',
                 oType: e.type,
                 note: e.note,
@@ -7292,7 +7318,11 @@ function SihtaricaView(_ref31) {
             }
           });
         } else if (e.date) {
-          m[wId][e.date] = {
+          m[wId][e.date] = isRadniTip ? {
+            type: 'rad',
+            jobType: e.type,
+            note: e.note
+          } : {
             type: 'odsutnost',
             oType: e.type,
             note: e.note
@@ -7928,7 +7958,7 @@ function SihtaricaView(_ref31) {
         fontSize: '0.72rem',
         color: 'var(--text-muted)'
       }
-    }, k));
+    }, v.icon, " ", k));
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: '0.72rem',
@@ -9511,27 +9541,11 @@ function SihtaricaView(_ref31) {
       bg: '#4a7a8a',
       color: 'white'
     }];
-    const ODSUTNI = [{
-      type: 'Godišnji odmor',
-      label: '🏖️ Godišnji odmor',
-      ...ODSUTNOST_COLOR['Godišnji odmor']
-    }, {
-      type: 'Bolovanje',
-      label: '🏥 Bolovanje',
-      ...ODSUTNOST_COLOR['Bolovanje']
-    }, {
-      type: 'Službeni put',
-      label: '✈️ Službeni put',
-      ...ODSUTNOST_COLOR['Službeni put']
-    }, {
-      type: 'Neopravdan dan',
-      label: '❌ Neopravdan dan',
-      ...ODSUTNOST_COLOR['Neopravdan dan']
-    }, {
-      type: 'Neplaćeno',
-      label: '📋 Neplaćeno',
-      ...ODSUTNOST_COLOR['Neplaćeno']
-    }];
+    const ODSUTNI = ODSUTNOST_TYPES.map(t => ({
+      type: t,
+      label: `${ODSUTNOST_COLOR[t].icon} ${t}`,
+      ...ODSUTNOST_COLOR[t]
+    }));
     // Position picker: clamp to viewport
     const pickerW = 210;
     const pickerX = Math.min(cellPicker.x, window.innerWidth - pickerW - 8);
