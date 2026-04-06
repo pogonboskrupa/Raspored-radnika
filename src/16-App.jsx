@@ -1,15 +1,24 @@
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem(AUTH_SESSION_KEY) === 'true');
+  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem(AUTH_USER_KEY) || '');
 
   if (!isAuthenticated) {
-    return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
+    return <LoginScreen onLogin={(name) => { setCurrentUser(name); setIsAuthenticated(true); }} />;
   }
 
-  return <AppMain onLogout={() => { localStorage.removeItem(AUTH_SESSION_KEY); setIsAuthenticated(false); }} />;
+  return <AppMain
+    currentUser={currentUser}
+    onLogout={() => {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
+      setIsAuthenticated(false);
+      setCurrentUser('');
+    }}
+  />;
 }
 
-function AppMain({ onLogout }) {
+function AppMain({ onLogout, currentUser }) {
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -330,8 +339,17 @@ function AppMain({ onLogout }) {
           {[['raspored','📋 Raspored'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
             <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
           )}
-          <button className="nav-tab no-print" onClick={onLogout} title="Odjavi se"
-            style={{marginLeft:'auto',opacity:0.7,fontSize:'0.75rem'}}>🔒 Odjava</button>
+          <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'0.4rem'}}>
+            {currentUser && (
+              <span style={{fontSize:'0.7rem',fontWeight:700,color:'rgba(255,255,255,0.9)',
+                background:'rgba(255,255,255,0.15)',padding:'0.15rem 0.55rem',borderRadius:8,
+                fontFamily:'var(--mono)',letterSpacing:'0.05em'}}>
+                👤 {currentUser}
+              </span>
+            )}
+            <button className="nav-tab no-print" onClick={onLogout} title="Odjavi se"
+              style={{opacity:0.7,fontSize:'0.75rem'}}>🔒 Odjava</button>
+          </div>
         </nav>
       </header>
 

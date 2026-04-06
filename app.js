@@ -637,119 +637,59 @@ class ErrorBoundary extends React.Component {
   }
 }
 // ─── LOGIN / AUTH ────────────────────────────────────────────────────────────
-const AUTH_KEY = 'sumarija_auth';
 const AUTH_SESSION_KEY = 'sumarija_session';
+const AUTH_USER_KEY = 'sumarija_user';
 function hashPin(pin) {
-  // Simple hash for PIN (not crypto-grade, but sufficient for basic access control)
   let hash = 0;
   for (let i = 0; i < pin.length; i++) {
     const char = pin.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return 'h_' + Math.abs(hash).toString(36);
 }
+
+// Korisnici — PIN-ovi su hashirani
+const USERS = [{
+  name: 'AMRA',
+  hash: hashPin('5555'),
+  icon: '👩'
+}, {
+  name: 'NEDIM',
+  hash: hashPin('7777'),
+  icon: '👨'
+}, {
+  name: 'IZET',
+  hash: hashPin('4444'),
+  icon: '👨'
+}];
 function LoginScreen(_ref) {
   let {
     onLogin
   } = _ref;
-  const [mode, setMode] = useState('login'); // 'login' | 'setup' | 'change'
   const [pin, setPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState('');
   const [showPin, setShowPin] = useState(false);
-
-  // Check if PIN exists
-  const [existingHash, setExistingHash] = useState(null);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    // Try Firebase first, then localStorage
-    if (FIREBASE_ENABLED) {
-      const ref = firebase.database().ref('sumarija/' + AUTH_KEY);
-      ref.once('value').then(snap => {
-        const val = snap.val();
-        if (val) {
-          setExistingHash(typeof val === 'string' ? val : null);
-          setMode('login');
-        } else {
-          setMode('setup');
-        }
-        setLoaded(true);
-      }).catch(() => {
-        // Fallback to localStorage
-        const local = localStorage.getItem(AUTH_KEY);
-        if (local) {
-          setExistingHash(local);
-          setMode('login');
-        } else setMode('setup');
-        setLoaded(true);
-      });
-    } else {
-      const local = localStorage.getItem(AUTH_KEY);
-      if (local) {
-        setExistingHash(local);
-        setMode('login');
-      } else setMode('setup');
-      setLoaded(true);
-    }
-  }, []);
-  const saveHash = hash => {
-    localStorage.setItem(AUTH_KEY, hash);
-    if (FIREBASE_ENABLED) {
-      firebase.database().ref('sumarija/' + AUTH_KEY).set(hash).catch(() => {});
-    }
-  };
-  const handleSetup = () => {
-    setError('');
-    if (pin.length < 4) {
-      setError('PIN mora imati barem 4 znaka');
-      return;
-    }
-    if (pin !== confirmPin) {
-      setError('PIN-ovi se ne poklapaju');
-      return;
-    }
-    const hash = hashPin(pin);
-    saveHash(hash);
-    localStorage.setItem(AUTH_SESSION_KEY, 'true');
-    onLogin();
-  };
   const handleLogin = () => {
     setError('');
     if (!pin) {
       setError('Unesite PIN');
       return;
     }
-    const hash = hashPin(pin);
-    if (hash === existingHash) {
+    const h = hashPin(pin);
+    const user = USERS.find(u => u.hash === h);
+    if (user) {
       localStorage.setItem(AUTH_SESSION_KEY, 'true');
-      onLogin();
+      localStorage.setItem(AUTH_USER_KEY, user.name);
+      onLogin(user.name);
     } else {
       setError('Pogrešan PIN!');
       setPin('');
     }
   };
   const handleKeyDown = e => {
-    if (e.key === 'Enter') {
-      if (mode === 'setup') handleSetup();else handleLogin();
-    }
+    if (e.key === 'Enter') handleLogin();
   };
-  if (!loaded) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        background: 'var(--bg)'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '1.2rem',
-        color: 'var(--text-muted)'
-      }
-    }, "U\u010Ditavanje..."));
-  }
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -765,20 +705,20 @@ function LoginScreen(_ref) {
       boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
       padding: '2rem',
       width: '100%',
-      maxWidth: 380,
+      maxWidth: 360,
       margin: '1rem'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
-      marginBottom: '1.5rem'
+      marginBottom: '1.75rem'
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: "1774102184971~2.png",
     alt: "Raspored Radnika",
     style: {
-      width: 100,
-      height: 100,
+      width: 96,
+      height: 96,
       borderRadius: 18,
       marginBottom: '0.5rem',
       boxShadow: '0 4px 16px rgba(0,0,0,0.15)'
@@ -796,135 +736,39 @@ function LoginScreen(_ref) {
       fontFamily: 'var(--mono)',
       fontSize: '0.7rem',
       color: 'var(--text-muted)',
-      marginTop: '0.25rem'
-    }
-  }, "raspored radnika")), mode === 'setup' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: 'center',
-      marginBottom: '1rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.85rem',
-      fontWeight: 600,
-      color: 'var(--text)'
-    }
-  }, "Postavi pristupni PIN"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.72rem',
-      color: 'var(--text-muted)',
       marginTop: '0.2rem'
     }
-  }, "Ovo je prvi put. Odaberite PIN za za\u0161titu aplikacije.")), /*#__PURE__*/React.createElement("div", {
+  }, "raspored radnika")), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: '0.75rem'
+      display: 'flex',
+      justifyContent: 'center',
+      gap: '0.6rem',
+      marginBottom: '1.25rem'
     }
-  }, /*#__PURE__*/React.createElement("label", {
+  }, USERS.map(u => /*#__PURE__*/React.createElement("div", {
+    key: u.name,
     style: {
-      fontSize: '0.72rem',
-      fontWeight: 600,
-      color: 'var(--text-muted)',
-      display: 'block',
-      marginBottom: '0.25rem'
-    }
-  }, "Novi PIN (min. 4 znaka)"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'relative'
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: showPin ? 'text' : 'password',
-    value: pin,
-    onChange: e => setPin(e.target.value),
-    onKeyDown: handleKeyDown,
-    autoFocus: true,
-    placeholder: "Unesite PIN...",
-    style: {
-      width: '100%',
-      padding: '0.6rem 2.5rem 0.6rem 0.75rem',
-      border: '2px solid var(--border)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '0.2rem',
+      background: '#f5f2ec',
       borderRadius: 8,
-      fontSize: '1rem',
-      letterSpacing: '0.15em',
-      outline: 'none',
-      boxSizing: 'border-box'
+      padding: '0.4rem 0.7rem',
+      minWidth: 64
     }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowPin(!showPin),
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
-      position: 'absolute',
-      right: 8,
-      top: '50%',
-      transform: 'translateY(-50%)',
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '1rem',
-      color: 'var(--text-muted)'
+      fontSize: '1.4rem'
     }
-  }, showPin ? '🙈' : '👁️'))), /*#__PURE__*/React.createElement("div", {
+  }, u.icon), /*#__PURE__*/React.createElement("span", {
     style: {
-      marginBottom: '0.75rem'
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '0.72rem',
-      fontWeight: 600,
-      color: 'var(--text-muted)',
-      display: 'block',
-      marginBottom: '0.25rem'
-    }
-  }, "Potvrdite PIN"), /*#__PURE__*/React.createElement("input", {
-    type: showPin ? 'text' : 'password',
-    value: confirmPin,
-    onChange: e => setConfirmPin(e.target.value),
-    onKeyDown: handleKeyDown,
-    placeholder: "Ponovite PIN...",
-    style: {
-      width: '100%',
-      padding: '0.6rem 0.75rem',
-      border: '2px solid var(--border)',
-      borderRadius: 8,
-      fontSize: '1rem',
-      letterSpacing: '0.15em',
-      outline: 'none',
-      boxSizing: 'border-box'
-    }
-  })), error && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: '#c53030',
-      fontSize: '0.78rem',
-      fontWeight: 600,
-      marginBottom: '0.5rem',
-      padding: '0.4rem 0.6rem',
-      background: '#fde8e8',
-      borderRadius: 6
-    }
-  }, error), /*#__PURE__*/React.createElement("button", {
-    onClick: handleSetup,
-    style: {
-      width: '100%',
-      padding: '0.65rem',
-      background: 'var(--green)',
-      color: 'white',
-      border: 'none',
-      borderRadius: 8,
-      fontSize: '0.9rem',
+      fontSize: '0.68rem',
       fontWeight: 700,
-      cursor: 'pointer',
-      marginTop: '0.25rem'
+      color: 'var(--text-muted)',
+      fontFamily: 'var(--mono)'
     }
-  }, "Postavi PIN i u\u0111i")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: 'center',
-      marginBottom: '1rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.85rem',
-      fontWeight: 600,
-      color: 'var(--text)'
-    }
-  }, "Prijava")), /*#__PURE__*/React.createElement("div", {
+  }, u.name)))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: '0.75rem'
     }
@@ -934,31 +778,36 @@ function LoginScreen(_ref) {
       fontWeight: 600,
       color: 'var(--text-muted)',
       display: 'block',
-      marginBottom: '0.25rem'
+      marginBottom: '0.3rem'
     }
-  }, "PIN"), /*#__PURE__*/React.createElement("div", {
+  }, "Unesite va\u0161 PIN"), /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'relative'
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: showPin ? 'text' : 'password',
     value: pin,
-    onChange: e => setPin(e.target.value),
+    onChange: e => {
+      setPin(e.target.value);
+      setError('');
+    },
     onKeyDown: handleKeyDown,
     autoFocus: true,
-    placeholder: "Unesite PIN...",
+    placeholder: "\u2022\u2022\u2022\u2022",
+    maxLength: 8,
     style: {
       width: '100%',
-      padding: '0.6rem 2.5rem 0.6rem 0.75rem',
-      border: '2px solid var(--border)',
+      padding: '0.65rem 2.5rem 0.65rem 0.75rem',
+      border: error ? '2px solid #c53030' : '2px solid var(--border)',
       borderRadius: 8,
-      fontSize: '1rem',
-      letterSpacing: '0.15em',
+      fontSize: '1.2rem',
+      letterSpacing: '0.25em',
       outline: 'none',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      textAlign: 'center'
     }
   }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowPin(!showPin),
+    onClick: () => setShowPin(s => !s),
     style: {
       position: 'absolute',
       right: 8,
@@ -978,23 +827,23 @@ function LoginScreen(_ref) {
       marginBottom: '0.5rem',
       padding: '0.4rem 0.6rem',
       background: '#fde8e8',
-      borderRadius: 6
+      borderRadius: 6,
+      textAlign: 'center'
     }
   }, error), /*#__PURE__*/React.createElement("button", {
     onClick: handleLogin,
     style: {
       width: '100%',
-      padding: '0.65rem',
+      padding: '0.7rem',
       background: 'var(--green)',
       color: 'white',
       border: 'none',
       borderRadius: 8,
-      fontSize: '0.9rem',
+      fontSize: '0.95rem',
       fontWeight: 700,
-      cursor: 'pointer',
-      marginTop: '0.25rem'
+      cursor: 'pointer'
     }
-  }, "Prijavi se"))));
+  }, "Prijavi se")));
 }
 // ─── SCHEDULE VIEW ────────────────────────────────────────────────────────────
 function ScheduleView(_ref2) {
@@ -10119,21 +9968,29 @@ function SihtaricaView(_ref31) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem(AUTH_SESSION_KEY) === 'true');
+  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem(AUTH_USER_KEY) || '');
   if (!isAuthenticated) {
     return /*#__PURE__*/React.createElement(LoginScreen, {
-      onLogin: () => setIsAuthenticated(true)
+      onLogin: name => {
+        setCurrentUser(name);
+        setIsAuthenticated(true);
+      }
     });
   }
   return /*#__PURE__*/React.createElement(AppMain, {
+    currentUser: currentUser,
     onLogout: () => {
       localStorage.removeItem(AUTH_SESSION_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
       setIsAuthenticated(false);
+      setCurrentUser('');
     }
   });
 }
 function AppMain(_ref46) {
   let {
-    onLogout
+    onLogout,
+    currentUser
   } = _ref46;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
@@ -10482,16 +10339,33 @@ function AppMain(_ref46) {
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,
       onClick: () => setActiveTab(k)
     }, l);
-  }), /*#__PURE__*/React.createElement("button", {
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginLeft: 'auto',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem'
+    }
+  }, currentUser && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.7rem',
+      fontWeight: 700,
+      color: 'rgba(255,255,255,0.9)',
+      background: 'rgba(255,255,255,0.15)',
+      padding: '0.15rem 0.55rem',
+      borderRadius: 8,
+      fontFamily: 'var(--mono)',
+      letterSpacing: '0.05em'
+    }
+  }, "\uD83D\uDC64 ", currentUser), /*#__PURE__*/React.createElement("button", {
     className: "nav-tab no-print",
     onClick: onLogout,
     title: "Odjavi se",
     style: {
-      marginLeft: 'auto',
       opacity: 0.7,
       fontSize: '0.75rem'
     }
-  }, "\uD83D\uDD12 Odjava"))), showInstallBanner && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDD12 Odjava")))), showInstallBanner && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',

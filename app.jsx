@@ -295,83 +295,40 @@ class ErrorBoundary extends React.Component {
   }
 }
 // ─── LOGIN / AUTH ────────────────────────────────────────────────────────────
-const AUTH_KEY = 'sumarija_auth';
 const AUTH_SESSION_KEY = 'sumarija_session';
+const AUTH_USER_KEY    = 'sumarija_user';
 
 function hashPin(pin) {
-  // Simple hash for PIN (not crypto-grade, but sufficient for basic access control)
   let hash = 0;
   for (let i = 0; i < pin.length; i++) {
     const char = pin.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return 'h_' + Math.abs(hash).toString(36);
 }
 
+// Korisnici — PIN-ovi su hashirani
+const USERS = [
+  { name: 'AMRA',  hash: hashPin('5555'), icon: '👩' },
+  { name: 'NEDIM', hash: hashPin('7777'), icon: '👨' },
+  { name: 'IZET',  hash: hashPin('4444'), icon: '👨' },
+];
+
 function LoginScreen({ onLogin }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'setup' | 'change'
-  const [pin, setPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [error, setError] = useState('');
+  const [pin, setPin]       = useState('');
+  const [error, setError]   = useState('');
   const [showPin, setShowPin] = useState(false);
-
-  // Check if PIN exists
-  const [existingHash, setExistingHash] = useState(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    // Try Firebase first, then localStorage
-    if (FIREBASE_ENABLED) {
-      const ref = firebase.database().ref('sumarija/' + AUTH_KEY);
-      ref.once('value').then(snap => {
-        const val = snap.val();
-        if (val) {
-          setExistingHash(typeof val === 'string' ? val : null);
-          setMode('login');
-        } else {
-          setMode('setup');
-        }
-        setLoaded(true);
-      }).catch(() => {
-        // Fallback to localStorage
-        const local = localStorage.getItem(AUTH_KEY);
-        if (local) { setExistingHash(local); setMode('login'); }
-        else setMode('setup');
-        setLoaded(true);
-      });
-    } else {
-      const local = localStorage.getItem(AUTH_KEY);
-      if (local) { setExistingHash(local); setMode('login'); }
-      else setMode('setup');
-      setLoaded(true);
-    }
-  }, []);
-
-  const saveHash = (hash) => {
-    localStorage.setItem(AUTH_KEY, hash);
-    if (FIREBASE_ENABLED) {
-      firebase.database().ref('sumarija/' + AUTH_KEY).set(hash).catch(() => {});
-    }
-  };
-
-  const handleSetup = () => {
-    setError('');
-    if (pin.length < 4) { setError('PIN mora imati barem 4 znaka'); return; }
-    if (pin !== confirmPin) { setError('PIN-ovi se ne poklapaju'); return; }
-    const hash = hashPin(pin);
-    saveHash(hash);
-    localStorage.setItem(AUTH_SESSION_KEY, 'true');
-    onLogin();
-  };
 
   const handleLogin = () => {
     setError('');
     if (!pin) { setError('Unesite PIN'); return; }
-    const hash = hashPin(pin);
-    if (hash === existingHash) {
+    const h = hashPin(pin);
+    const user = USERS.find(u => u.hash === h);
+    if (user) {
       localStorage.setItem(AUTH_SESSION_KEY, 'true');
-      onLogin();
+      localStorage.setItem(AUTH_USER_KEY, user.name);
+      onLogin(user.name);
     } else {
       setError('Pogrešan PIN!');
       setPin('');
@@ -379,88 +336,78 @@ function LoginScreen({ onLogin }) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      if (mode === 'setup') handleSetup();
-      else handleLogin();
-    }
+    if (e.key === 'Enter') handleLogin();
   };
-
-  if (!loaded) {
-    return (
-      <div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'100vh',background:'var(--bg)'}}>
-        <div style={{fontSize:'1.2rem',color:'var(--text-muted)'}}>Učitavanje...</div>
-      </div>
-    );
-  }
 
   return (
     <div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'100vh',background:'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e8f0e6 100%)'}}>
-      <div style={{background:'white',borderRadius:16,boxShadow:'0 8px 32px rgba(0,0,0,0.12)',padding:'2rem',width:'100%',maxWidth:380,margin:'1rem'}}>
-        {/* Logo/Header */}
-        <div style={{textAlign:'center',marginBottom:'1.5rem'}}>
-          <img src="1774102184971~2.png" alt="Raspored Radnika" style={{width:100,height:100,borderRadius:18,marginBottom:'0.5rem',boxShadow:'0 4px 16px rgba(0,0,0,0.15)'}} />
+      <div style={{background:'white',borderRadius:16,boxShadow:'0 8px 32px rgba(0,0,0,0.12)',padding:'2rem',width:'100%',maxWidth:360,margin:'1rem'}}>
+
+        {/* Logo */}
+        <div style={{textAlign:'center',marginBottom:'1.75rem'}}>
+          <img src="1774102184971~2.png" alt="Raspored Radnika" style={{width:96,height:96,borderRadius:18,marginBottom:'0.5rem',boxShadow:'0 4px 16px rgba(0,0,0,0.15)'}} />
           <div style={{fontFamily:'var(--mono)',fontWeight:800,fontSize:'1.1rem',color:'var(--green)',letterSpacing:'-0.03em'}}>
             Šumarija Bos.Krupa
           </div>
-          <div style={{fontFamily:'var(--mono)',fontSize:'0.7rem',color:'var(--text-muted)',marginTop:'0.25rem'}}>
+          <div style={{fontFamily:'var(--mono)',fontSize:'0.7rem',color:'var(--text-muted)',marginTop:'0.2rem'}}>
             raspored radnika
           </div>
         </div>
 
-        {mode === 'setup' ? (
-          <>
-            <div style={{textAlign:'center',marginBottom:'1rem'}}>
-              <div style={{fontSize:'0.85rem',fontWeight:600,color:'var(--text)'}}>Postavi pristupni PIN</div>
-              <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginTop:'0.2rem'}}>
-                Ovo je prvi put. Odaberite PIN za zaštitu aplikacije.
-              </div>
+        {/* Korisnici — vizualni hint ko može ući */}
+        <div style={{display:'flex',justifyContent:'center',gap:'0.6rem',marginBottom:'1.25rem'}}>
+          {USERS.map(u => (
+            <div key={u.name} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'0.2rem',
+              background:'#f5f2ec',borderRadius:8,padding:'0.4rem 0.7rem',minWidth:64}}>
+              <span style={{fontSize:'1.4rem'}}>{u.icon}</span>
+              <span style={{fontSize:'0.68rem',fontWeight:700,color:'var(--text-muted)',fontFamily:'var(--mono)'}}>{u.name}</span>
             </div>
-            <div style={{marginBottom:'0.75rem'}}>
-              <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.25rem'}}>Novi PIN (min. 4 znaka)</label>
-              <div style={{position:'relative'}}>
-                <input type={showPin ? 'text' : 'password'} value={pin} onChange={e => setPin(e.target.value)}
-                  onKeyDown={handleKeyDown} autoFocus placeholder="Unesite PIN..."
-                  style={{width:'100%',padding:'0.6rem 2.5rem 0.6rem 0.75rem',border:'2px solid var(--border)',borderRadius:8,fontSize:'1rem',letterSpacing:'0.15em',outline:'none',boxSizing:'border-box'}} />
-                <button onClick={() => setShowPin(!showPin)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'1rem',color:'var(--text-muted)'}}>
-                  {showPin ? '🙈' : '👁️'}
-                </button>
-              </div>
-            </div>
-            <div style={{marginBottom:'0.75rem'}}>
-              <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.25rem'}}>Potvrdite PIN</label>
-              <input type={showPin ? 'text' : 'password'} value={confirmPin} onChange={e => setConfirmPin(e.target.value)}
-                onKeyDown={handleKeyDown} placeholder="Ponovite PIN..."
-                style={{width:'100%',padding:'0.6rem 0.75rem',border:'2px solid var(--border)',borderRadius:8,fontSize:'1rem',letterSpacing:'0.15em',outline:'none',boxSizing:'border-box'}} />
-            </div>
-            {error && <div style={{color:'#c53030',fontSize:'0.78rem',fontWeight:600,marginBottom:'0.5rem',padding:'0.4rem 0.6rem',background:'#fde8e8',borderRadius:6}}>{error}</div>}
-            <button onClick={handleSetup}
-              style={{width:'100%',padding:'0.65rem',background:'var(--green)',color:'white',border:'none',borderRadius:8,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',marginTop:'0.25rem'}}>
-              Postavi PIN i uđi
+          ))}
+        </div>
+
+        {/* PIN unos */}
+        <div style={{marginBottom:'0.75rem'}}>
+          <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.3rem'}}>
+            Unesite vaš PIN
+          </label>
+          <div style={{position:'relative'}}>
+            <input
+              type={showPin ? 'text' : 'password'}
+              value={pin}
+              onChange={e => { setPin(e.target.value); setError(''); }}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              placeholder="••••"
+              maxLength={8}
+              style={{
+                width:'100%', padding:'0.65rem 2.5rem 0.65rem 0.75rem',
+                border: error ? '2px solid #c53030' : '2px solid var(--border)',
+                borderRadius:8, fontSize:'1.2rem', letterSpacing:'0.25em',
+                outline:'none', boxSizing:'border-box', textAlign:'center',
+              }}
+            />
+            <button onClick={() => setShowPin(s => !s)} style={{
+              position:'absolute', right:8, top:'50%', transform:'translateY(-50%)',
+              background:'none', border:'none', cursor:'pointer', fontSize:'1rem', color:'var(--text-muted)',
+            }}>
+              {showPin ? '🙈' : '👁️'}
             </button>
-          </>
-        ) : (
-          <>
-            <div style={{textAlign:'center',marginBottom:'1rem'}}>
-              <div style={{fontSize:'0.85rem',fontWeight:600,color:'var(--text)'}}>Prijava</div>
-            </div>
-            <div style={{marginBottom:'0.75rem'}}>
-              <label style={{fontSize:'0.72rem',fontWeight:600,color:'var(--text-muted)',display:'block',marginBottom:'0.25rem'}}>PIN</label>
-              <div style={{position:'relative'}}>
-                <input type={showPin ? 'text' : 'password'} value={pin} onChange={e => setPin(e.target.value)}
-                  onKeyDown={handleKeyDown} autoFocus placeholder="Unesite PIN..."
-                  style={{width:'100%',padding:'0.6rem 2.5rem 0.6rem 0.75rem',border:'2px solid var(--border)',borderRadius:8,fontSize:'1rem',letterSpacing:'0.15em',outline:'none',boxSizing:'border-box'}} />
-                <button onClick={() => setShowPin(!showPin)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'1rem',color:'var(--text-muted)'}}>
-                  {showPin ? '🙈' : '👁️'}
-                </button>
-              </div>
-            </div>
-            {error && <div style={{color:'#c53030',fontSize:'0.78rem',fontWeight:600,marginBottom:'0.5rem',padding:'0.4rem 0.6rem',background:'#fde8e8',borderRadius:6}}>{error}</div>}
-            <button onClick={handleLogin}
-              style={{width:'100%',padding:'0.65rem',background:'var(--green)',color:'white',border:'none',borderRadius:8,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',marginTop:'0.25rem'}}>
-              Prijavi se
-            </button>
-          </>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{color:'#c53030',fontSize:'0.78rem',fontWeight:600,marginBottom:'0.5rem',
+            padding:'0.4rem 0.6rem',background:'#fde8e8',borderRadius:6,textAlign:'center'}}>
+            {error}
+          </div>
         )}
+
+        <button onClick={handleLogin} style={{
+          width:'100%', padding:'0.7rem', background:'var(--green)', color:'white',
+          border:'none', borderRadius:8, fontSize:'0.95rem', fontWeight:700, cursor:'pointer',
+        }}>
+          Prijavi se
+        </button>
       </div>
     </div>
   );
@@ -4906,15 +4853,24 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem(AUTH_SESSION_KEY) === 'true');
+  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem(AUTH_USER_KEY) || '');
 
   if (!isAuthenticated) {
-    return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
+    return <LoginScreen onLogin={(name) => { setCurrentUser(name); setIsAuthenticated(true); }} />;
   }
 
-  return <AppMain onLogout={() => { localStorage.removeItem(AUTH_SESSION_KEY); setIsAuthenticated(false); }} />;
+  return <AppMain
+    currentUser={currentUser}
+    onLogout={() => {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
+      setIsAuthenticated(false);
+      setCurrentUser('');
+    }}
+  />;
 }
 
-function AppMain({ onLogout }) {
+function AppMain({ onLogout, currentUser }) {
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -5235,8 +5191,17 @@ function AppMain({ onLogout }) {
           {[['raspored','📋 Raspored'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
             <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
           )}
-          <button className="nav-tab no-print" onClick={onLogout} title="Odjavi se"
-            style={{marginLeft:'auto',opacity:0.7,fontSize:'0.75rem'}}>🔒 Odjava</button>
+          <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'0.4rem'}}>
+            {currentUser && (
+              <span style={{fontSize:'0.7rem',fontWeight:700,color:'rgba(255,255,255,0.9)',
+                background:'rgba(255,255,255,0.15)',padding:'0.15rem 0.55rem',borderRadius:8,
+                fontFamily:'var(--mono)',letterSpacing:'0.05em'}}>
+                👤 {currentUser}
+              </span>
+            )}
+            <button className="nav-tab no-print" onClick={onLogout} title="Odjavi se"
+              style={{opacity:0.7,fontSize:'0.75rem'}}>🔒 Odjava</button>
+          </div>
         </nav>
       </header>
 
