@@ -8,7 +8,7 @@ function DepartmentsView({ departments, setDepartments, schedules, dName }) {
       if (!form.gospodarskaJedinica) return alert('Odaberite gospodarsku jedinicu!');
       if (!form.brojOdjela.trim()) return alert('Unesite broj odjela!');
       if (dept) setDepartments(ds => ds.map(d => d.id === form.id ? form : d));
-      else setDepartments(ds => [...ds, form]);
+      else setDepartments(ds => [{ ...form, createdAt: Date.now() }, ...ds]);
       onClose();
     };
     return (
@@ -53,7 +53,7 @@ function DepartmentsView({ departments, setDepartments, schedules, dName }) {
         <table className="schedule-table">
           <thead><tr><th>Gospodarska jedinica</th><th>Broj odjela</th><th>Napomena</th><th>Rasporeda</th><th>Akcije</th></tr></thead>
           <tbody>
-            {departments.map(d => {
+            {[...departments].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map(d => {
               const cnt = schedules.filter(s => s.deptId === d.id).length;
               return (
                 <tr key={d.id}>

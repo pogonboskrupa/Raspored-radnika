@@ -30,6 +30,13 @@ function HistorijaView({ history, wName, dName, restoreVersion, schedules }) {
                   <span className={`history-action ${h.action}`}>
                     {h.action==='create'?'✅ Kreiran':h.action==='edit'?'✏️ Izmjenjen':h.action==='delete'?'🗑️ Obrisan':'↩️ Vraćen'}
                   </span>
+                  {h.user && (
+                    <span style={{fontSize:'0.72rem',fontWeight:700,color:'white',
+                      background:'var(--green)',borderRadius:5,padding:'0.1rem 0.45rem',
+                      fontFamily:'var(--mono)',flexShrink:0}}>
+                      👤 {h.user}
+                    </span>
+                  )}
                   <span style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>
                     Raspored: {fmtDate(h.date)} — {h.newData?.deptId || h.oldData?.deptId ? dName(h.newData?.deptId || h.oldData?.deptId) : ''}
                     {' '}<span className={jobBadgeClass(h.newData?.jobType||h.oldData?.jobType)} style={{fontSize:'0.65rem'}}>

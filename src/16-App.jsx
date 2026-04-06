@@ -79,9 +79,10 @@ function AppMain({ onLogout, currentUser }) {
   const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes.filter(jt => !JOB_TYPES.includes(jt)), 'Ostalo'];
 
   const addHistory = (action, scheduleId, oldData, newData) => {
+    const user = localStorage.getItem(AUTH_USER_KEY) || '';
     setHistory(h => [{
       id: uid(), timestamp: Date.now(), action, scheduleId,
-      date: newData?.date || oldData?.date, oldData, newData
+      date: newData?.date || oldData?.date, oldData, newData, user
     }, ...h].slice(0, 200));
   };
 

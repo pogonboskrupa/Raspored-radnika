@@ -5418,7 +5418,10 @@ function DepartmentsView(_ref23) {
     const save = () => {
       if (!form.gospodarskaJedinica) return alert('Odaberite gospodarsku jedinicu!');
       if (!form.brojOdjela.trim()) return alert('Unesite broj odjela!');
-      if (dept) setDepartments(ds => ds.map(d => d.id === form.id ? form : d));else setDepartments(ds => [...ds, form]);
+      if (dept) setDepartments(ds => ds.map(d => d.id === form.id ? form : d));else setDepartments(ds => [{
+        ...form,
+        createdAt: Date.now()
+      }, ...ds]);
       onClose();
     };
     return /*#__PURE__*/React.createElement("div", {
@@ -5499,7 +5502,7 @@ function DepartmentsView(_ref23) {
     className: "card"
   }, /*#__PURE__*/React.createElement("table", {
     className: "schedule-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("th", null, "Broj odjela"), /*#__PURE__*/React.createElement("th", null, "Napomena"), /*#__PURE__*/React.createElement("th", null, "Rasporeda"), /*#__PURE__*/React.createElement("th", null, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, departments.map(d => {
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("th", null, "Broj odjela"), /*#__PURE__*/React.createElement("th", null, "Napomena"), /*#__PURE__*/React.createElement("th", null, "Rasporeda"), /*#__PURE__*/React.createElement("th", null, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, [...departments].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map(d => {
     const cnt = schedules.filter(s => s.deptId === d.id).length;
     return /*#__PURE__*/React.createElement("tr", {
       key: d.id
@@ -5766,7 +5769,18 @@ function HistorijaView(_ref27) {
       className: "history-header"
     }, /*#__PURE__*/React.createElement("span", {
       className: `history-action ${h.action}`
-    }, h.action === 'create' ? '✅ Kreiran' : h.action === 'edit' ? '✏️ Izmjenjen' : h.action === 'delete' ? '🗑️ Obrisan' : '↩️ Vraćen'), /*#__PURE__*/React.createElement("span", {
+    }, h.action === 'create' ? '✅ Kreiran' : h.action === 'edit' ? '✏️ Izmjenjen' : h.action === 'delete' ? '🗑️ Obrisan' : '↩️ Vraćen'), h.user && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.72rem',
+        fontWeight: 700,
+        color: 'white',
+        background: 'var(--green)',
+        borderRadius: 5,
+        padding: '0.1rem 0.45rem',
+        fontFamily: 'var(--mono)',
+        flexShrink: 0
+      }
+    }, "\uD83D\uDC64 ", h.user), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '0.78rem',
         color: 'var(--text-muted)'
@@ -10046,6 +10060,7 @@ function AppMain(_ref46) {
   const [customJobTypes, setCustomJobTypes] = useStorage('sumarija_custom_jobs', []);
   const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes.filter(jt => !JOB_TYPES.includes(jt)), 'Ostalo'];
   const addHistory = (action, scheduleId, oldData, newData) => {
+    const user = localStorage.getItem(AUTH_USER_KEY) || '';
     setHistory(h => [{
       id: uid(),
       timestamp: Date.now(),
@@ -10053,7 +10068,8 @@ function AppMain(_ref46) {
       scheduleId,
       date: newData?.date || oldData?.date,
       oldData,
-      newData
+      newData,
+      user
     }, ...h].slice(0, 200));
   };
 

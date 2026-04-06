@@ -2812,7 +2812,7 @@ function DepartmentsView({ departments, setDepartments, schedules, dName }) {
       if (!form.gospodarskaJedinica) return alert('Odaberite gospodarsku jedinicu!');
       if (!form.brojOdjela.trim()) return alert('Unesite broj odjela!');
       if (dept) setDepartments(ds => ds.map(d => d.id === form.id ? form : d));
-      else setDepartments(ds => [...ds, form]);
+      else setDepartments(ds => [{ ...form, createdAt: Date.now() }, ...ds]);
       onClose();
     };
     return (
@@ -2857,7 +2857,7 @@ function DepartmentsView({ departments, setDepartments, schedules, dName }) {
         <table className="schedule-table">
           <thead><tr><th>Gospodarska jedinica</th><th>Broj odjela</th><th>Napomena</th><th>Rasporeda</th><th>Akcije</th></tr></thead>
           <tbody>
-            {departments.map(d => {
+            {[...departments].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map(d => {
               const cnt = schedules.filter(s => s.deptId === d.id).length;
               return (
                 <tr key={d.id}>
@@ -3015,6 +3015,13 @@ function HistorijaView({ history, wName, dName, restoreVersion, schedules }) {
                   <span className={`history-action ${h.action}`}>
                     {h.action==='create'?'✅ Kreiran':h.action==='edit'?'✏️ Izmjenjen':h.action==='delete'?'🗑️ Obrisan':'↩️ Vraćen'}
                   </span>
+                  {h.user && (
+                    <span style={{fontSize:'0.72rem',fontWeight:700,color:'white',
+                      background:'var(--green)',borderRadius:5,padding:'0.1rem 0.45rem',
+                      fontFamily:'var(--mono)',flexShrink:0}}>
+                      👤 {h.user}
+                    </span>
+                  )}
                   <span style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>
                     Raspored: {fmtDate(h.date)} — {h.newData?.deptId || h.oldData?.deptId ? dName(h.newData?.deptId || h.oldData?.deptId) : ''}
                     {' '}<span className={jobBadgeClass(h.newData?.jobType||h.oldData?.jobType)} style={{fontSize:'0.65rem'}}>
@@ -4931,9 +4938,10 @@ function AppMain({ onLogout, currentUser }) {
   const allJobTypes = [...JOB_TYPES.filter(jt => jt !== 'Ostalo'), ...customJobTypes.filter(jt => !JOB_TYPES.includes(jt)), 'Ostalo'];
 
   const addHistory = (action, scheduleId, oldData, newData) => {
+    const user = localStorage.getItem(AUTH_USER_KEY) || '';
     setHistory(h => [{
       id: uid(), timestamp: Date.now(), action, scheduleId,
-      date: newData?.date || oldData?.date, oldData, newData
+      date: newData?.date || oldData?.date, oldData, newData, user
     }, ...h].slice(0, 200));
   };
 
