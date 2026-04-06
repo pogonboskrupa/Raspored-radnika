@@ -1363,6 +1363,8 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
     { id: 'teren',       label: 'Teren',       icon: '🌿', bg:'#e8f5e9', color:'#2e7d32', border:'#81c784' },
   ];
 
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+
   // Determine jobType default based on category
   const defaultJob = () => {
     if (worker.category === 'primac_panj') return 'Primka';
@@ -1469,7 +1471,8 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   };
 
   const handleSaveRad = () => {
-    if (!deptId) return alert('Odaberi odjel!');
+    const isDeptRequired = quickStatus === 'teren' || DEPT_REQUIRED_JOBS.includes(jobType);
+    if (isDeptRequired && !deptId) return alert('Odaberi odjel!');
     const finalAllWorkers = otherDriverId && !allWorkers.includes(otherDriverId)
       ? [...allWorkers, otherDriverId] : allWorkers;
     const entry = {
@@ -1622,9 +1625,9 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
               )}
 
               {/* Odjel — hide for kancelarija */}
-              {quickStatus !== 'kancelarija' && (
+              {(quickStatus === 'teren' || (!quickStatus && DEPT_REQUIRED_JOBS.includes(jobType))) && (
                 <div className="form-group">
-                  <label className="form-label">Odjel / Radilište</label>
+                  <label className="form-label" style={{color:'#b5620a',fontWeight:700}}>Odjel / Radilište</label>
                   {departments.length > 0 && (
                     <select className="form-select" value={deptId} onChange={e=>setDeptId(e.target.value)} style={{marginBottom:'0.4rem'}}>
                       <option value="">— Odaberi postojeći —</option>
@@ -1833,7 +1836,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
 function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName, godisnji, selectedDate }) {
   const initJobType = data.jobType || (allJobTypes || JOB_TYPES)[0];
-  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
@@ -1862,7 +1865,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
   const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
   const TERENSKI_CATS = ['primac_panj', 'otpremac', 'pomocni', 'radnik_primka', 'vlastita_rezija', 'vozac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
@@ -1916,7 +1919,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   };
 
   const handleSubmit = () => {
-    if (!form.deptId && !isKisa) return alert('Odaberite odjel!');
+    if (isDeptRequired && !form.deptId) return alert('Odaberite odjel!');
     if (form.allWorkers.length === 0) return alert('Odaberite barem jednog radnika!');
     const c = checkConflict(form, isEdit ? form.id : null);
     if (c.length > 0 && !forceOverride) {
@@ -1948,14 +1951,14 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             </div>
           )}
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem'}}>
+          <div style={{display:'grid',gridTemplateColumns: isDeptRequired ? '1fr 1fr' : '1fr',gap:'0.75rem'}}>
             <div className="form-group">
               <label className="form-label">Datum</label>
               <input type="date" className="form-input" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
             </div>
-            <div className="form-group">
-              <label className="form-label" style={isDeptRequired ? {color:'#b5620a',fontWeight:700} : {}}>
-                Odjel / Radilište {isDeptRequired && !form.deptId && <span style={{color:'#c53030',fontSize:'0.75rem'}}> ⚠️ obavezno za {form.jobType}</span>}
+            {isDeptRequired && <div className="form-group">
+              <label className="form-label" style={{color:'#b5620a',fontWeight:700}}>
+                Odjel / Radilište {!form.deptId && <span style={{color:'#c53030',fontSize:'0.75rem'}}> ⚠️ obavezno za {form.jobType}</span>}
               </label>
               {departments.length > 0 && (
                 <select className="form-select" value={form.deptId} onChange={e=>setForm(f=>({...f,deptId:e.target.value}))} style={{marginBottom:'0.4rem', ...(isDeptRequired && !form.deptId ? {border:'2px solid #c53030',background:'#fff5f5'} : {})}}>
@@ -1997,7 +2000,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                   ✓ {departments.find(d=>d.id===form.deptId).gospodarskaJedinica} — Odjel {departments.find(d=>d.id===form.deptId).brojOdjela}
                 </div>
               )}
-            </div>
+            </div>}
           </div>
 
           <div className="form-group">
@@ -2189,8 +2192,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             </div>
           )}
 
-          {/* ─── VOZILA SEKCIJA (više vozila) — samo za terenske poslove ─── */}
-          {isDeptRequired && (
+          {/* ─── VOZILA SEKCIJA (više vozila) ─── */}
+          {true && (
           <div className="form-group">
             <label className="form-label">🚗 Vozila (prevoz radnika)</label>
 

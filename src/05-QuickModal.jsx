@@ -19,6 +19,8 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
     { id: 'teren',       label: 'Teren',       icon: '🌿', bg:'#e8f5e9', color:'#2e7d32', border:'#81c784' },
   ];
 
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+
   // Determine jobType default based on category
   const defaultJob = () => {
     if (worker.category === 'primac_panj') return 'Primka';
@@ -125,7 +127,8 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   };
 
   const handleSaveRad = () => {
-    if (!deptId) return alert('Odaberi odjel!');
+    const isDeptRequired = quickStatus === 'teren' || DEPT_REQUIRED_JOBS.includes(jobType);
+    if (isDeptRequired && !deptId) return alert('Odaberi odjel!');
     const finalAllWorkers = otherDriverId && !allWorkers.includes(otherDriverId)
       ? [...allWorkers, otherDriverId] : allWorkers;
     const entry = {
@@ -278,9 +281,9 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
               )}
 
               {/* Odjel — hide for kancelarija */}
-              {quickStatus !== 'kancelarija' && (
+              {(quickStatus === 'teren' || (!quickStatus && DEPT_REQUIRED_JOBS.includes(jobType))) && (
                 <div className="form-group">
-                  <label className="form-label">Odjel / Radilište</label>
+                  <label className="form-label" style={{color:'#b5620a',fontWeight:700}}>Odjel / Radilište</label>
                   {departments.length > 0 && (
                     <select className="form-select" value={deptId} onChange={e=>setDeptId(e.target.value)} style={{marginBottom:'0.4rem'}}>
                       <option value="">— Odaberi postojeći —</option>
