@@ -14,6 +14,24 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
   const [newJobName, setNewJobName] = useState('');
   const [showAddJob, setShowAddJob] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [weekMode, setWeekMode] = useState(false);
+
+  // Sedmični prikaz — izračunaj Mon-Sat od selectedDate
+  const weekDays = useMemo(() => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    const dow = d.getDay(); // 0=Sun
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + mondayOffset);
+    return Array.from({length:6}, (_,i) => {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + i);
+      return day.toISOString().split('T')[0];
+    }).filter(dt => new Date(dt+'T00:00:00').getDay() !== 0); // skip Sunday
+  }, [selectedDate]);
+
+  const DAY_NAMES_SHORT = ['Ned','Pon','Uto','Sri','Čet','Pet','Sub'];
+  const DAY_NAMES_FULL  = ['Nedjelja','Ponedjeljak','Utorak','Srijeda','Četvrtak','Petak','Subota'];
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
   const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleIds, otherDriverId, rect }
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -105,6 +123,12 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </div>
         </div>
         <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+          <button className="btn btn-sm no-print" onClick={() => setWeekMode(m => !m)} style={{
+            background: weekMode ? 'var(--green)' : 'var(--bg)',
+            color: weekMode ? 'white' : 'var(--text-muted)',
+            border: `1px solid ${weekMode ? 'var(--green)' : 'var(--border)'}`,
+            fontWeight: weekMode ? 700 : 400,
+          }}>📅 Sedmično</button>
           {!currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && <>
             <button className="btn btn-secondary btn-sm no-print" onClick={() => copyFromDate(yesterday)}>
               📋 Kopiraj jučer
@@ -118,6 +142,76 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           </>}
         </div>
       </div>
+
+      {/* ═══ SEDMIČNI PRIKAZ ═══ */}
+      {weekMode && (
+        <div style={{marginBottom:'1rem',overflowX:'auto'}}>
+          <div style={{display:'grid',gridTemplateColumns:`repeat(${weekDays.length}, minmax(160px, 1fr))`,gap:'0.4rem',minWidth:weekDays.length*160}}>
+            {weekDays.map(dt => {
+              const isSelected = dt === selectedDate;
+              const isHoliday  = !!(holidays?.[dt]);
+              const isSat      = new Date(dt+'T00:00:00').getDay() === 6;
+              const dtSchedules = schedules.filter(s => s.date === dt && (!sidebarFilter || s.deptId === sidebarFilter));
+              const totalW     = new Set(dtSchedules.flatMap(s => s.allWorkers)).size;
+              const dow        = new Date(dt+'T00:00:00').getDay();
+              const dayLabel   = DAY_NAMES_FULL[dow];
+              const dayNum     = dt.slice(8);
+              return (
+                <div key={dt}
+                  onClick={() => { setSelectedDate(dt); setWeekMode(false); }}
+                  style={{
+                    border: isSelected ? '2px solid var(--green)' : '1px solid var(--border)',
+                    borderRadius:8, background: isHoliday ? '#fff3e0' : isSat ? '#f5f2ec' : 'var(--surface)',
+                    cursor:'pointer', overflow:'hidden',
+                    boxShadow: isSelected ? '0 0 0 3px rgba(45,90,39,0.15)' : 'var(--shadow)',
+                  }}>
+                  {/* Header */}
+                  <div style={{
+                    padding:'0.35rem 0.6rem', display:'flex', justifyContent:'space-between', alignItems:'center',
+                    background: isSelected ? 'var(--green)' : isHoliday ? '#e65100' : isSat ? '#d5d0c8' : 'var(--bg)',
+                    color: isSelected || isHoliday ? 'white' : 'var(--text)',
+                  }}>
+                    <span style={{fontWeight:700,fontSize:'0.78rem'}}>{dayLabel.slice(0,3).toUpperCase()} {dayNum}.</span>
+                    {isHoliday
+                      ? <span style={{fontSize:'0.6rem',fontWeight:700}}>🎉 PRAZNIK</span>
+                      : <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:'0.78rem',
+                          background: isSelected ? 'rgba(255,255,255,0.25)' : 'var(--green-pale)',
+                          color: isSelected ? 'white' : 'var(--green)',
+                          borderRadius:4, padding:'0.05rem 0.35rem'
+                        }}>{totalW}</span>
+                    }
+                  </div>
+                  {/* Stavke */}
+                  <div style={{padding:'0.3rem 0.4rem', minHeight:60}}>
+                    {isHoliday ? (
+                      <div style={{fontSize:'0.72rem',color:'#e65100',fontStyle:'italic',padding:'0.2rem'}}>{holidays[dt]}</div>
+                    ) : dtSchedules.length === 0 ? (
+                      <div style={{fontSize:'0.7rem',color:'var(--text-light)',fontStyle:'italic',padding:'0.2rem'}}>Nema unosa</div>
+                    ) : (
+                      dtSchedules.slice(0,5).map(s => (
+                        <div key={s.id} style={{
+                          fontSize:'0.68rem', marginBottom:'0.2rem', padding:'0.15rem 0.3rem',
+                          borderRadius:4, background:'var(--bg)', border:'1px solid var(--border)',
+                          display:'flex', gap:'0.3rem', alignItems:'center',
+                        }}>
+                          <span className={jobBadgeClass(s.jobType)} style={{fontSize:'0.55rem',padding:'0.05rem 0.25rem'}}>{s.jobType}</span>
+                          <span style={{color:'var(--text-muted)',fontFamily:'var(--mono)',fontSize:'0.65rem'}}>{s.allWorkers.length}r</span>
+                        </div>
+                      ))
+                    )}
+                    {dtSchedules.length > 5 && (
+                      <div style={{fontSize:'0.65rem',color:'var(--text-light)',padding:'0.15rem 0.3rem'}}>+{dtSchedules.length-5} više…</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginTop:'0.4rem',fontStyle:'italic'}}>
+            Klikni na dan za detaljan prikaz
+          </div>
+        </div>
+      )}
 
       {/* HOLIDAY NOTICE */}
       {currentHoliday && (

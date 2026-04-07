@@ -319,7 +319,67 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           {sortedWorkers.filter(w=>w.status==='aktivan').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
 
-        <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>Štampaj</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => {
+          const title = `Šihtarica — ${MONTH_NAMES[selMonth]} ${selYear}${selWorker ? ' — ' + workers.find(w=>w.id===selWorker)?.name : ''}`;
+          const printWorkers = (selWorker ? sortedWorkers.filter(w=>w.id===selWorker) : sortedWorkers).filter(w=>w.status==='aktivan');
+          const DAY_LABELS = 'NPUSČPS';
+
+          let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+          <title>${title}</title>
+          <style>
+            *{margin:0;padding:0;box-sizing:border-box}
+            body{font-family:Arial,sans-serif;font-size:9pt;padding:8mm;color:#222}
+            h1{font-size:13pt;margin-bottom:1mm;text-align:center}
+            .sub{font-size:9pt;text-align:center;color:#555;margin-bottom:5mm}
+            table{border-collapse:collapse;width:100%;font-size:7.5pt}
+            th,td{border:1px solid #ccc;padding:1.5mm 1mm;text-align:center}
+            th{background:#f0ede6;font-size:6.5pt}
+            .wname{text-align:left;padding-left:2mm;font-weight:700;min-width:90px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .rad{background:#d4ecd4;color:#1a4d1a;font-weight:700}
+            .go{background:#dae8f5;color:#1a3d5c;font-weight:700}
+            .b{background:#fde8e8;color:#8b2020;font-weight:700}
+            .sd{background:#fdf0e0;color:#b5620a;font-weight:700}
+            .sp{background:#ddeeff;color:#0a4b78;font-weight:700}
+            .nd{background:#6b0000;color:#fff;font-weight:700}
+            .n{background:#eee;color:#555;font-weight:700}
+            .praznik{background:#fff3e0;color:#e65100;font-weight:700}
+            .vikend{background:#ece9e2;color:#bbb}
+            .sum{background:#f0ede6;font-weight:700;font-size:7pt}
+            @media print{body{padding:5mm}}
+          </style></head><body>`;
+          html += `<h1>${title}</h1><div class="sub">Šumarija Bosanska Krupa</div>`;
+          html += `<table><thead><tr><th class="wname">Radnik</th>`;
+          days.forEach(d => {
+            const wknd = isWeekend(d);
+            html += `<th style="${wknd?'color:#bbb':''}">${d}<br/><span style="font-size:5.5pt">${DAY_LABELS[dayOfWeek(d)]}</span></th>`;
+          });
+          html += `<th class="sum">R</th><th class="sum">GO</th><th class="sum">B</th><th class="sum">SD</th></tr></thead><tbody>`;
+
+          printWorkers.forEach(w => {
+            const stats = workerStats.find(s=>s.id===w.id)||{radnih:0,odsutTypes:{}};
+            html += `<tr><td class="wname">${w.name}</td>`;
+            days.forEach(d => {
+              const date = isoDate(d);
+              const entry = workerDayMap[w.id]?.[date];
+              const wknd = isWeekend(d);
+              if (wknd) { html += `<td class="vikend">—</td>`; return; }
+              if (!entry) { html += `<td></td>`; return; }
+              if (entry.type === 'rad') { html += `<td class="rad">8</td>`; return; }
+              if (entry.type === 'praznik') { html += `<td class="praznik">P</td>`; return; }
+              const SHORT_CLASS = {'Godišnji odmor':'go','Bolovanje':'b','Slobodan dan':'sd','Službeni put':'sp','Neopravdan dan':'nd','Neplaćeno':'n'};
+              const cls = SHORT_CLASS[entry.oType] || 'n';
+              const short = ODSUTNOST_COLOR[entry.oType]?.short || '?';
+              html += `<td class="${cls}">${short}</td>`;
+            });
+            html += `<td class="sum">${stats.radnih||0}</td><td class="sum">${stats.odsutTypes?.['Godišnji odmor']||0}</td><td class="sum">${stats.odsutTypes?.['Bolovanje']||0}</td><td class="sum">${stats.odsutTypes?.['Slobodan dan']||0}</td></tr>`;
+          });
+
+          html += `</tbody></table></body></html>`;
+          const w = window.open('','_blank');
+          w.document.write(html);
+          w.document.close();
+          w.onload = () => w.print();
+        }}>🖨️ Štampaj</button>
       </div>}
 
       {/* ═══════ PRAZNICI VIEW ═══════ */}

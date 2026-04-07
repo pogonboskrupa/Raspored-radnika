@@ -21,6 +21,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   });
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
+  const [workerSearch, setWorkerSearch] = useState('');
 
   const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -285,8 +286,11 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
           ) : (
             <div className="form-group">
               <label className="form-label">Radnici</label>
+              <input className="form-input" placeholder="🔍 Pretraži radnika..." value={workerSearch}
+                onChange={e => setWorkerSearch(e.target.value)}
+                style={{marginBottom:'0.4rem',fontSize:'0.82rem',padding:'0.35rem 0.6rem'}} />
               <div className="worker-selector">
-                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).sort((a, b) => {
+                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac') && (!workerSearch || w.name.toLowerCase().includes(workerSearch.toLowerCase()))).sort((a, b) => {
                   if (isTerenOrKanc) {
                     const aP = a.category === 'poslovoda_isk' || a.category === 'poslovoda_uzg' ? 0 : 1;
                     const bP = b.category === 'poslovoda_isk' || b.category === 'poslovoda_uzg' ? 0 : 1;
@@ -304,8 +308,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                     </div>
                   );
                 })}
-                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).length === 0 && (
-                  <div style={{padding:'0.6rem 0.75rem',fontSize:'0.78rem',color:'var(--text-muted)',fontStyle:'italic'}}>Svi raspoloživi radnici su odabrani.</div>
+                {availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac') && (!workerSearch || w.name.toLowerCase().includes(workerSearch.toLowerCase()))).length === 0 && (
+                  <div style={{padding:'0.6rem 0.75rem',fontSize:'0.78rem',color:'var(--text-muted)',fontStyle:'italic'}}>{workerSearch ? `Nema radnika za "${workerSearch}"` : 'Svi raspoloživi radnici su odabrani.'}</div>
                 )}
               </div>
             </div>

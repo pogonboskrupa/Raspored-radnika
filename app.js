@@ -892,6 +892,25 @@ function ScheduleView(_ref2) {
   const [newJobName, setNewJobName] = useState('');
   const [showAddJob, setShowAddJob] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [weekMode, setWeekMode] = useState(false);
+
+  // Sedmični prikaz — izračunaj Mon-Sat od selectedDate
+  const weekDays = useMemo(() => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    const dow = d.getDay(); // 0=Sun
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + mondayOffset);
+    return Array.from({
+      length: 6
+    }, (_, i) => {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + i);
+      return day.toISOString().split('T')[0];
+    }).filter(dt => new Date(dt + 'T00:00:00').getDay() !== 0); // skip Sunday
+  }, [selectedDate]);
+  const DAY_NAMES_SHORT = ['Ned', 'Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub'];
+  const DAY_NAMES_FULL = ['Nedjelja', 'Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota'];
   const [mobileUnassignedOpen, setMobileUnassignedOpen] = useState(false);
   const [vehiclePopup, setVehiclePopup] = useState(null); // { rowId, vehicleIds, otherDriverId, rect }
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -1015,7 +1034,16 @@ function ScheduleView(_ref2) {
       flexWrap: 'wrap',
       alignItems: 'center'
     }
-  }, !currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-sm no-print",
+    onClick: () => setWeekMode(m => !m),
+    style: {
+      background: weekMode ? 'var(--green)' : 'var(--bg)',
+      color: weekMode ? 'white' : 'var(--text-muted)',
+      border: `1px solid ${weekMode ? 'var(--green)' : 'var(--border)'}`,
+      fontWeight: weekMode ? 700 : 400
+    }
+  }, "\uD83D\uDCC5 Sedmi\u010Dno"), !currentHoliday && (!isSaturday || saturdayWorkMode || hasSaturdayEntries) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm no-print",
     onClick: () => copyFromDate(yesterday)
   }, "\uD83D\uDCCB Kopiraj ju\u010Der"), /*#__PURE__*/React.createElement("button", {
@@ -1024,7 +1052,129 @@ function ScheduleView(_ref2) {
   }, "\uD83D\uDDA8\uFE0F Print"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm no-print",
     onClick: onAdd
-  }, "+ Novi unos")))), currentHoliday && /*#__PURE__*/React.createElement("div", {
+  }, "+ Novi unos")))), weekMode && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '1rem',
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: `repeat(${weekDays.length}, minmax(160px, 1fr))`,
+      gap: '0.4rem',
+      minWidth: weekDays.length * 160
+    }
+  }, weekDays.map(dt => {
+    const isSelected = dt === selectedDate;
+    const isHoliday = !!holidays?.[dt];
+    const isSat = new Date(dt + 'T00:00:00').getDay() === 6;
+    const dtSchedules = schedules.filter(s => s.date === dt && (!sidebarFilter || s.deptId === sidebarFilter));
+    const totalW = new Set(dtSchedules.flatMap(s => s.allWorkers)).size;
+    const dow = new Date(dt + 'T00:00:00').getDay();
+    const dayLabel = DAY_NAMES_FULL[dow];
+    const dayNum = dt.slice(8);
+    return /*#__PURE__*/React.createElement("div", {
+      key: dt,
+      onClick: () => {
+        setSelectedDate(dt);
+        setWeekMode(false);
+      },
+      style: {
+        border: isSelected ? '2px solid var(--green)' : '1px solid var(--border)',
+        borderRadius: 8,
+        background: isHoliday ? '#fff3e0' : isSat ? '#f5f2ec' : 'var(--surface)',
+        cursor: 'pointer',
+        overflow: 'hidden',
+        boxShadow: isSelected ? '0 0 0 3px rgba(45,90,39,0.15)' : 'var(--shadow)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.35rem 0.6rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: isSelected ? 'var(--green)' : isHoliday ? '#e65100' : isSat ? '#d5d0c8' : 'var(--bg)',
+        color: isSelected || isHoliday ? 'white' : 'var(--text)'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: '0.78rem'
+      }
+    }, dayLabel.slice(0, 3).toUpperCase(), " ", dayNum, "."), isHoliday ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.6rem',
+        fontWeight: 700
+      }
+    }, "\uD83C\uDF89 PRAZNIK") : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontWeight: 700,
+        fontSize: '0.78rem',
+        background: isSelected ? 'rgba(255,255,255,0.25)' : 'var(--green-pale)',
+        color: isSelected ? 'white' : 'var(--green)',
+        borderRadius: 4,
+        padding: '0.05rem 0.35rem'
+      }
+    }, totalW)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '0.3rem 0.4rem',
+        minHeight: 60
+      }
+    }, isHoliday ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        color: '#e65100',
+        fontStyle: 'italic',
+        padding: '0.2rem'
+      }
+    }, holidays[dt]) : dtSchedules.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.7rem',
+        color: 'var(--text-light)',
+        fontStyle: 'italic',
+        padding: '0.2rem'
+      }
+    }, "Nema unosa") : dtSchedules.slice(0, 5).map(s => /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      style: {
+        fontSize: '0.68rem',
+        marginBottom: '0.2rem',
+        padding: '0.15rem 0.3rem',
+        borderRadius: 4,
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        display: 'flex',
+        gap: '0.3rem',
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: jobBadgeClass(s.jobType),
+      style: {
+        fontSize: '0.55rem',
+        padding: '0.05rem 0.25rem'
+      }
+    }, s.jobType), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)',
+        fontFamily: 'var(--mono)',
+        fontSize: '0.65rem'
+      }
+    }, s.allWorkers.length, "r"))), dtSchedules.length > 5 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.65rem',
+        color: 'var(--text-light)',
+        padding: '0.15rem 0.3rem'
+      }
+    }, "+", dtSchedules.length - 5, " vi\u0161e\u2026")));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.72rem',
+      color: 'var(--text-muted)',
+      marginTop: '0.4rem',
+      fontStyle: 'italic'
+    }
+  }, "Klikni na dan za detaljan prikaz")), currentHoliday && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
       padding: '3rem 1rem'
@@ -2706,6 +2856,7 @@ function QuickModal(_ref12) {
   const [otherDriverId, setOtherDriverId] = useState('');
   const [forceOverride, setForce] = useState(false);
   const [conflicts, setConflicts] = useState([]);
+  const [workerSearch, setWorkerSearch] = useState('');
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
   const regularVozaci = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
@@ -3176,44 +3327,58 @@ function QuickModal(_ref12) {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"
-  }, "Pratioci (opciono)"), /*#__PURE__*/React.createElement("div", {
-    className: "worker-selector"
-  }, companionGroups.map(g => /*#__PURE__*/React.createElement("div", {
-    key: g.label
-  }, /*#__PURE__*/React.createElement("div", {
+  }, "Pratioci (opciono)"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "\uD83D\uDD0D Pretra\u017Ei radnika...",
+    value: workerSearch,
+    onChange: e => setWorkerSearch(e.target.value),
     style: {
-      padding: '0.25rem 0.7rem',
-      fontSize: '0.62rem',
-      fontWeight: 700,
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      color: 'var(--text-light)',
-      background: 'var(--bg)',
-      borderBottom: '1px solid var(--border)'
+      marginBottom: '0.4rem',
+      fontSize: '0.82rem',
+      padding: '0.35rem 0.6rem'
     }
-  }, g.label), g.workers.filter(w => !extraWorkers.includes(w.id)).map(w => {
-    const wcat = getCatById(w.category);
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "worker-selector"
+  }, companionGroups.map(g => {
+    const filtered = g.workers.filter(w => !extraWorkers.includes(w.id) && (!workerSearch || w.name.toLowerCase().includes(workerSearch.toLowerCase())));
+    if (filtered.length === 0) return null;
     return /*#__PURE__*/React.createElement("div", {
-      key: w.id,
-      className: "worker-option",
-      onClick: () => toggleExtra(w.id)
-    }, /*#__PURE__*/React.createElement("span", {
+      key: g.label
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: '0.85rem'
+        padding: '0.25rem 0.7rem',
+        fontSize: '0.62rem',
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        color: 'var(--text-light)',
+        background: 'var(--bg)',
+        borderBottom: '1px solid var(--border)'
       }
-    }, wcat?.icon), w.name, /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: 'auto',
-        fontSize: '0.65rem',
-        color: wcat?.color,
-        background: wcat?.pale,
-        border: `1px solid ${wcat?.border}`,
-        padding: '0.1rem 0.3rem',
-        borderRadius: 3,
-        fontFamily: 'var(--mono)'
-      }
-    }, wcat?.short));
-  })))), extraWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, g.label), filtered.map(w => {
+      const wcat = getCatById(w.category);
+      return /*#__PURE__*/React.createElement("div", {
+        key: w.id,
+        className: "worker-option",
+        onClick: () => toggleExtra(w.id)
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.85rem'
+        }
+      }, wcat?.icon), w.name, /*#__PURE__*/React.createElement("span", {
+        style: {
+          marginLeft: 'auto',
+          fontSize: '0.65rem',
+          color: wcat?.color,
+          background: wcat?.pale,
+          border: `1px solid ${wcat?.border}`,
+          padding: '0.1rem 0.3rem',
+          borderRadius: 3,
+          fontFamily: 'var(--mono)'
+        }
+      }, wcat?.short));
+    }));
+  })), extraWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexWrap: 'wrap',
@@ -3540,6 +3705,7 @@ function EntryModal(_ref15) {
   });
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
+  const [workerSearch, setWorkerSearch] = useState('');
   const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
@@ -4036,9 +4202,19 @@ function EntryModal(_ref15) {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label"
-  }, "Radnici"), /*#__PURE__*/React.createElement("div", {
+  }, "Radnici"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    placeholder: "\uD83D\uDD0D Pretra\u017Ei radnika...",
+    value: workerSearch,
+    onChange: e => setWorkerSearch(e.target.value),
+    style: {
+      marginBottom: '0.4rem',
+      fontSize: '0.82rem',
+      padding: '0.35rem 0.6rem'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
     className: "worker-selector"
-  }, availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).sort((a, b) => {
+  }, availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac') && (!workerSearch || w.name.toLowerCase().includes(workerSearch.toLowerCase()))).sort((a, b) => {
     if (isTerenOrKanc) {
       const aP = a.category === 'poslovoda_isk' || a.category === 'poslovoda_uzg' ? 0 : 1;
       const bP = b.category === 'poslovoda_isk' || b.category === 'poslovoda_uzg' ? 0 : 1;
@@ -4067,14 +4243,14 @@ function EntryModal(_ref15) {
         fontFamily: 'var(--mono)'
       }
     }, cat?.short));
-  }), availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac')).length === 0 && /*#__PURE__*/React.createElement("div", {
+  }), availableWorkers.filter(w => !form.allWorkers.includes(w.id) && (!isOtprema || w.category === 'otpremac') && (!workerSearch || w.name.toLowerCase().includes(workerSearch.toLowerCase()))).length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '0.6rem 0.75rem',
       fontSize: '0.78rem',
       color: 'var(--text-muted)',
       fontStyle: 'italic'
     }
-  }, "Svi raspolo\u017Eivi radnici su odabrani."))), form.allWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, workerSearch ? `Nema radnika za "${workerSearch}"` : 'Svi raspoloživi radnici su odabrani.'))), form.allWorkers.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'var(--green-pale)',
       border: '1px solid #9bc492',
@@ -7611,8 +7787,87 @@ function SihtaricaView(_ref31) {
     value: w.id
   }, w.name))), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm",
-    onClick: () => window.print()
-  }, "\u0160tampaj")), sihtView === 'praznici' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      const title = `Šihtarica — ${MONTH_NAMES[selMonth]} ${selYear}${selWorker ? ' — ' + workers.find(w => w.id === selWorker)?.name : ''}`;
+      const printWorkers = (selWorker ? sortedWorkers.filter(w => w.id === selWorker) : sortedWorkers).filter(w => w.status === 'aktivan');
+      const DAY_LABELS = 'NPUSČPS';
+      let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+          <title>${title}</title>
+          <style>
+            *{margin:0;padding:0;box-sizing:border-box}
+            body{font-family:Arial,sans-serif;font-size:9pt;padding:8mm;color:#222}
+            h1{font-size:13pt;margin-bottom:1mm;text-align:center}
+            .sub{font-size:9pt;text-align:center;color:#555;margin-bottom:5mm}
+            table{border-collapse:collapse;width:100%;font-size:7.5pt}
+            th,td{border:1px solid #ccc;padding:1.5mm 1mm;text-align:center}
+            th{background:#f0ede6;font-size:6.5pt}
+            .wname{text-align:left;padding-left:2mm;font-weight:700;min-width:90px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .rad{background:#d4ecd4;color:#1a4d1a;font-weight:700}
+            .go{background:#dae8f5;color:#1a3d5c;font-weight:700}
+            .b{background:#fde8e8;color:#8b2020;font-weight:700}
+            .sd{background:#fdf0e0;color:#b5620a;font-weight:700}
+            .sp{background:#ddeeff;color:#0a4b78;font-weight:700}
+            .nd{background:#6b0000;color:#fff;font-weight:700}
+            .n{background:#eee;color:#555;font-weight:700}
+            .praznik{background:#fff3e0;color:#e65100;font-weight:700}
+            .vikend{background:#ece9e2;color:#bbb}
+            .sum{background:#f0ede6;font-weight:700;font-size:7pt}
+            @media print{body{padding:5mm}}
+          </style></head><body>`;
+      html += `<h1>${title}</h1><div class="sub">Šumarija Bosanska Krupa</div>`;
+      html += `<table><thead><tr><th class="wname">Radnik</th>`;
+      days.forEach(d => {
+        const wknd = isWeekend(d);
+        html += `<th style="${wknd ? 'color:#bbb' : ''}">${d}<br/><span style="font-size:5.5pt">${DAY_LABELS[dayOfWeek(d)]}</span></th>`;
+      });
+      html += `<th class="sum">R</th><th class="sum">GO</th><th class="sum">B</th><th class="sum">SD</th></tr></thead><tbody>`;
+      printWorkers.forEach(w => {
+        const stats = workerStats.find(s => s.id === w.id) || {
+          radnih: 0,
+          odsutTypes: {}
+        };
+        html += `<tr><td class="wname">${w.name}</td>`;
+        days.forEach(d => {
+          const date = isoDate(d);
+          const entry = workerDayMap[w.id]?.[date];
+          const wknd = isWeekend(d);
+          if (wknd) {
+            html += `<td class="vikend">—</td>`;
+            return;
+          }
+          if (!entry) {
+            html += `<td></td>`;
+            return;
+          }
+          if (entry.type === 'rad') {
+            html += `<td class="rad">8</td>`;
+            return;
+          }
+          if (entry.type === 'praznik') {
+            html += `<td class="praznik">P</td>`;
+            return;
+          }
+          const SHORT_CLASS = {
+            'Godišnji odmor': 'go',
+            'Bolovanje': 'b',
+            'Slobodan dan': 'sd',
+            'Službeni put': 'sp',
+            'Neopravdan dan': 'nd',
+            'Neplaćeno': 'n'
+          };
+          const cls = SHORT_CLASS[entry.oType] || 'n';
+          const short = ODSUTNOST_COLOR[entry.oType]?.short || '?';
+          html += `<td class="${cls}">${short}</td>`;
+        });
+        html += `<td class="sum">${stats.radnih || 0}</td><td class="sum">${stats.odsutTypes?.['Godišnji odmor'] || 0}</td><td class="sum">${stats.odsutTypes?.['Bolovanje'] || 0}</td><td class="sum">${stats.odsutTypes?.['Slobodan dan'] || 0}</td></tr>`;
+      });
+      html += `</tbody></table></body></html>`;
+      const w = window.open('', '_blank');
+      w.document.write(html);
+      w.document.close();
+      w.onload = () => w.print();
+    }
+  }, "\uD83D\uDDA8\uFE0F \u0160tampaj")), sihtView === 'praznici' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',

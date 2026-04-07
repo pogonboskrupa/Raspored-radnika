@@ -45,6 +45,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const [otherDriverId, setOtherDriverId] = useState('');
   const [forceOverride, setForce]   = useState(false);
   const [conflicts, setConflicts]   = useState([]);
+  const [workerSearch, setWorkerSearch] = useState('');
 
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
@@ -316,24 +317,31 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
               {isPrimac && !quickStatus && (
                 <div className="form-group">
                   <label className="form-label">Pratioci (opciono)</label>
+                  <input className="form-input" placeholder="🔍 Pretraži radnika..." value={workerSearch}
+                    onChange={e => setWorkerSearch(e.target.value)}
+                    style={{marginBottom:'0.4rem',fontSize:'0.82rem',padding:'0.35rem 0.6rem'}} />
                   <div className="worker-selector">
-                    {companionGroups.map(g => (
-                      <div key={g.label}>
-                        <div style={{padding:'0.25rem 0.7rem',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',background:'var(--bg)',borderBottom:'1px solid var(--border)'}}>
-                          {g.label}
+                    {companionGroups.map(g => {
+                      const filtered = g.workers.filter(w => !extraWorkers.includes(w.id) && (!workerSearch || w.name.toLowerCase().includes(workerSearch.toLowerCase())));
+                      if (filtered.length === 0) return null;
+                      return (
+                        <div key={g.label}>
+                          <div style={{padding:'0.25rem 0.7rem',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',background:'var(--bg)',borderBottom:'1px solid var(--border)'}}>
+                            {g.label}
+                          </div>
+                          {filtered.map(w => {
+                            const wcat = getCatById(w.category);
+                            return (
+                              <div key={w.id} className="worker-option" onClick={() => toggleExtra(w.id)}>
+                                <span style={{fontSize:'0.85rem'}}>{wcat?.icon}</span>
+                                {w.name}
+                                <span style={{marginLeft:'auto',fontSize:'0.65rem',color:wcat?.color,background:wcat?.pale,border:`1px solid ${wcat?.border}`,padding:'0.1rem 0.3rem',borderRadius:3,fontFamily:'var(--mono)'}}>{wcat?.short}</span>
+                              </div>
+                            );
+                          })}
                         </div>
-                        {g.workers.filter(w => !extraWorkers.includes(w.id)).map(w => {
-                          const wcat = getCatById(w.category);
-                          return (
-                            <div key={w.id} className="worker-option" onClick={() => toggleExtra(w.id)}>
-                              <span style={{fontSize:'0.85rem'}}>{wcat?.icon}</span>
-                              {w.name}
-                              <span style={{marginLeft:'auto',fontSize:'0.65rem',color:wcat?.color,background:wcat?.pale,border:`1px solid ${wcat?.border}`,padding:'0.1rem 0.3rem',borderRadius:3,fontFamily:'var(--mono)'}}>{wcat?.short}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {extraWorkers.length > 0 && (
                     <div style={{display:'flex',flexWrap:'wrap',gap:'0.3rem',marginTop:'0.4rem'}}>
