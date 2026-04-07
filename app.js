@@ -3202,7 +3202,11 @@ function QuickModal(_ref12) {
   }, QUICK_STATUSES.map(qs => /*#__PURE__*/React.createElement("button", {
     key: qs.id,
     type: "button",
-    onClick: () => setQuickStatus(quickStatus === qs.id ? null : qs.id),
+    onClick: () => {
+      const next = quickStatus === qs.id ? null : qs.id;
+      setQuickStatus(next);
+      if (next === 'teren') setDeptId('');
+    },
     style: {
       padding: '0.5rem',
       border: `2px solid ${quickStatus === qs.id ? qs.color : qs.border}`,
@@ -3694,11 +3698,11 @@ function EntryModal(_ref15) {
     selectedDate
   } = _ref15;
   const initJobType = data.jobType || (allJobTypes || JOB_TYPES)[0];
-  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
-    deptId: data.deptId || (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : departments[0]?.id || ''),
+    deptId: data.deptId || (initJobType === 'Teren' ? '' : DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : departments[0]?.id || ''),
     jobType: initJobType,
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
@@ -3992,7 +3996,7 @@ function EntryModal(_ref15) {
         helper1Worker: '',
         helper2Worker: '',
         extraWorkers: [],
-        deptId: needsDept && !isEdit ? '' : f.deptId
+        deptId: newJob === 'Teren' ? '' : needsDept && !isEdit ? '' : f.deptId
       }));
     }
   }, (allJobTypes || JOB_TYPES).map(jt => /*#__PURE__*/React.createElement("option", {

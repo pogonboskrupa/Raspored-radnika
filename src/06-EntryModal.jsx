@@ -1,10 +1,10 @@
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
 function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName, godisnji, selectedDate }) {
   const initJobType = data.jobType || (allJobTypes || JOB_TYPES)[0];
-  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];  const [form, setForm] = useState({
+  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];  const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
-    deptId: data.deptId || (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : (departments[0]?.id || '')),
+    deptId: data.deptId || (initJobType === 'Teren' ? '' : (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : (departments[0]?.id || ''))),
     jobType: initJobType,
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
@@ -179,7 +179,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               const newJob = e.target.value;
               const needsDept = DEPT_REQUIRED_JOBS.includes(newJob);
               setForm(f=>({...f,jobType:newJob,allWorkers:[],primatWorker:'',helper1Worker:'',helper2Worker:'',extraWorkers:[],
-                deptId: needsDept && !isEdit ? '' : f.deptId
+                deptId: (newJob === 'Teren') ? '' : (needsDept && !isEdit ? '' : f.deptId)
               }));
             }}>
               {(allJobTypes || JOB_TYPES).map(jt => <option key={jt}>{jt}</option>)}

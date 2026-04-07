@@ -249,7 +249,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
               {/* Kancelarija / Teren brze opcije */}
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.4rem',marginBottom:'0.75rem'}}>
                 {QUICK_STATUSES.map(qs => (
-                  <button key={qs.id} type="button" onClick={()=>setQuickStatus(quickStatus===qs.id ? null : qs.id)} style={{
+                  <button key={qs.id} type="button" onClick={()=>{ const next = quickStatus===qs.id ? null : qs.id; setQuickStatus(next); if(next==='teren') setDeptId(''); }} style={{
                     padding:'0.5rem',border:`2px solid ${quickStatus===qs.id ? qs.color : qs.border}`,
                     borderRadius:8,background:quickStatus===qs.id ? qs.bg : 'var(--bg)',
                     color:quickStatus===qs.id ? qs.color : 'var(--text-muted)',
