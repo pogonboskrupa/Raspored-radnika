@@ -1,8 +1,7 @@
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
 function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName, godisnji, selectedDate }) {
   const initJobType = data.jobType || (allJobTypes || JOB_TYPES)[0];
-  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
-  const [form, setForm] = useState({
+  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];  const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
     deptId: data.deptId || (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : (departments[0]?.id || '')),
@@ -31,7 +30,9 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS     = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
+  const isDeptShown    = DEPT_SHOW_JOBS.includes(form.jobType);
   const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
   const TERENSKI_CATS = ['primac_panj', 'otpremac', 'pomocni', 'radnik_primka', 'vlastita_rezija', 'vozac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
@@ -117,14 +118,16 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             </div>
           )}
 
-          <div style={{display:'grid',gridTemplateColumns: isDeptRequired ? '1fr 1fr' : '1fr',gap:'0.75rem'}}>
+          <div style={{display:'grid',gridTemplateColumns: isDeptShown ? '1fr 1fr' : '1fr',gap:'0.75rem'}}>
             <div className="form-group">
               <label className="form-label">Datum</label>
               <input type="date" className="form-input" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
             </div>
-            {isDeptRequired && <div className="form-group">
-              <label className="form-label" style={{color:'#b5620a',fontWeight:700}}>
-                Odjel / Radilište {!form.deptId && <span style={{color:'#c53030',fontSize:'0.75rem'}}> ⚠️ obavezno za {form.jobType}</span>}
+            {isDeptShown && <div className="form-group">
+              <label className="form-label" style={isDeptRequired ? {color:'#b5620a',fontWeight:700} : {}}>
+                Odjel / Radilište
+                {isDeptRequired && !form.deptId && <span style={{color:'#c53030',fontSize:'0.75rem'}}> ⚠️ obavezno za {form.jobType}</span>}
+                {!isDeptRequired && <span style={{color:'var(--text-light)',fontSize:'0.72rem',fontWeight:400}}> (opciono)</span>}
               </label>
               {departments.length > 0 && (
                 <select className="form-select" value={form.deptId} onChange={e=>setForm(f=>({...f,deptId:e.target.value}))} style={{marginBottom:'0.4rem', ...(isDeptRequired && !form.deptId ? {border:'2px solid #c53030',background:'#fff5f5'} : {})}}>

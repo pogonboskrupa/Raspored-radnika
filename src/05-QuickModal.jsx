@@ -19,7 +19,8 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
     { id: 'teren',       label: 'Teren',       icon: '🌿', bg:'#e8f5e9', color:'#2e7d32', border:'#81c784' },
   ];
 
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS     = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
 
   // Determine jobType default based on category
   const defaultJob = () => {
@@ -128,7 +129,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   };
 
   const handleSaveRad = () => {
-    const isDeptRequired = quickStatus === 'teren' || DEPT_REQUIRED_JOBS.includes(jobType);
+    const isDeptRequired = DEPT_REQUIRED_JOBS.includes(jobType); // teren nije obavezan
     if (isDeptRequired && !deptId) return alert('Odaberi odjel!');
     const finalAllWorkers = otherDriverId && !allWorkers.includes(otherDriverId)
       ? [...allWorkers, otherDriverId] : allWorkers;
@@ -282,9 +283,12 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
               )}
 
               {/* Odjel — hide for kancelarija */}
-              {(quickStatus === 'teren' || (!quickStatus && DEPT_REQUIRED_JOBS.includes(jobType))) && (
+              {(quickStatus === 'teren' || (!quickStatus && DEPT_SHOW_JOBS.includes(jobType))) && (
                 <div className="form-group">
-                  <label className="form-label" style={{color:'#b5620a',fontWeight:700}}>Odjel / Radilište</label>
+                  <label className="form-label" style={DEPT_REQUIRED_JOBS.includes(jobType) ? {color:'#b5620a',fontWeight:700} : {}}>
+                    Odjel / Radilište
+                    {!DEPT_REQUIRED_JOBS.includes(jobType) && quickStatus !== 'teren' && <span style={{color:'var(--text-light)',fontSize:'0.72rem',fontWeight:400}}> (opciono)</span>}
+                  </label>
                   {departments.length > 0 && (
                     <select className="form-select" value={deptId} onChange={e=>setDeptId(e.target.value)} style={{marginBottom:'0.4rem'}}>
                       <option value="">— Odaberi postojeći —</option>

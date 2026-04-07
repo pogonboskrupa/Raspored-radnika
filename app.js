@@ -2831,7 +2831,8 @@ function QuickModal(_ref12) {
     color: '#2e7d32',
     border: '#81c784'
   }];
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
 
   // Determine jobType default based on category
   const defaultJob = () => {
@@ -2960,7 +2961,7 @@ function QuickModal(_ref12) {
     onSave(entry);
   };
   const handleSaveRad = () => {
-    const isDeptRequired = quickStatus === 'teren' || DEPT_REQUIRED_JOBS.includes(jobType);
+    const isDeptRequired = DEPT_REQUIRED_JOBS.includes(jobType); // teren nije obavezan
     if (isDeptRequired && !deptId) return alert('Odaberi odjel!');
     const finalAllWorkers = otherDriverId && !allWorkers.includes(otherDriverId) ? [...allWorkers, otherDriverId] : allWorkers;
     const entry = {
@@ -3242,15 +3243,21 @@ function QuickModal(_ref12) {
       fontSize: '0.75rem',
       padding: '0.25rem 0.6rem'
     }
-  }, jt)))), (quickStatus === 'teren' || !quickStatus && DEPT_REQUIRED_JOBS.includes(jobType)) && /*#__PURE__*/React.createElement("div", {
+  }, jt)))), (quickStatus === 'teren' || !quickStatus && DEPT_SHOW_JOBS.includes(jobType)) && /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label",
-    style: {
+    style: DEPT_REQUIRED_JOBS.includes(jobType) ? {
       color: '#b5620a',
       fontWeight: 700
+    } : {}
+  }, "Odjel / Radili\u0161te", !DEPT_REQUIRED_JOBS.includes(jobType) && quickStatus !== 'teren' && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-light)',
+      fontSize: '0.72rem',
+      fontWeight: 400
     }
-  }, "Odjel / Radili\u0161te"), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
+  }, " (opciono)")), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: deptId,
     onChange: e => setDeptId(e.target.value),
@@ -3716,7 +3723,9 @@ function EntryModal(_ref15) {
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
+  const isDeptShown = DEPT_SHOW_JOBS.includes(form.jobType);
   const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
   const TERENSKI_CATS = ['primac_panj', 'otpremac', 'pomocni', 'radnik_primka', 'vlastita_rezija', 'vozac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
@@ -3826,7 +3835,7 @@ function EntryModal(_ref15) {
   }, "Ipak sa\u010Duvaj (override)"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
-      gridTemplateColumns: isDeptRequired ? '1fr 1fr' : '1fr',
+      gridTemplateColumns: isDeptShown ? '1fr 1fr' : '1fr',
       gap: '0.75rem'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -3841,20 +3850,26 @@ function EntryModal(_ref15) {
       ...f,
       date: e.target.value
     }))
-  })), isDeptRequired && /*#__PURE__*/React.createElement("div", {
+  })), isDeptShown && /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "form-label",
-    style: {
+    style: isDeptRequired ? {
       color: '#b5620a',
       fontWeight: 700
-    }
-  }, "Odjel / Radili\u0161te ", !form.deptId && /*#__PURE__*/React.createElement("span", {
+    } : {}
+  }, "Odjel / Radili\u0161te", isDeptRequired && !form.deptId && /*#__PURE__*/React.createElement("span", {
     style: {
       color: '#c53030',
       fontSize: '0.75rem'
     }
-  }, " \u26A0\uFE0F obavezno za ", form.jobType)), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
+  }, " \u26A0\uFE0F obavezno za ", form.jobType), !isDeptRequired && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-light)',
+      fontSize: '0.72rem',
+      fontWeight: 400
+    }
+  }, " (opciono)")), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: form.deptId,
     onChange: e => setForm(f => ({
