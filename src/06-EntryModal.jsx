@@ -135,10 +135,11 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end'}}>
                 <div style={{flex:2}}>
                   <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem'}}>Gospodarska jedinica</div>
-                  <select className="form-select" id="newDeptGJ" style={{fontSize:'0.82rem'}}>
-                    <option value="">— Odaberi —</option>
-                    {GOSPODARSKE_JEDINICE.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                  <input className="form-input" id="newDeptGJ" list="gj-list-entry"
+                    placeholder="Odaberi ili upiši..." style={{fontSize:'0.82rem'}} />
+                  <datalist id="gj-list-entry">
+                    {GOSPODARSKE_JEDINICE.map(g => <option key={g} value={g} />)}
+                  </datalist>
                 </div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:'0.7rem',color:'var(--text-light)',marginBottom:'0.2rem'}}>Br. odjela</div>

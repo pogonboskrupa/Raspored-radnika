@@ -3278,19 +3278,21 @@ function QuickModal(_ref12) {
       color: 'var(--text-light)',
       marginBottom: '0.2rem'
     }
-  }, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("select", {
-    className: "form-select",
+  }, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    list: "gj-list-quick",
+    placeholder: "Odaberi ili upi\u0161i...",
     value: newGJ,
     onChange: e => setNewGJ(e.target.value),
     style: {
       fontSize: '0.82rem'
     }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\u2014 Odaberi \u2014"), GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "gj-list-quick"
+  }, GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
     key: g,
     value: g
-  }, g)))), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -3887,18 +3889,20 @@ function EntryModal(_ref15) {
       color: 'var(--text-light)',
       marginBottom: '0.2rem'
     }
-  }, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("select", {
-    className: "form-select",
+  }, "Gospodarska jedinica"), /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
     id: "newDeptGJ",
+    list: "gj-list-entry",
+    placeholder: "Odaberi ili upi\u0161i...",
     style: {
       fontSize: '0.82rem'
     }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\u2014 Odaberi \u2014"), GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "gj-list-entry"
+  }, GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
     key: g,
     value: g
-  }, g)))), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -5618,19 +5622,21 @@ function DepartmentsView(_ref23) {
       className: "form-group"
     }, /*#__PURE__*/React.createElement("label", {
       className: "form-label"
-    }, "Gospodarska jedinica *"), /*#__PURE__*/React.createElement("select", {
-      className: "form-select",
+    }, "Gospodarska jedinica *"), /*#__PURE__*/React.createElement("input", {
+      className: "form-input",
+      list: "gj-list-dept",
+      placeholder: "Odaberi ili upi\u0161i novu...",
       value: form.gospodarskaJedinica,
       onChange: e => setForm(f => ({
         ...f,
         gospodarskaJedinica: e.target.value
       }))
-    }, /*#__PURE__*/React.createElement("option", {
-      value: ""
-    }, "\u2014 Odaberi \u2014"), GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
+    }), /*#__PURE__*/React.createElement("datalist", {
+      id: "gj-list-dept"
+    }, GOSPODARSKE_JEDINICE.map(g => /*#__PURE__*/React.createElement("option", {
       key: g,
       value: g
-    }, g)))), /*#__PURE__*/React.createElement("div", {
+    })))), /*#__PURE__*/React.createElement("div", {
       className: "form-group"
     }, /*#__PURE__*/React.createElement("label", {
       className: "form-label"

@@ -22,10 +22,13 @@ function DepartmentsView({ departments, setDepartments, schedules, dName }) {
           <div className="modal-body">
             <div className="form-group">
               <label className="form-label">Gospodarska jedinica *</label>
-              <select className="form-select" value={form.gospodarskaJedinica} onChange={e=>setForm(f=>({...f,gospodarskaJedinica:e.target.value}))}>
-                <option value="">— Odaberi —</option>
-                {GOSPODARSKE_JEDINICE.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
+              <input className="form-input" list="gj-list-dept"
+                placeholder="Odaberi ili upiši novu..."
+                value={form.gospodarskaJedinica}
+                onChange={e=>setForm(f=>({...f,gospodarskaJedinica:e.target.value}))} />
+              <datalist id="gj-list-dept">
+                {GOSPODARSKE_JEDINICE.map(g => <option key={g} value={g} />)}
+              </datalist>
             </div>
             <div className="form-group">
               <label className="form-label">Broj odjela *</label>
