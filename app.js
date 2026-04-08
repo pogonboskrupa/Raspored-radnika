@@ -970,12 +970,15 @@ function ScheduleView(_ref2) {
       rect
     });
   };
+  // For entries with no dept (Teren, Ostalo, etc.), use jobType as group key
+  const deptKey = s => s.deptId || s.jobType || 'Ostalo';
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
     daySchedules.filter(s => s.jobType !== 'Otprema').forEach(s => {
-      if (!m[s.deptId]) m[s.deptId] = [];
-      m[s.deptId].push(s);
+      const key = deptKey(s);
+      if (!m[key]) m[key] = [];
+      m[key].push(s);
     });
     return m;
   }, [daySchedules]);
@@ -1387,14 +1390,16 @@ function ScheduleView(_ref2) {
     onClick: onAdd
   }, "+ Dodaj prvi unos")) : Object.entries(byDept).map(_ref4 => {
     let [deptId, rows] = _ref4;
+    const isVirtualDept = !departments.find(d => d.id === deptId);
+    const headerLabel = isVirtualDept ? deptId.toUpperCase() : dName(deptId);
     return /*#__PURE__*/React.createElement("div", {
       className: "card",
       key: deptId
     }, /*#__PURE__*/React.createElement("div", {
       className: "dept-header"
-    }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDFD5\uFE0F"), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement("span", null, isVirtualDept ? '📋' : '🏕️'), /*#__PURE__*/React.createElement("span", {
       className: "dept-name"
-    }, dName(deptId)), /*#__PURE__*/React.createElement("span", {
+    }, headerLabel), /*#__PURE__*/React.createElement("span", {
       className: "dept-count"
     }, new Set(rows.flatMap(r => r.allWorkers)).size, " radnika")), /*#__PURE__*/React.createElement("table", {
       className: "schedule-table"
@@ -2842,7 +2847,7 @@ function QuickModal(_ref12) {
     color: '#2e7d32',
     border: '#81c784'
   }];
-  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Ostalo', 'Prerada', 'Farbanje sjekačkih linija'];
   const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
 
   // Determine jobType default based on category
@@ -3720,7 +3725,7 @@ function EntryModal(_ref15) {
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
-    deptId: data.deptId || (initJobType === 'Teren' ? '' : DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : departments[0]?.id || ''),
+    deptId: data.deptId || (initJobType === 'Teren' || initJobType === 'Ostalo' ? '' : DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : departments[0]?.id || ''),
     jobType: initJobType,
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
@@ -3752,7 +3757,7 @@ function EntryModal(_ref15) {
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
-  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Ostalo', 'Prerada', 'Farbanje sjekačkih linija'];
   const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
   const isDeptShown = DEPT_SHOW_JOBS.includes(form.jobType);
   const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
@@ -4021,7 +4026,7 @@ function EntryModal(_ref15) {
         helper1Worker: '',
         helper2Worker: '',
         extraWorkers: [],
-        deptId: newJob === 'Teren' ? '' : needsDept && !isEdit ? '' : f.deptId
+        deptId: newJob === 'Teren' || newJob === 'Ostalo' ? '' : needsDept && !isEdit ? '' : f.deptId
       }));
     }
   }, (allJobTypes || JOB_TYPES).map(jt => /*#__PURE__*/React.createElement("option", {

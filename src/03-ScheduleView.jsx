@@ -84,12 +84,15 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
     const rect = e.currentTarget.getBoundingClientRect();
     setVehiclePopup(vehiclePopup?.rowId === row.id ? null : { rowId: row.id, vehicleIds: getVehicleIds(row), otherDriverId: row.otherDriverId || '', rect });
   };
+  // For entries with no dept (Teren, Ostalo, etc.), use jobType as group key
+  const deptKey = (s) => s.deptId || s.jobType || 'Ostalo';
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
     daySchedules.filter(s => s.jobType !== 'Otprema').forEach(s => {
-      if (!m[s.deptId]) m[s.deptId] = [];
-      m[s.deptId].push(s);
+      const key = deptKey(s);
+      if (!m[key]) m[key] = [];
+      m[key].push(s);
     });
     return m;
   }, [daySchedules]);
@@ -307,11 +310,13 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           <button className="btn btn-primary" onClick={onAdd}>+ Dodaj prvi unos</button>
         </div>
       ) : (
-        Object.entries(byDept).map(([deptId, rows]) => (
-          <div className="card" key={deptId}>
+        Object.entries(byDept).map(([deptId, rows]) => {
+          const isVirtualDept = !departments.find(d => d.id === deptId);
+          const headerLabel = isVirtualDept ? deptId.toUpperCase() : dName(deptId);
+          return (<div className="card" key={deptId}>
             <div className="dept-header">
-              <span>🏕️</span>
-              <span className="dept-name">{dName(deptId)}</span>
+              <span>{isVirtualDept ? '📋' : '🏕️'}</span>
+              <span className="dept-name">{headerLabel}</span>
               <span className="dept-count">{new Set(rows.flatMap(r => r.allWorkers)).size} radnika</span>
             </div>
             <table className="schedule-table">
@@ -406,7 +411,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               </tbody>
             </table>
           </div>
-        ))
+        );})
       )}
 
       {/* ─── OTPREMA SEKCIJA ─── */}

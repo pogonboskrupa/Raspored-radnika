@@ -498,12 +498,15 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
     const rect = e.currentTarget.getBoundingClientRect();
     setVehiclePopup(vehiclePopup?.rowId === row.id ? null : { rowId: row.id, vehicleIds: getVehicleIds(row), otherDriverId: row.otherDriverId || '', rect });
   };
+  // For entries with no dept (Teren, Ostalo, etc.), use jobType as group key
+  const deptKey = (s) => s.deptId || s.jobType || 'Ostalo';
   // Group by dept — exclude Otprema
   const byDept = useMemo(() => {
     const m = {};
     daySchedules.filter(s => s.jobType !== 'Otprema').forEach(s => {
-      if (!m[s.deptId]) m[s.deptId] = [];
-      m[s.deptId].push(s);
+      const key = deptKey(s);
+      if (!m[key]) m[key] = [];
+      m[key].push(s);
     });
     return m;
   }, [daySchedules]);
@@ -721,11 +724,13 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
           <button className="btn btn-primary" onClick={onAdd}>+ Dodaj prvi unos</button>
         </div>
       ) : (
-        Object.entries(byDept).map(([deptId, rows]) => (
-          <div className="card" key={deptId}>
+        Object.entries(byDept).map(([deptId, rows]) => {
+          const isVirtualDept = !departments.find(d => d.id === deptId);
+          const headerLabel = isVirtualDept ? deptId.toUpperCase() : dName(deptId);
+          return (<div className="card" key={deptId}>
             <div className="dept-header">
-              <span>🏕️</span>
-              <span className="dept-name">{dName(deptId)}</span>
+              <span>{isVirtualDept ? '📋' : '🏕️'}</span>
+              <span className="dept-name">{headerLabel}</span>
               <span className="dept-count">{new Set(rows.flatMap(r => r.allWorkers)).size} radnika</span>
             </div>
             <table className="schedule-table">
@@ -820,7 +825,7 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
               </tbody>
             </table>
           </div>
-        ))
+        );})
       )}
 
       {/* ─── OTPREMA SEKCIJA ─── */}
@@ -1420,7 +1425,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
     { id: 'teren',       label: 'Teren',       icon: '🌿', bg:'#e8f5e9', color:'#2e7d32', border:'#81c784' },
   ];
 
-  const DEPT_SHOW_JOBS     = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS     = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Ostalo', 'Prerada', 'Farbanje sjekačkih linija'];
   const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
 
   // Determine jobType default based on category
@@ -1916,7 +1921,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];  const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
-    deptId: data.deptId || (initJobType === 'Teren' ? '' : (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : (departments[0]?.id || ''))),
+    deptId: data.deptId || (initJobType === 'Teren' || initJobType === 'Ostalo' ? '' : (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : (departments[0]?.id || ''))),
     jobType: initJobType,
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
@@ -1948,7 +1953,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
-  const DEPT_SHOW_JOBS     = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS     = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Ostalo', 'Prerada', 'Farbanje sjekačkih linija'];
   const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
   const isDeptShown    = DEPT_SHOW_JOBS.includes(form.jobType);
   const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
@@ -2097,7 +2102,7 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               const newJob = e.target.value;
               const needsDept = DEPT_REQUIRED_JOBS.includes(newJob);
               setForm(f=>({...f,jobType:newJob,allWorkers:[],primatWorker:'',helper1Worker:'',helper2Worker:'',extraWorkers:[],
-                deptId: (newJob === 'Teren') ? '' : (needsDept && !isEdit ? '' : f.deptId)
+                deptId: (newJob === 'Teren' || newJob === 'Ostalo') ? '' : (needsDept && !isEdit ? '' : f.deptId)
               }));
             }}>
               {(allJobTypes || JOB_TYPES).map(jt => <option key={jt}>{jt}</option>)}
