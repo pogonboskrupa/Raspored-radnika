@@ -3775,7 +3775,7 @@ function VozaciView({ vehicles, setVehicles, workers }) {
 }
 
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, goKvota, setGoKvota, holidays, setHolidays, wName, dName }) {
+function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, goKvota, setGoKvota, holidays, setHolidays, wName, dName, onSihtSave }) {
   const now = new Date();
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
@@ -3829,6 +3829,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
       else { wDates[date] = type; }
       return { ...prev, [workerId]: wDates };
     });
+    if (onSihtSave) onSihtSave(workerId, date, type);
     setCellPicker(null);
   };
 
@@ -5252,6 +5253,40 @@ function AppMain({ onLogout, currentUser }) {
     setHistoryModal(null);
   };
 
+  // Called from SihtaricaView when a cell is manually set
+  const SIHT_RAD_TYPES = ['Teren', 'Kancelarija'];
+  const sihtSave = (workerId, date, type) => {
+    if (type === null) {
+      // Clear: remove sihtEntry schedules for this worker+date
+      setSchedules(prev => prev.filter(s => !(s.sihtEntry && s.date === date && (s.allWorkers || []).includes(workerId))));
+      // Clear sihtEntry godisnji entries
+      setGodisnji(prev => {
+        const entries = (prev[workerId] || []).filter(e => !(e.sihtEntry && e.date === date));
+        return { ...prev, [workerId]: entries };
+      });
+      return;
+    }
+    if (SIHT_RAD_TYPES.includes(type)) {
+      // Create minimal schedule entry only if worker not already scheduled that day
+      const alreadyIn = schedules.some(s => s.date === date && !s.sihtEntry && (s.allWorkers || []).includes(workerId));
+      if (!alreadyIn) {
+        // Remove any previous sihtEntry for this worker+date first
+        const cleaned = schedules.filter(s => !(s.sihtEntry && s.date === date && (s.allWorkers || []).includes(workerId)));
+        const entry = { id: uid(), date, jobType: type, allWorkers: [workerId], deptId: '', extraWorkers: [], vehicleIds: [], note: '', kisaMode: 'go', overrides: [], sihtEntry: true };
+        setSchedules([...cleaned, entry]);
+      }
+    } else {
+      // Odsutnost — add to godisnji if not already there
+      const already = (godisnji[workerId] || []).some(e => e.date === date && !e.sihtEntry);
+      if (!already) {
+        const prev = godisnji[workerId] || [];
+        const cleaned = prev.filter(e => !(e.sihtEntry && e.date === date));
+        const entry = { id: uid(), date, type, note: '', sihtEntry: true };
+        setGodisnji(g => ({ ...g, [workerId]: [...cleaned, entry] }));
+      }
+    }
+  };
+
   const copyFromDate = (fromDate) => {
     if (holidays[selectedDate]) {
       return alert(`Nije moguće kopirati raspored na ${selectedDate} — praznik: "${holidays[selectedDate]}"`);
@@ -5517,6 +5552,7 @@ function AppMain({ onLogout, currentUser }) {
               goKvota={goKvota} setGoKvota={setGoKvota}
               holidays={holidays} setHolidays={setHolidays}
               wName={wName} dName={dName}
+              onSihtSave={sihtSave}
             />
           )}
           {activeTab === 'pregled' && (

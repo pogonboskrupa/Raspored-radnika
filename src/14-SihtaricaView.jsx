@@ -1,5 +1,5 @@
 // ─── ŠIHTARICA VIEW ──────────────────────────────────────────────────────────
-function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, goKvota, setGoKvota, holidays, setHolidays, wName, dName }) {
+function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji, goKvota, setGoKvota, holidays, setHolidays, wName, dName, onSihtSave }) {
   const now = new Date();
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
@@ -53,6 +53,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
       else { wDates[date] = type; }
       return { ...prev, [workerId]: wDates };
     });
+    if (onSihtSave) onSihtSave(workerId, date, type);
     setCellPicker(null);
   };
 
