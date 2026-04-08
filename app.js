@@ -10493,8 +10493,19 @@ function AppMain(_ref46) {
   const SIHT_RAD_TYPES = ['Teren', 'Kancelarija'];
   const sihtSave = (workerId, date, type) => {
     if (type === null) {
-      // Clear: remove sihtEntry schedules for this worker+date
-      setSchedules(prev => prev.filter(s => !(s.sihtEntry && s.date === date && (s.allWorkers || []).includes(workerId))));
+      // Clear: remove worker from sihtEntry row; delete row if it becomes empty
+      setSchedules(prev => prev.reduce((acc, s) => {
+        if (!s.sihtEntry || s.date !== date || !(s.allWorkers || []).includes(workerId)) {
+          acc.push(s);
+          return acc;
+        }
+        const remaining = (s.allWorkers || []).filter(id => id !== workerId);
+        if (remaining.length > 0) acc.push({
+          ...s,
+          allWorkers: remaining
+        });
+        return acc;
+      }, []));
       // Clear sihtEntry godisnji entries
       setGodisnji(prev => {
         const entries = (prev[workerId] || []).filter(e => !(e.sihtEntry && e.date === date));
@@ -10506,25 +10517,36 @@ function AppMain(_ref46) {
       return;
     }
     if (SIHT_RAD_TYPES.includes(type)) {
-      // Create minimal schedule entry only if worker not already scheduled that day
+      // Don't create entry if worker already in a real (non-siht) schedule for this date
       const alreadyIn = schedules.some(s => s.date === date && !s.sihtEntry && (s.allWorkers || []).includes(workerId));
       if (!alreadyIn) {
-        // Remove any previous sihtEntry for this worker+date first
-        const cleaned = schedules.filter(s => !(s.sihtEntry && s.date === date && (s.allWorkers || []).includes(workerId)));
-        const entry = {
-          id: uid(),
-          date,
-          jobType: type,
-          allWorkers: [workerId],
-          deptId: '',
-          extraWorkers: [],
-          vehicleIds: [],
-          note: '',
-          kisaMode: 'go',
-          overrides: [],
-          sihtEntry: true
-        };
-        setSchedules([...cleaned, entry]);
+        setSchedules(prev => {
+          // Remove any previous sihtEntry for this worker+date (different job type)
+          const withoutOld = prev.filter(s => !(s.sihtEntry && s.date === date && (s.allWorkers || []).includes(workerId)));
+          // Find existing sihtEntry row for same date+jobType to merge into
+          const existing = withoutOld.find(s => s.sihtEntry && s.date === date && s.jobType === type);
+          if (existing) {
+            return withoutOld.map(s => s.id === existing.id ? {
+              ...s,
+              allWorkers: [...new Set([...s.allWorkers, workerId])]
+            } : s);
+          }
+          // No existing row — create new one
+          const entry = {
+            id: uid(),
+            date,
+            jobType: type,
+            allWorkers: [workerId],
+            deptId: '',
+            extraWorkers: [],
+            vehicleIds: [],
+            note: '',
+            kisaMode: 'go',
+            overrides: [],
+            sihtEntry: true
+          };
+          return [...withoutOld, entry];
+        });
       }
     } else {
       // Odsutnost — add to godisnji if not already there
