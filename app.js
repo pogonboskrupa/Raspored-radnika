@@ -1901,7 +1901,12 @@ function ScheduleView(_ref2) {
   }, dName(d.id)), /*#__PURE__*/React.createElement("span", {
     className: "count"
   }, statsByDept[d.id]?.size || 0))))), (() => {
-    const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
+    const assignedWorkers = new Set([...daySchedules.flatMap(s => s.allWorkers || []), ...daySchedules.flatMap(s => {
+      const vIds = s.vehicleIds?.length ? s.vehicleIds : s.vehicleId ? [s.vehicleId] : [];
+      const driverIds = vIds.map(vid => (vehicles || []).find(v => v.id === vid)?.driverId).filter(Boolean);
+      if (s.otherDriverId) return [s.otherDriverId];
+      return driverIds;
+    })]);
     const absentMap = {};
     Object.entries(godisnji || {}).forEach(_ref6 => {
       let [wId, entries] = _ref6;
@@ -2421,6 +2426,7 @@ function RightPanel(_ref9) {
     schedules,
     workers,
     departments,
+    vehicles,
     wName,
     dName,
     statsByJob,
@@ -2433,7 +2439,12 @@ function RightPanel(_ref9) {
     onWorkerClick
   } = _ref9;
   const [copyDate, setCopyDate] = useState('');
-  const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
+  const assignedWorkers = new Set([...daySchedules.flatMap(s => s.allWorkers || []), ...daySchedules.flatMap(s => {
+    const vIds = s.vehicleIds?.length ? s.vehicleIds : s.vehicleId ? [s.vehicleId] : [];
+    const driverIds = vIds.map(vid => (vehicles || []).find(v => v.id === vid)?.driverId).filter(Boolean);
+    if (s.otherDriverId) return [s.otherDriverId];
+    return driverIds;
+  })]);
   const absentMap = {};
   Object.entries(godisnji || {}).forEach(_ref0 => {
     let [wId, entries] = _ref0;
@@ -10881,6 +10892,7 @@ function AppMain(_ref46) {
     schedules: schedules,
     workers: workers,
     departments: departments,
+    vehicles: vehicles,
     wName: wName,
     dName: dName,
     statsByJob: statsByJob,

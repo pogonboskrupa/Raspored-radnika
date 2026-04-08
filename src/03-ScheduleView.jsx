@@ -552,7 +552,15 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
 
       {/* MOBILE: Unassigned & absent workers (visible only on small screens via CSS) */}
       {(() => {
-        const assignedWorkers = new Set(daySchedules.flatMap(s => s.allWorkers));
+        const assignedWorkers = new Set([
+          ...daySchedules.flatMap(s => s.allWorkers || []),
+          ...daySchedules.flatMap(s => {
+            const vIds = s.vehicleIds?.length ? s.vehicleIds : (s.vehicleId ? [s.vehicleId] : []);
+            const driverIds = vIds.map(vid => (vehicles || []).find(v => v.id === vid)?.driverId).filter(Boolean);
+            if (s.otherDriverId) return [s.otherDriverId];
+            return driverIds;
+          }),
+        ]);
         const absentMap = {};
         Object.entries(godisnji || {}).forEach(([wId, entries]) => {
           const entry = entries.find(e => e.date === selectedDate) ||

@@ -486,6 +486,7 @@ function AppMain({ onLogout, currentUser }) {
             schedules={schedules}
             workers={workers}
             departments={departments}
+            vehicles={vehicles}
             wName={wName}
             dName={dName}
             statsByJob={statsByJob}
