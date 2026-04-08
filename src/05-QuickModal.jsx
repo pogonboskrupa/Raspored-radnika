@@ -53,7 +53,13 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
   const regularVozaci = workers.filter(w => w.category === 'vozac' && w.status === 'aktivan');
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
 
-  const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const activeWorkers = workers.filter(w => w.status === 'aktivan')
+    .sort((a, b) => {
+      const catIds = WORKER_CATEGORIES.map(c => c.id);
+      const ai = catIds.indexOf(a.category), bi = catIds.indexOf(b.category);
+      const ca = ai === -1 ? 999 : ai, cb = bi === -1 ? 999 : bi;
+      return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
+    });
   const absentWorkerIds = new Set(
     Object.entries(godisnji || {}).filter(([wId, entries]) =>
       entries.some(e => e.date === selectedDate || (e.open && e.dateOd && e.dateOd <= selectedDate))

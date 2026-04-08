@@ -25,7 +25,13 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
   const otherPotentialDrivers = workers.filter(w => OTHER_DRIVER_CATS.includes(w.category) && w.status === 'aktivan');
-  const activeWorkers = workers.filter(w => w.status === 'aktivan');
+  const catIds = WORKER_CATEGORIES.map(c => c.id);
+  const activeWorkers = workers.filter(w => w.status === 'aktivan')
+    .sort((a, b) => {
+      const ai = catIds.indexOf(a.category), bi = catIds.indexOf(b.category);
+      const ca = ai === -1 ? 999 : ai, cb = bi === -1 ? 999 : bi;
+      return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
+    });
   const isPrimka = form.jobType === 'Primka';
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
@@ -298,9 +304,12 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                   if (isTerenOrKanc) {
                     const aP = a.category === 'poslovoda_isk' || a.category === 'poslovoda_uzg' ? 0 : 1;
                     const bP = b.category === 'poslovoda_isk' || b.category === 'poslovoda_uzg' ? 0 : 1;
-                    return aP - bP;
+                    if (aP !== bP) return aP - bP;
                   }
-                  return 0;
+                  const catIds = WORKER_CATEGORIES.map(c => c.id);
+                  const ai = catIds.indexOf(a.category), bi = catIds.indexOf(b.category);
+                  const ca = ai === -1 ? 999 : ai, cb = bi === -1 ? 999 : bi;
+                  return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
                 }).map(w => {
                   const cat = getCatById(w.category);
                   return (
