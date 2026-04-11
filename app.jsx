@@ -3889,12 +3889,23 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         // Backward compat: stari Teren/Kancelarija unosi iz godisnji → radni dan
         const isRadniTip = e.type === 'Teren' || e.type === 'Kancelarija';
         if (e.open && e.dateOd) {
+          // Open-ended: fills from dateOd to end of current month
           days.forEach(d => {
             const date = isoDate(d);
             if (date >= e.dateOd && !isWeekend(d)) {
               m[wId][date] = isRadniTip
                 ? { type: 'rad', jobType: e.type, note: e.note, open: true, dateOd: e.dateOd }
                 : { type: 'odsutnost', oType: e.type, note: e.note, open: true, dateOd: e.dateOd };
+            }
+          });
+        } else if (!e.open && e.dateOd && e.dateDo) {
+          // Closed range (zaključeno): fills only from dateOd to dateDo
+          days.forEach(d => {
+            const date = isoDate(d);
+            if (date >= e.dateOd && date <= e.dateDo && !isWeekend(d)) {
+              m[wId][date] = isRadniTip
+                ? { type: 'rad', jobType: e.type, note: e.note, dateOd: e.dateOd, dateDo: e.dateDo }
+                : { type: 'odsutnost', oType: e.type, note: e.note, dateOd: e.dateOd, dateDo: e.dateDo };
             }
           });
         } else if (e.date) {
@@ -3929,7 +3940,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
       });
     }
     return m;
-  }, [schedules, godisnji, workers, holidays, sihtManual]);
+  }, [schedules, godisnji, workers, holidays, sihtManual, selYear, selMonth]);
 
   // Stats per worker for selected month
   const workerStats = useMemo(() => {
@@ -3981,20 +3992,16 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
     setGoForm({ date:'', dateDo:'', type:'Godišnji odmor', note:'' });
   };
 
-  // Close an open-ended leave by setting end date and expanding into individual date entries
+  // Close an open-ended leave: set dateDo directly on the entry (no conversion needed)
   const closeOpenLeave = (wId, openEntry, dateDo) => {
-    const startDate = new Date(openEntry.dateOd);
-    const endDate = new Date(dateDo);
-    if (endDate < startDate) return alert('Datum završetka mora biti nakon početka!');
-    const dates = [];
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
-      const dw = d.getDay();
-      if (dw !== 0 && dw !== 6) dates.push(d.toISOString().slice(0,10));
-    }
+    if (dateDo < openEntry.dateOd) return alert('Datum završetka mora biti nakon početka!');
     setGodisnji(g => {
-      const prev = (g[wId] || []).filter(e => !(e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type) && !dates.includes(e.date));
-      const newEntries = dates.map(dt => ({ date: dt, type: openEntry.type, note: openEntry.note }));
-      return { ...g, [wId]: [...prev, ...newEntries] };
+      const entries = g[wId] || [];
+      const updated = entries.map(e => {
+        const isTarget = e.open && e.dateOd === openEntry.dateOd && e.type === openEntry.type;
+        return isTarget ? { ...e, open: false, dateDo } : e;
+      });
+      return { ...g, [wId]: updated };
     });
   };
 
@@ -4358,15 +4365,19 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
                       cellBorderColor = entry.manual ? oc.color : oc.border;
                       const clickHandler = entry.manual
                         ? () => setManualCell(w.id, date, null)
-                        : () => (entry.open ? deleteOpenLeave(w.id, {dateOd:entry.dateOd, type:entry.oType, note:entry.note}) : deleteGodisnji(w.id, date));
+                        : entry.open
+                          ? () => deleteOpenLeave(w.id, {dateOd:entry.dateOd, type:entry.oType, note:entry.note})
+                          : entry.dateDo
+                            ? () => setGodisnji(g => ({ ...g, [w.id]: (g[w.id]||[]).filter(e => !(e.dateOd === entry.dateOd && e.dateDo === entry.dateDo && e.type === entry.oType)) }))
+                            : () => deleteGodisnji(w.id, date);
                       cellText = (
                         <span style={{color:oc.color,fontWeight:700,fontSize:'0.6rem',fontFamily:'var(--mono)',cursor:'pointer'}}
                           onClick={e=>{e.stopPropagation();clickHandler();}}
-                          title={entry.manual ? 'Ručni unos · klikni za brisanje' : (entry.open ? 'Otvoreno od '+entry.dateOd+' · klikni za brisanje' : 'Klikni za brisanje: '+entry.oType)}>
+                          title={entry.manual ? 'Ručni unos · klikni za brisanje' : entry.open ? 'Otvoreno od '+entry.dateOd+' · klikni za brisanje' : entry.dateDo ? (entry.dateOd+' – '+entry.dateDo+' · klikni za brisanje') : 'Klikni za brisanje: '+entry.oType}>
                           {oc.short}
                         </span>
                       );
-                      title = entry.oType + (entry.manual ? ' (ručno)' : entry.open ? ' (otvoreno od '+entry.dateOd+')' : '') + (entry.note ? ' — '+entry.note : '');
+                      title = entry.oType + (entry.manual ? ' (ručno)' : entry.open ? ' (otvoreno od '+entry.dateOd+')' : entry.dateDo ? (' ('+entry.dateOd+' – '+entry.dateDo+')') : '') + (entry.note ? ' — '+entry.note : '');
                     }
                     return (
                       <td key={d} title={title} style={{
