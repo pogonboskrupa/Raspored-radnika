@@ -1,10 +1,10 @@
 // ─── ENTRY MODAL ──────────────────────────────────────────────────────────────
 function EntryModal({ data, isEdit, workers, departments, setDepartments, schedules, checkConflict, vehicles, allJobTypes, onSave, onClose, wName, godisnji, selectedDate }) {
   const initJobType = data.jobType || (allJobTypes || JOB_TYPES)[0];
-  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];  const [form, setForm] = useState({
+  const DEPT_REQUIRED_JOBS_INIT = [];  const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
-    deptId: data.deptId || (initJobType === 'Teren' || initJobType === 'Ostalo' ? '' : (DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : (departments[0]?.id || ''))),
+    deptId: data.deptId || '',
     jobType: initJobType,
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
@@ -36,10 +36,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
-  const DEPT_SHOW_JOBS     = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Ostalo', 'Prerada', 'Farbanje sjekačkih linija'];
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
-  const isDeptShown    = DEPT_SHOW_JOBS.includes(form.jobType);
-  const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
+  const isDeptShown    = true;
+  const isDeptRequired = false;
   const TERENSKI_CATS = ['primac_panj', 'otpremac', 'pomocni', 'radnik_primka', 'vlastita_rezija', 'vozac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
 
@@ -92,7 +90,6 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   };
 
   const handleSubmit = () => {
-    if (isDeptRequired && !form.deptId) return alert('Odaberite odjel!');
     if (form.allWorkers.length === 0) return alert('Odaberite barem jednog radnika!');
     const c = checkConflict(form, isEdit ? form.id : null);
     if (c.length > 0 && !forceOverride) {
@@ -130,13 +127,11 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               <input type="date" className="form-input" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
             </div>
             {isDeptShown && <div className="form-group">
-              <label className="form-label" style={isDeptRequired ? {color:'#b5620a',fontWeight:700} : {}}>
-                Odjel / Radilište
-                {isDeptRequired && !form.deptId && <span style={{color:'#c53030',fontSize:'0.75rem'}}> ⚠️ obavezno za {form.jobType}</span>}
-                {!isDeptRequired && <span style={{color:'var(--text-light)',fontSize:'0.72rem',fontWeight:400}}> (opciono)</span>}
+              <label className="form-label">
+                Odjel / Radilište <span style={{color:'var(--text-light)',fontSize:'0.72rem',fontWeight:400}}>(opciono)</span>
               </label>
               {departments.length > 0 && (
-                <select className="form-select" value={form.deptId} onChange={e=>setForm(f=>({...f,deptId:e.target.value}))} style={{marginBottom:'0.4rem', ...(isDeptRequired && !form.deptId ? {border:'2px solid #c53030',background:'#fff5f5'} : {})}}>
+                <select className="form-select" value={form.deptId} onChange={e=>setForm(f=>({...f,deptId:e.target.value}))} style={{marginBottom:'0.4rem'}}>
                   <option value="">— Odaberi postojeći —</option>
                   {departments.map(d => <option key={d.id} value={d.id}>{d.gospodarskaJedinica} — Odjel {d.brojOdjela}</option>)}
                 </select>
@@ -183,9 +178,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
             <label className="form-label">Vrsta posla</label>
             <select className="form-select" value={form.jobType} onChange={e=>{
               const newJob = e.target.value;
-              const needsDept = DEPT_REQUIRED_JOBS.includes(newJob);
               setForm(f=>({...f,jobType:newJob,allWorkers:[],primatWorker:'',helper1Worker:'',helper2Worker:'',extraWorkers:[],
-                deptId: (newJob === 'Teren' || newJob === 'Ostalo') ? '' : (needsDept && !isEdit ? '' : f.deptId)
+                deptId: f.deptId
               }));
             }}>
               {(allJobTypes || JOB_TYPES).map(jt => <option key={jt}>{jt}</option>)}

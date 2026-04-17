@@ -2847,8 +2847,8 @@ function QuickModal(_ref12) {
     color: '#2e7d32',
     border: '#81c784'
   }];
-  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Ostalo', 'Prerada', 'Farbanje sjekačkih linija'];
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_SHOW_JOBS = allJobTypes || JOB_TYPES; // show for all job types
+  const DEPT_REQUIRED_JOBS = []; // none required
 
   // Determine jobType default based on category
   const defaultJob = () => {
@@ -2984,8 +2984,7 @@ function QuickModal(_ref12) {
     onSave(entry);
   };
   const handleSaveRad = () => {
-    const isDeptRequired = DEPT_REQUIRED_JOBS.includes(jobType); // teren nije obavezan
-    if (isDeptRequired && !deptId) return alert('Odaberi odjel!');
+    const isDeptRequired = false;
     const finalAllWorkers = otherDriverId && !allWorkers.includes(otherDriverId) ? [...allWorkers, otherDriverId] : allWorkers;
     const entry = {
       id: uid(),
@@ -3270,21 +3269,17 @@ function QuickModal(_ref12) {
       fontSize: '0.75rem',
       padding: '0.25rem 0.6rem'
     }
-  }, jt)))), (quickStatus === 'teren' || !quickStatus && DEPT_SHOW_JOBS.includes(jobType)) && /*#__PURE__*/React.createElement("div", {
+  }, jt)))), quickStatus !== 'kancelarija' && /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "form-label",
-    style: DEPT_REQUIRED_JOBS.includes(jobType) ? {
-      color: '#b5620a',
-      fontWeight: 700
-    } : {}
-  }, "Odjel / Radili\u0161te", !DEPT_REQUIRED_JOBS.includes(jobType) && quickStatus !== 'teren' && /*#__PURE__*/React.createElement("span", {
+    className: "form-label"
+  }, "Odjel / Radili\u0161te ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: 'var(--text-light)',
       fontSize: '0.72rem',
       fontWeight: 400
     }
-  }, " (opciono)")), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
+  }, "(opciono)")), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: deptId,
     onChange: e => setDeptId(e.target.value),
@@ -3721,11 +3716,11 @@ function EntryModal(_ref15) {
     selectedDate
   } = _ref15;
   const initJobType = data.jobType || (allJobTypes || JOB_TYPES)[0];
-  const DEPT_REQUIRED_JOBS_INIT = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
+  const DEPT_REQUIRED_JOBS_INIT = [];
   const [form, setForm] = useState({
     id: data.id || uid(),
     date: data.date || today(),
-    deptId: data.deptId || (initJobType === 'Teren' || initJobType === 'Ostalo' ? '' : DEPT_REQUIRED_JOBS_INIT.includes(initJobType) && !isEdit ? '' : departments[0]?.id || ''),
+    deptId: data.deptId || '',
     jobType: initJobType,
     primatWorker: data.primatWorker || '',
     helper1Worker: data.helper1Worker || '',
@@ -3757,10 +3752,8 @@ function EntryModal(_ref15) {
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
-  const DEPT_SHOW_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Teren', 'Ostalo', 'Prerada', 'Farbanje sjekačkih linija'];
-  const DEPT_REQUIRED_JOBS = ['Primka', 'Otprema', 'Doznaka stabala', 'Pošumljavanje', 'Prerada', 'Farbanje sjekačkih linija'];
-  const isDeptShown = DEPT_SHOW_JOBS.includes(form.jobType);
-  const isDeptRequired = DEPT_REQUIRED_JOBS.includes(form.jobType);
+  const isDeptShown = true;
+  const isDeptRequired = false;
   const TERENSKI_CATS = ['primac_panj', 'otpremac', 'pomocni', 'radnik_primka', 'vlastita_rezija', 'vozac'];
   const availableVehicles = (vehicles || []).filter(v => v.status === 'vozno');
   const ENTRY_DRIVER_CATS = ['vozac', 'poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -3815,7 +3808,6 @@ function EntryModal(_ref15) {
     });
   };
   const handleSubmit = () => {
-    if (isDeptRequired && !form.deptId) return alert('Odaberite odjel!');
     if (form.allWorkers.length === 0) return alert('Odaberite barem jednog radnika!');
     const c = checkConflict(form, isEdit ? form.id : null);
     if (c.length > 0 && !forceOverride) {
@@ -3887,23 +3879,14 @@ function EntryModal(_ref15) {
   })), isDeptShown && /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "form-label",
-    style: isDeptRequired ? {
-      color: '#b5620a',
-      fontWeight: 700
-    } : {}
-  }, "Odjel / Radili\u0161te", isDeptRequired && !form.deptId && /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: '#c53030',
-      fontSize: '0.75rem'
-    }
-  }, " \u26A0\uFE0F obavezno za ", form.jobType), !isDeptRequired && /*#__PURE__*/React.createElement("span", {
+    className: "form-label"
+  }, "Odjel / Radili\u0161te ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: 'var(--text-light)',
       fontSize: '0.72rem',
       fontWeight: 400
     }
-  }, " (opciono)")), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
+  }, "(opciono)")), departments.length > 0 && /*#__PURE__*/React.createElement("select", {
     className: "form-select",
     value: form.deptId,
     onChange: e => setForm(f => ({
@@ -3911,11 +3894,7 @@ function EntryModal(_ref15) {
       deptId: e.target.value
     })),
     style: {
-      marginBottom: '0.4rem',
-      ...(isDeptRequired && !form.deptId ? {
-        border: '2px solid #c53030',
-        background: '#fff5f5'
-      } : {})
+      marginBottom: '0.4rem'
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
@@ -4017,7 +3996,6 @@ function EntryModal(_ref15) {
     value: form.jobType,
     onChange: e => {
       const newJob = e.target.value;
-      const needsDept = DEPT_REQUIRED_JOBS.includes(newJob);
       setForm(f => ({
         ...f,
         jobType: newJob,
@@ -4026,7 +4004,7 @@ function EntryModal(_ref15) {
         helper1Worker: '',
         helper2Worker: '',
         extraWorkers: [],
-        deptId: newJob === 'Teren' || newJob === 'Ostalo' ? '' : needsDept && !isEdit ? '' : f.deptId
+        deptId: f.deptId
       }));
     }
   }, (allJobTypes || JOB_TYPES).map(jt => /*#__PURE__*/React.createElement("option", {
