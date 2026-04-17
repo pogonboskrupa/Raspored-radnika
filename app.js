@@ -2858,7 +2858,19 @@ function QuickModal(_ref12) {
     if (worker.category === 'vlastita_rezija') return 'Ostalo';
     return 'Ostalo';
   };
-  const [deptId, setDeptId] = useState(departments[0]?.id || '');
+  const sortedDepts = useMemo(() => {
+    const lastUsed = {};
+    (schedules || []).forEach(s => {
+      if (s.deptId) lastUsed[s.deptId] = Math.max(lastUsed[s.deptId] || 0, new Date(s.date).getTime());
+    });
+    return [...departments].sort((a, b) => {
+      const au = lastUsed[a.id] || 0,
+        bu = lastUsed[b.id] || 0;
+      if (au !== bu) return bu - au;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  }, [departments, schedules]);
+  const [deptId, setDeptId] = useState('');
   const [newGJ, setNewGJ] = useState('');
   const [newBroj, setNewBroj] = useState('');
   const [jobType, setJobType] = useState(defaultJob());
@@ -3288,7 +3300,7 @@ function QuickModal(_ref12) {
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Odaberi postoje\u0107i \u2014"), departments.map(d => /*#__PURE__*/React.createElement("option", {
+  }, "\u2014 Odaberi postoje\u0107i \u2014"), sortedDepts.map(d => /*#__PURE__*/React.createElement("option", {
     key: d.id,
     value: d.id
   }, d.gospodarskaJedinica, " \u2014 Odjel ", d.brojOdjela))), /*#__PURE__*/React.createElement("div", {
@@ -3748,7 +3760,19 @@ function EntryModal(_ref15) {
       cb = bi === -1 ? 999 : bi;
     return ca !== cb ? ca - cb : a.name.localeCompare(b.name);
   });
-  const isPrimka = form.jobType === 'Primka';
+  // Sort departments: most recently used in schedules first, then most recently added
+  const sortedDepts = useMemo(() => {
+    const lastUsed = {};
+    (schedules || []).forEach(s => {
+      if (s.deptId) lastUsed[s.deptId] = Math.max(lastUsed[s.deptId] || 0, new Date(s.date).getTime());
+    });
+    return [...departments].sort((a, b) => {
+      const au = lastUsed[a.id] || 0,
+        bu = lastUsed[b.id] || 0;
+      if (au !== bu) return bu - au;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  }, [departments, schedules]);
   const isOtprema = form.jobType === 'Otprema';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
@@ -3898,7 +3922,7 @@ function EntryModal(_ref15) {
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014 Odaberi postoje\u0107i \u2014"), departments.map(d => /*#__PURE__*/React.createElement("option", {
+  }, "\u2014 Odaberi postoje\u0107i \u2014"), sortedDepts.map(d => /*#__PURE__*/React.createElement("option", {
     key: d.id,
     value: d.id
   }, d.gospodarskaJedinica, " \u2014 Odjel ", d.brojOdjela))), /*#__PURE__*/React.createElement("div", {

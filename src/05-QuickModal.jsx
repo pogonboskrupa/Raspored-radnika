@@ -31,7 +31,16 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
     return 'Ostalo';
   };
 
-  const [deptId, setDeptId]         = useState(departments[0]?.id || '');
+  const sortedDepts = useMemo(() => {
+    const lastUsed = {};
+    (schedules || []).forEach(s => { if (s.deptId) lastUsed[s.deptId] = Math.max(lastUsed[s.deptId] || 0, new Date(s.date).getTime()); });
+    return [...departments].sort((a, b) => {
+      const au = lastUsed[a.id] || 0, bu = lastUsed[b.id] || 0;
+      if (au !== bu) return bu - au;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  }, [departments, schedules]);
+  const [deptId, setDeptId]         = useState('');
   const [newGJ, setNewGJ]           = useState('');
   const [newBroj, setNewBroj]       = useState('');
   const [jobType, setJobType]       = useState(defaultJob());
@@ -296,7 +305,7 @@ function QuickModal({ worker, workers, departments, setDepartments, selectedDate
                   {departments.length > 0 && (
                     <select className="form-select" value={deptId} onChange={e=>setDeptId(e.target.value)} style={{marginBottom:'0.4rem'}}>
                       <option value="">— Odaberi postojeći —</option>
-                      {departments.map(d => <option key={d.id} value={d.id}>{d.gospodarskaJedinica} — Odjel {d.brojOdjela}</option>)}
+                      {sortedDepts.map(d => <option key={d.id} value={d.id}>{d.gospodarskaJedinica} — Odjel {d.brojOdjela}</option>)}
                     </select>
                   )}
                   <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end'}}>
