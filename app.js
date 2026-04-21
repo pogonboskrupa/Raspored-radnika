@@ -7485,7 +7485,7 @@ function SihtaricaView(_ref31) {
             delete m[wId][date];
             return;
           }
-          if (type === 'Teren' || type === 'Kancelarija') {
+          if (JOB_TYPES.includes(type)) {
             m[wId][date] = {
               type: 'rad',
               jobType: type,
@@ -9748,6 +9748,51 @@ function SihtaricaView(_ref31) {
       label: '🏢 Kancelarija',
       bg: '#4a7a8a',
       color: 'white'
+    }, {
+      type: 'Primka',
+      label: '📋 Primka',
+      bg: '#b5620a',
+      color: 'white'
+    }, {
+      type: 'Otprema',
+      label: '🚛 Otprema',
+      bg: '#6b3080',
+      color: 'white'
+    }, {
+      type: 'Prerada',
+      label: '🪚 Prerada',
+      bg: '#5a3d00',
+      color: 'white'
+    }, {
+      type: 'Pošumljavanje',
+      label: '🌱 Pošumljavanje',
+      bg: '#1a5a2d',
+      color: 'white'
+    }, {
+      type: 'Doznaka stabala',
+      label: '🪵 Doznaka stabala',
+      bg: '#7a3b00',
+      color: 'white'
+    }, {
+      type: 'Kiša',
+      label: '🌧️ Kiša',
+      bg: '#607d8b',
+      color: 'white'
+    }, {
+      type: 'Farbanje sjekačkih linija',
+      label: '🎨 Farbanje sj.linija',
+      bg: '#8b6914',
+      color: 'white'
+    }, {
+      type: 'Sektor ekologije',
+      label: '♻️ Sektor ekologije',
+      bg: '#2e7d32',
+      color: 'white'
+    }, {
+      type: 'Ostalo',
+      label: '📎 Ostalo',
+      bg: '#757575',
+      color: 'white'
     }];
     const ODSUTNI = ODSUTNOST_TYPES.map(t => ({
       type: t,
@@ -9755,7 +9800,7 @@ function SihtaricaView(_ref31) {
       ...ODSUTNOST_COLOR[t]
     }));
     // Position picker: clamp to viewport
-    const pickerW = 210;
+    const pickerW = 240;
     const pickerX = Math.min(cellPicker.x, window.innerWidth - pickerW - 8);
     const pickerY = cellPicker.y + 4;
     return /*#__PURE__*/React.createElement("div", {
@@ -9775,7 +9820,8 @@ function SihtaricaView(_ref31) {
         borderRadius: 8,
         boxShadow: '0 4px 24px rgba(0,0,0,0.22)',
         border: '1px solid var(--border)',
-        overflow: 'hidden',
+        maxHeight: 'calc(100vh - 40px)',
+        overflowY: 'auto',
         zIndex: 3001
       },
       onClick: e => e.stopPropagation()
@@ -10517,7 +10563,7 @@ function AppMain(_ref46) {
   };
 
   // Called from SihtaricaView when a cell is manually set
-  const SIHT_RAD_TYPES = ['Teren', 'Kancelarija'];
+  const SIHT_RAD_TYPES = JOB_TYPES;
   const sihtSave = (workerId, date, type) => {
     if (type === null) {
       // Clear: remove worker from sihtEntry row; delete row if it becomes empty

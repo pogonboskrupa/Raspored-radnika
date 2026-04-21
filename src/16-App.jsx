@@ -199,7 +199,7 @@ function AppMain({ onLogout, currentUser }) {
   };
 
   // Called from SihtaricaView when a cell is manually set
-  const SIHT_RAD_TYPES = ['Teren', 'Kancelarija'];
+  const SIHT_RAD_TYPES = JOB_TYPES;
   const sihtSave = (workerId, date, type) => {
     if (type === null) {
       // Clear: remove worker from sihtEntry row; delete row if it becomes empty
