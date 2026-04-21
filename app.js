@@ -3774,6 +3774,7 @@ function EntryModal(_ref15) {
     });
   }, [departments, schedules]);
   const isOtprema = form.jobType === 'Otprema';
+  const isPrimka = form.jobType === 'Primka';
   const isKisa = form.jobType === 'Kiša';
   const isTerenOrKanc = form.jobType === 'Teren' || form.jobType === 'Kancelarija';
   const isDeptShown = true;
