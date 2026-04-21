@@ -135,7 +135,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         if (!m[wId]) return;
         Object.entries(dates).forEach(([date, type]) => {
           if (!type) { delete m[wId][date]; return; }
-          if (type === 'Teren' || type === 'Kancelarija') {
+          if (JOB_TYPES.includes(type)) {
             m[wId][date] = { type: 'rad', jobType: type, manual: true };
           } else {
             m[wId][date] = { type: 'odsutnost', oType: type, manual: true };
@@ -1072,8 +1072,17 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
         const existing = workerDayMap[cellPicker.workerId]?.[cellPicker.date];
         const hasManual = !!(sihtManual[cellPicker.workerId]?.[cellPicker.date]);
         const RADNI = [
-          { type: 'Teren',      label: '🌲 Teren',       bg: catColor,   color: 'white' },
-          { type: 'Kancelarija',label: '🏢 Kancelarija', bg: '#4a7a8a',  color: 'white' },
+          { type: 'Teren',       label: '🌲 Teren',       bg: catColor,   color: 'white' },
+          { type: 'Kancelarija', label: '🏢 Kancelarija', bg: '#4a7a8a',  color: 'white' },
+          { type: 'Primka',      label: '📋 Primka',      bg: '#b5620a',  color: 'white' },
+          { type: 'Otprema',     label: '🚛 Otprema',     bg: '#6b3080',  color: 'white' },
+          { type: 'Prerada',     label: '🪚 Prerada',     bg: '#5a3d00',  color: 'white' },
+          { type: 'Pošumljavanje', label: '🌱 Pošumljavanje', bg: '#1a5a2d', color: 'white' },
+          { type: 'Doznaka stabala', label: '🪵 Doznaka stabala', bg: '#7a3b00', color: 'white' },
+          { type: 'Kiša',        label: '🌧️ Kiša',        bg: '#607d8b',  color: 'white' },
+          { type: 'Farbanje sjekačkih linija', label: '🎨 Farbanje sj.linija', bg: '#8b6914', color: 'white' },
+          { type: 'Sektor ekologije', label: '♻️ Sektor ekologije', bg: '#2e7d32', color: 'white' },
+          { type: 'Ostalo',      label: '📎 Ostalo',      bg: '#757575',  color: 'white' },
         ];
         const ODSUTNI = ODSUTNOST_TYPES.map(t => ({
           type: t,
@@ -1081,7 +1090,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
           ...ODSUTNOST_COLOR[t],
         }));
         // Position picker: clamp to viewport
-        const pickerW = 210;
+        const pickerW = 240;
         const pickerX = Math.min(cellPicker.x, window.innerWidth - pickerW - 8);
         const pickerY = cellPicker.y + 4;
         return (
@@ -1090,7 +1099,7 @@ function SihtaricaView({ schedules, workers, departments, godisnji, setGodisnji,
               position:'fixed', left: pickerX, top: pickerY,
               width: pickerW, background:'white', borderRadius:8,
               boxShadow:'0 4px 24px rgba(0,0,0,0.22)', border:'1px solid var(--border)',
-              overflow:'hidden', zIndex:3001,
+              maxHeight:'calc(100vh - 40px)', overflowY:'auto', zIndex:3001,
             }} onClick={e=>e.stopPropagation()}>
               {/* Header */}
               <div style={{background:catColor,color:'white',padding:'0.4rem 0.75rem',fontSize:'0.75rem',fontWeight:700,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
