@@ -650,19 +650,11 @@ function hashPin(pin) {
 }
 
 // Korisnici — PIN-ovi su hashirani
-const USERS = [{
-  name: 'AMRA',
-  hash: hashPin('5555'),
-  icon: '👩'
-}, {
-  name: 'NEDIM',
-  hash: hashPin('7777'),
-  icon: '👨'
-}, {
-  name: 'IZET',
-  hash: hashPin('4444'),
-  icon: '👨'
-}];
+const USERS = [
+  { name: 'AMRA',  email: 'amra@suma.ba',  pin: '555555', icon: '👩' },
+  { name: 'NEDIM', email: 'nedim@suma.ba', pin: '777777', icon: '👨' },
+  { name: 'IZET',  email: 'izet@suma.ba',  pin: '444444', icon: '👨' },
+];
 function LoginScreen(_ref) {
   let {
     onLogin
