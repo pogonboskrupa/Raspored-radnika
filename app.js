@@ -10447,10 +10447,6 @@ function RasporedKamionaView(_ref46) {
   const [selectedDate, setSelectedDate] = useState(nextWorkingDay());
   const dayRows = useMemo(() => truckRows.filter(r => r.date === selectedDate), [truckRows, selectedDate]);
   const kupci = useMemo(() => [...new Set(dispozicije.map(d => d.kupac).filter(Boolean))].sort(), [dispozicije]);
-  const odjeliList = useMemo(() => {
-    const used = truckRows.map(r => r.odjel).filter(Boolean);
-    return [...new Set([...GOSPODARSKE_JEDINICE, ...used])].sort();
-  }, [truckRows]);
 
   // Najstarija dispozicija ODABRANOG kupca sa pozitivnim stanjem za odabrani sortiment
   const findDispForKupac = (kupac, sortiment) => {
@@ -10626,7 +10622,7 @@ function RasporedKamionaView(_ref46) {
     onClick: addRow
   }, "+ Dodaj kamion")) : /*#__PURE__*/React.createElement("table", {
     className: "schedule-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Odjel"), /*#__PURE__*/React.createElement("th", null, "Sortiment"), /*#__PURE__*/React.createElement("th", null, "Kupac (dogovoreni)"), /*#__PURE__*/React.createElement("th", null, "Dispozicija"), /*#__PURE__*/React.createElement("th", null, "Auto-prijedlog"), /*#__PURE__*/React.createElement("th", {
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Odjel"), /*#__PURE__*/React.createElement("th", null, "Sortiment"), /*#__PURE__*/React.createElement("th", null, "Prijedlog"), /*#__PURE__*/React.createElement("th", null, "Dispozicija"), /*#__PURE__*/React.createElement("th", {
     className: "no-print"
   }, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, dayRows.map(r => {
     const found = findDispForKupac(r.kupac, r.sortiment);
@@ -10638,7 +10634,6 @@ function RasporedKamionaView(_ref46) {
       "data-label": "Odjel"
     }, /*#__PURE__*/React.createElement("input", {
       className: "form-input",
-      list: "odjel-list-kamioni",
       value: r.odjel,
       placeholder: "npr. RISOVAC KRUPA 54",
       onChange: e => updateRow(r.id, {
@@ -10664,25 +10659,72 @@ function RasporedKamionaView(_ref46) {
       key: f,
       value: f
     }, SORTIMENT_LABELS[f])))), /*#__PURE__*/React.createElement("td", {
-      "data-label": "Kupac"
-    }, /*#__PURE__*/React.createElement("select", {
+      "data-label": "Prijedlog"
+    }, !r.sortiment ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-light)'
+      }
+    }, "\u2014") : r.kupac ? /*#__PURE__*/React.createElement("select", {
       className: "form-select",
       value: r.kupac,
       onChange: e => updateRow(r.id, {
         kupac: e.target.value
-      })
+      }),
+      style: {
+        fontWeight: 700,
+        color: 'var(--green)',
+        borderColor: 'var(--green)'
+      }
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
-    }, "\u2014 odaberi kupca \u2014"), kupciOptions.map(k => /*#__PURE__*/React.createElement("option", {
+    }, "\u2014 ukloni odabir \u2014"), kupciOptions.map(k => /*#__PURE__*/React.createElement("option", {
       key: k,
       value: k
-    }, k))), r.sortiment && kupciOptions.length === 0 && /*#__PURE__*/React.createElement("div", {
+    }, k))) : suggestions.length === 0 ? /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: '0.7rem',
         color: 'var(--red)',
-        marginTop: '0.2rem'
+        fontSize: '0.78rem',
+        fontWeight: 600
       }
-    }, "Nema kupaca sa stanjem za ovaj sortiment.")), /*#__PURE__*/React.createElement("td", {
+    }, "Nema kupaca sa stanjem za ovaj sortiment.") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.15rem',
+        maxHeight: 170,
+        overflowY: 'auto'
+      }
+    }, suggestions.map((s, idx) => /*#__PURE__*/React.createElement("button", {
+      key: s.disp.id || s.disp.kupac,
+      type: "button",
+      onClick: () => updateRow(r.id, {
+        kupac: s.disp.kupac
+      }),
+      className: "btn btn-ghost btn-sm no-print",
+      title: "Klikni da odabere\u0161 ovog kupca",
+      style: {
+        justifyContent: 'flex-start',
+        textAlign: 'left',
+        padding: '0.15rem 0.4rem',
+        fontWeight: 500,
+        background: 'transparent',
+        color: 'var(--text)',
+        fontSize: '0.74rem',
+        lineHeight: 1.35,
+        whiteSpace: 'normal',
+        height: 'auto'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        color: 'var(--text-light)',
+        marginRight: 4
+      }
+    }, idx + 1, "."), /*#__PURE__*/React.createElement("strong", null, s.disp.kupac), " \u2014 ", s.bal.toFixed(2), " m\xB3 ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, "(", fmtDate(s.disp.datum), ")"))))), /*#__PURE__*/React.createElement("td", {
       "data-label": "Dispozicija"
     }, !r.kupac || !r.sortiment ? /*#__PURE__*/React.createElement("span", {
       style: {
@@ -10708,67 +10750,13 @@ function RasporedKamionaView(_ref46) {
         fontWeight: 600
       }
     }, "\u26A0 Nema dispozicije sa stanjem!")), /*#__PURE__*/React.createElement("td", {
-      "data-label": "Auto-prijedlog"
-    }, !r.sortiment ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--text-light)'
-      }
-    }, "\u2014") : suggestions.length === 0 ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--text-light)',
-        fontSize: '0.8rem'
-      }
-    }, "Nema prijedloga") : /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.15rem',
-        maxHeight: 170,
-        overflowY: 'auto'
-      }
-    }, suggestions.map((s, idx) => /*#__PURE__*/React.createElement("button", {
-      key: s.disp.id || s.disp.kupac,
-      type: "button",
-      onClick: () => updateRow(r.id, {
-        kupac: s.disp.kupac
-      }),
-      className: "btn btn-ghost btn-sm no-print",
-      title: "Klikni da odabere\u0161 ovog kupca",
-      style: {
-        justifyContent: 'flex-start',
-        textAlign: 'left',
-        padding: '0.15rem 0.4rem',
-        fontWeight: r.kupac === s.disp.kupac ? 700 : 500,
-        background: r.kupac === s.disp.kupac ? 'var(--green-pale)' : 'transparent',
-        color: r.kupac === s.disp.kupac ? 'var(--green)' : 'var(--text)',
-        fontSize: '0.74rem',
-        lineHeight: 1.35,
-        whiteSpace: 'normal',
-        height: 'auto'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        color: 'var(--text-light)',
-        marginRight: 4
-      }
-    }, idx + 1, "."), /*#__PURE__*/React.createElement("strong", null, s.disp.kupac), " \u2014 ", s.bal.toFixed(2), " m\xB3 ", /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--text-muted)'
-      }
-    }, "(", fmtDate(s.disp.datum), ")"))))), /*#__PURE__*/React.createElement("td", {
       "data-label": "Akcije",
       className: "no-print"
     }, /*#__PURE__*/React.createElement("button", {
       className: "btn btn-danger btn-icon btn-sm",
       onClick: () => deleteRow(r.id)
     }, "\uD83D\uDDD1\uFE0F")));
-  }))))), /*#__PURE__*/React.createElement("datalist", {
-    id: "odjel-list-kamioni"
-  }, odjeliList.map(o => /*#__PURE__*/React.createElement("option", {
-    key: o,
-    value: o
-  }))));
+  }))))));
 }
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {

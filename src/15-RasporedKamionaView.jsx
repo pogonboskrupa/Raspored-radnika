@@ -28,11 +28,6 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
     [...new Set(dispozicije.map(d => d.kupac).filter(Boolean))].sort(),
     [dispozicije]);
 
-  const odjeliList = useMemo(() => {
-    const used = truckRows.map(r => r.odjel).filter(Boolean);
-    return [...new Set([...GOSPODARSKE_JEDINICE, ...used])].sort();
-  }, [truckRows]);
-
   // Najstarija dispozicija ODABRANOG kupca sa pozitivnim stanjem za odabrani sortiment
   const findDispForKupac = (kupac, sortiment) => {
     if (!kupac || !sortiment) return null;
@@ -191,9 +186,8 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                 <tr>
                   <th>Odjel</th>
                   <th>Sortiment</th>
-                  <th>Kupac (dogovoreni)</th>
+                  <th>Prijedlog</th>
                   <th>Dispozicija</th>
-                  <th>Auto-prijedlog</th>
                   <th className="no-print">Akcije</th>
                 </tr>
               </thead>
@@ -205,7 +199,7 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                   return (
                     <tr key={r.id}>
                       <td data-label="Odjel">
-                        <input className="form-input" list="odjel-list-kamioni" value={r.odjel}
+                        <input className="form-input" value={r.odjel}
                           placeholder="npr. RISOVAC KRUPA 54"
                           onChange={e => updateRow(r.id, { odjel: e.target.value })} />
                       </td>
@@ -221,14 +215,36 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                           {SORTIMENT_FIELDS.map(f => <option key={f} value={f}>{SORTIMENT_LABELS[f]}</option>)}
                         </select>
                       </td>
-                      <td data-label="Kupac">
-                        <select className="form-select" value={r.kupac} onChange={e => updateRow(r.id, { kupac: e.target.value })}>
-                          <option value="">— odaberi kupca —</option>
-                          {kupciOptions.map(k => <option key={k} value={k}>{k}</option>)}
-                        </select>
-                        {r.sortiment && kupciOptions.length === 0 && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--red)', marginTop: '0.2rem' }}>Nema kupaca sa stanjem za ovaj sortiment.</div>
-                        )}
+                      <td data-label="Prijedlog">
+                        {!r.sortiment ? <span style={{ color: 'var(--text-light)' }}>—</span> :
+                          r.kupac ? (
+                            <select className="form-select" value={r.kupac}
+                              onChange={e => updateRow(r.id, { kupac: e.target.value })}
+                              style={{ fontWeight: 700, color: 'var(--green)', borderColor: 'var(--green)' }}>
+                              <option value="">— ukloni odabir —</option>
+                              {kupciOptions.map(k => <option key={k} value={k}>{k}</option>)}
+                            </select>
+                          ) : suggestions.length === 0 ? (
+                            <span style={{ color: 'var(--red)', fontSize: '0.78rem', fontWeight: 600 }}>Nema kupaca sa stanjem za ovaj sortiment.</span>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', maxHeight: 170, overflowY: 'auto' }}>
+                              {suggestions.map((s, idx) => (
+                                <button key={s.disp.id || s.disp.kupac} type="button"
+                                  onClick={() => updateRow(r.id, { kupac: s.disp.kupac })}
+                                  className="btn btn-ghost btn-sm no-print"
+                                  title="Klikni da odabereš ovog kupca"
+                                  style={{
+                                    justifyContent: 'flex-start', textAlign: 'left', padding: '0.15rem 0.4rem',
+                                    fontWeight: 500, background: 'transparent', color: 'var(--text)',
+                                    fontSize: '0.74rem', lineHeight: 1.35, whiteSpace: 'normal', height: 'auto',
+                                  }}>
+                                  <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-light)', marginRight: 4 }}>{idx + 1}.</span>
+                                  <strong>{s.disp.kupac}</strong> — {s.bal.toFixed(2)} m³ <span style={{ color: 'var(--text-muted)' }}>({fmtDate(s.disp.datum)})</span>
+                                </button>
+                              ))}
+                            </div>
+                          )
+                        }
                       </td>
                       <td data-label="Dispozicija">
                         {!r.kupac || !r.sortiment ? <span style={{ color: 'var(--text-light)' }}>—</span> :
@@ -239,30 +255,6 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                               <div style={{ color: 'var(--text-muted)' }}>{fmtDate(found.disp.datum)}</div>
                             </div>
                           ) : <span style={{ color: 'var(--red)', fontSize: '0.78rem', fontWeight: 600 }}>⚠ Nema dispozicije sa stanjem!</span>
-                        }
-                      </td>
-                      <td data-label="Auto-prijedlog">
-                        {!r.sortiment ? <span style={{ color: 'var(--text-light)' }}>—</span> :
-                          suggestions.length === 0 ? <span style={{ color: 'var(--text-light)', fontSize: '0.8rem' }}>Nema prijedloga</span> : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', maxHeight: 170, overflowY: 'auto' }}>
-                              {suggestions.map((s, idx) => (
-                                <button key={s.disp.id || s.disp.kupac} type="button"
-                                  onClick={() => updateRow(r.id, { kupac: s.disp.kupac })}
-                                  className="btn btn-ghost btn-sm no-print"
-                                  title="Klikni da odabereš ovog kupca"
-                                  style={{
-                                    justifyContent: 'flex-start', textAlign: 'left', padding: '0.15rem 0.4rem',
-                                    fontWeight: r.kupac === s.disp.kupac ? 700 : 500,
-                                    background: r.kupac === s.disp.kupac ? 'var(--green-pale)' : 'transparent',
-                                    color: r.kupac === s.disp.kupac ? 'var(--green)' : 'var(--text)',
-                                    fontSize: '0.74rem', lineHeight: 1.35, whiteSpace: 'normal', height: 'auto',
-                                  }}>
-                                  <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-light)', marginRight: 4 }}>{idx + 1}.</span>
-                                  <strong>{s.disp.kupac}</strong> — {s.bal.toFixed(2)} m³ <span style={{ color: 'var(--text-muted)' }}>({fmtDate(s.disp.datum)})</span>
-                                </button>
-                              ))}
-                            </div>
-                          )
                         }
                       </td>
                       <td data-label="Akcije" className="no-print">
@@ -276,9 +268,6 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
           )}
         </div>
       </div>
-      <datalist id="odjel-list-kamioni">
-        {odjeliList.map(o => <option key={o} value={o} />)}
-      </datalist>
     </div>
   );
 }
