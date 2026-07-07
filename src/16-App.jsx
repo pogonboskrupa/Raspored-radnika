@@ -397,7 +397,7 @@ function AppMain({ onLogout, currentUser }) {
           }
         </div>
         <nav className="nav-tabs">
-          {[['raspored','📋 Raspored'],['kamioni','🚚 Raspored kamiona'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']]
+          {[['raspored','📋 Raspored'],['kamioni','🚚 Raspored kamiona'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']]
             .filter(([k]) => !(isPoslovodja && (k === 'radnici' || k === 'odjeli')))
             .map(([k,l]) =>
             <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>

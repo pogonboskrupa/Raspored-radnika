@@ -11679,7 +11679,7 @@ function AppMain(_ref50) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref54 => {
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref54 => {
     let [k] = _ref54;
     return !(isPoslovodja && (k === 'radnici' || k === 'odjeli'));
   }).map(_ref55 => {
