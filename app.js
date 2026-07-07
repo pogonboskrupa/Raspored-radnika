@@ -390,6 +390,7 @@ const INITIAL_WORKERS = [
 const GOSPODARSKE_JEDINICE = ['RISOVAC KRUPA', 'GRMEČ JASENICA', 'VOJSKOVA', 'BAŠTRA ĆORKOVAČA', 'GOMILA'];
 const INITIAL_DEPARTMENTS = [];
 const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Kiša', 'Farbanje sjekačkih linija', 'Ostalo'];
+const APP_VERSION = '1.1.0';
 
 // ─── SORTIMENTI (dijeli šifre polja sa DISPOZICIJE aplikacijom — dispozicije-krupa) ──
 const SORTIMENT_FIELDS = ['tc', 'rud', 'cd', 'cc', 'tl', 'fl', 'oc', 'od'];
@@ -11658,7 +11659,14 @@ function AppMain(_ref50) {
     className: "app-title"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
-  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Bos.Krupa"), FIREBASE_ENABLED ? /*#__PURE__*/React.createElement("span", {
+  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Bos.Krupa"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.6rem',
+      color: 'rgba(255,255,255,0.55)',
+      fontFamily: 'var(--mono)',
+      marginLeft: '0.1rem'
+    }
+  }, "v", APP_VERSION), FIREBASE_ENABLED ? /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: '0.65rem',
       background: 'rgba(255,255,255,0.15)',

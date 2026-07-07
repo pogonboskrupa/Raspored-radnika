@@ -391,6 +391,7 @@ function AppMain({ onLogout, currentUser }) {
         <div className="app-title">
           <span className="icon">🌲</span>
           <span>Šumarija Bos.Krupa</span>
+          <span style={{fontSize:'0.6rem',color:'rgba(255,255,255,0.55)',fontFamily:'var(--mono)',marginLeft:'0.1rem'}}>v{APP_VERSION}</span>
           {FIREBASE_ENABLED
             ? <span style={{fontSize:'0.65rem',background:'rgba(255,255,255,0.15)',padding:'0.15rem 0.5rem',borderRadius:10,marginLeft:'0.25rem',fontFamily:'var(--mono)'}}>🔴 live sync</span>
             : <span style={{fontSize:'0.65rem',background:'rgba(255,255,255,0.1)',padding:'0.15rem 0.5rem',borderRadius:10,marginLeft:'0.25rem',fontFamily:'var(--mono)',opacity:0.6}}>💾 lokalno</span>
