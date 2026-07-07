@@ -717,6 +717,18 @@ const USERS = [{
   name: 'IZET',
   hash: hashPin('4444'),
   icon: '👨'
+}, {
+  name: 'IRFAN',
+  hash: hashPin('1454'),
+  icon: '👨'
+}, {
+  name: 'JASMIN',
+  hash: hashPin('0307'),
+  icon: '👨'
+}, {
+  name: 'MEHMEDALIJA',
+  hash: hashPin('2212'),
+  icon: '👨'
 }];
 function LoginScreen(_ref) {
   let {
