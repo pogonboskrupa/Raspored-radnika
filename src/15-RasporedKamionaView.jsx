@@ -28,6 +28,11 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
     [...new Set(dispozicije.map(d => d.kupac).filter(Boolean))].sort(),
     [dispozicije]);
 
+  // Pamti sve prethodno unesene odjele (bilo kojeg dana) za autocomplete
+  const odjeliList = useMemo(() =>
+    [...new Set(truckRows.map(r => r.odjel).filter(Boolean))].sort(),
+    [truckRows]);
+
   // Najstarija dispozicija ODABRANOG kupca sa pozitivnim stanjem za odabrani sortiment
   const findDispForKupac = (kupac, sortiment) => {
     if (!kupac || !sortiment) return null;
@@ -127,7 +132,7 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
     win.onload = () => { win.print(); };
   };
 
-  const handleCopyMessage = () => {
+  const buildMessageText = () => {
     const byOdjel = groupByOdjel(dayRows);
     let text = `🚚 RASPORED KAMIONA – ${fmtDate(selectedDate)}\n`;
     Object.entries(byOdjel).forEach(([odjel, rows]) => {
@@ -140,13 +145,28 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
           : `   ⚠ Nema dispozicije sa stanjem!\n`;
       });
     });
+    return text;
+  };
 
+  const handleCopyMessage = () => {
+    const text = buildMessageText();
     const onDone = () => showToast('Kopirano u međuspremnik!', 'success');
     const onFail = () => showToast('Kopiranje nije uspjelo.', 'error');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(onDone).catch(() => fallbackCopyToClipboard(text, onDone, onFail));
     } else {
       fallbackCopyToClipboard(text, onDone, onFail);
+    }
+  };
+
+  // Podijeli direktno na Messenger/Viber/WhatsApp — na mobitelu Web Share API otvara
+  // sistemski meni sa svim instaliranim aplikacijama; na desktopu (bez podrške) šalje na WhatsApp Web.
+  const handleShare = () => {
+    const text = buildMessageText();
+    if (navigator.share) {
+      navigator.share({ text }).catch(() => {});
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     }
   };
 
@@ -159,6 +179,7 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-secondary btn-sm no-print" onClick={handleCopyMessage}>📋 Kopiraj za poruku</button>
+          <button className="btn btn-secondary btn-sm no-print" onClick={handleShare}>📤 Pošalji (Viber/WhatsApp/Messenger)</button>
           <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>🖨️ Štampaj za poslovođe</button>
           <button className="btn btn-primary btn-sm no-print" onClick={addRow}>+ Dodaj kamion</button>
         </div>
@@ -199,7 +220,7 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                   return (
                     <tr key={r.id}>
                       <td data-label="Odjel">
-                        <input className="form-input" value={r.odjel}
+                        <input className="form-input" list="odjel-list-kamioni" value={r.odjel}
                           placeholder="npr. RISOVAC KRUPA 54"
                           onChange={e => updateRow(r.id, { odjel: e.target.value })} />
                       </td>
@@ -268,6 +289,9 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
           )}
         </div>
       </div>
+      <datalist id="odjel-list-kamioni">
+        {odjeliList.map(o => <option key={o} value={o} />)}
+      </datalist>
     </div>
   );
 }

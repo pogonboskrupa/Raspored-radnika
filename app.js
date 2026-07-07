@@ -10448,6 +10448,9 @@ function RasporedKamionaView(_ref46) {
   const dayRows = useMemo(() => truckRows.filter(r => r.date === selectedDate), [truckRows, selectedDate]);
   const kupci = useMemo(() => [...new Set(dispozicije.map(d => d.kupac).filter(Boolean))].sort(), [dispozicije]);
 
+  // Pamti sve prethodno unesene odjele (bilo kojeg dana) za autocomplete
+  const odjeliList = useMemo(() => [...new Set(truckRows.map(r => r.odjel).filter(Boolean))].sort(), [truckRows]);
+
   // Najstarija dispozicija ODABRANOG kupca sa pozitivnim stanjem za odabrani sortiment
   const findDispForKupac = (kupac, sortiment) => {
     if (!kupac || !sortiment) return null;
@@ -10553,7 +10556,7 @@ function RasporedKamionaView(_ref46) {
       win.print();
     };
   };
-  const handleCopyMessage = () => {
+  const buildMessageText = () => {
     const byOdjel = groupByOdjel(dayRows);
     let text = `🚚 RASPORED KAMIONA – ${fmtDate(selectedDate)}\n`;
     Object.entries(byOdjel).forEach(_ref48 => {
@@ -10565,12 +10568,29 @@ function RasporedKamionaView(_ref46) {
         text += found ? `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³\n` : `   ⚠ Nema dispozicije sa stanjem!\n`;
       });
     });
+    return text;
+  };
+  const handleCopyMessage = () => {
+    const text = buildMessageText();
     const onDone = () => showToast('Kopirano u međuspremnik!', 'success');
     const onFail = () => showToast('Kopiranje nije uspjelo.', 'error');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(onDone).catch(() => fallbackCopyToClipboard(text, onDone, onFail));
     } else {
       fallbackCopyToClipboard(text, onDone, onFail);
+    }
+  };
+
+  // Podijeli direktno na Messenger/Viber/WhatsApp — na mobitelu Web Share API otvara
+  // sistemski meni sa svim instaliranim aplikacijama; na desktopu (bez podrške) šalje na WhatsApp Web.
+  const handleShare = () => {
+    const text = buildMessageText();
+    if (navigator.share) {
+      navigator.share({
+        text
+      }).catch(() => {});
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     }
   };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -10593,6 +10613,9 @@ function RasporedKamionaView(_ref46) {
     className: "btn btn-secondary btn-sm no-print",
     onClick: handleCopyMessage
   }, "\uD83D\uDCCB Kopiraj za poruku"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm no-print",
+    onClick: handleShare
+  }, "\uD83D\uDCE4 Po\u0161alji (Viber/WhatsApp/Messenger)"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary btn-sm no-print",
     onClick: handlePrint
   }, "\uD83D\uDDA8\uFE0F \u0160tampaj za poslovo\u0111e"), /*#__PURE__*/React.createElement("button", {
@@ -10634,6 +10657,7 @@ function RasporedKamionaView(_ref46) {
       "data-label": "Odjel"
     }, /*#__PURE__*/React.createElement("input", {
       className: "form-input",
+      list: "odjel-list-kamioni",
       value: r.odjel,
       placeholder: "npr. RISOVAC KRUPA 54",
       onChange: e => updateRow(r.id, {
@@ -10756,7 +10780,12 @@ function RasporedKamionaView(_ref46) {
       className: "btn btn-danger btn-icon btn-sm",
       onClick: () => deleteRow(r.id)
     }, "\uD83D\uDDD1\uFE0F")));
-  }))))));
+  }))))), /*#__PURE__*/React.createElement("datalist", {
+    id: "odjel-list-kamioni"
+  }, odjeliList.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o,
+    value: o
+  }))));
 }
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
