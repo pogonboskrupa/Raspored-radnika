@@ -23,6 +23,7 @@ function AppMain({ onLogout, currentUser }) {
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
   const [history, setHistory] = useStorage('sumarija_history', []);
+  const [truckRows, setTruckRows] = useStorage('sumarija_truck_raspored', []);
 
   // PWA install prompt
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
@@ -389,7 +390,7 @@ function AppMain({ onLogout, currentUser }) {
           }
         </div>
         <nav className="nav-tabs">
-          {[['raspored','📋 Raspored'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
+          {[['raspored','📋 Raspored'],['kamioni','🚚 Raspored kamiona'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
             <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
           )}
           <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'0.4rem'}}>
@@ -495,6 +496,9 @@ function AppMain({ onLogout, currentUser }) {
               customJobTypes={customJobTypes}
               setCustomJobTypes={setCustomJobTypes}
             />
+          )}
+          {activeTab === 'kamioni' && (
+            <RasporedKamionaView truckRows={truckRows} setTruckRows={setTruckRows} />
           )}
           {activeTab === 'radnici' && (
             <WorkersView workers={workers} setWorkers={setWorkers} schedules={schedules} />

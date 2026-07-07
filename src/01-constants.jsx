@@ -121,9 +121,43 @@ const INITIAL_DEPARTMENTS = [];
 
 const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Kiša', 'Farbanje sjekačkih linija', 'Ostalo'];
 
+// ─── SORTIMENTI (dijeli šifre polja sa DISPOZICIJE aplikacijom — dispozicije-krupa) ──
+const SORTIMENT_FIELDS = ['tc', 'rud', 'cd', 'cc', 'tl', 'fl', 'oc', 'od'];
+const SORTIMENT_LABELS = {
+  tc: 'Trupci Č', rud: 'Rudno/RD', cd: 'Cel.Duga', cc: 'Cel.Cij.',
+  tl: 'Trupci L', fl: 'F/L', oc: 'Ogr.Cij.', od: 'Ogr.Dugi',
+};
+
 const today = () => new Date().toISOString().split('T')[0];
 const yesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; };
+const nextWorkingDay = () => { const d = new Date(); d.setDate(d.getDate()+1); while (d.getDay()===0) d.setDate(d.getDate()+1); return d.toISOString().split('T')[0]; };
 const uid = () => Math.random().toString(36).slice(2,10);
+
+// ─── DISPOZICIJE (read-only sync sa dispozicije-krupa Firestore projektom) ────────
+// Balans identičan getBalance() iz DISPOZICIJE aplikacije: original - suma otprema po disp_id.
+function getDispBalance(disp, otpreme) {
+  const spent = {};
+  SORTIMENT_FIELDS.forEach(f => spent[f] = 0);
+  otpreme.filter(o => o.disp_id === disp.id).forEach(o => {
+    SORTIMENT_FIELDS.forEach(f => spent[f] += (o[f] || 0));
+  });
+  const bal = {};
+  SORTIMENT_FIELDS.forEach(f => bal[f] = (disp[f] || 0) - spent[f]);
+  return bal;
+}
+
+// Hook koji čita live podatke koje puni window.__dispData (vidi index.html, modularni Firestore listener)
+function useDispozicijeData() {
+  const [data, setData] = useState(() => (window.__dispData ? { ...window.__dispData } : { dispozicije: [], otpreme: [], ready: false }));
+  useEffect(() => {
+    window.__dispListeners = window.__dispListeners || [];
+    const handler = d => setData({ ...d });
+    window.__dispListeners.push(handler);
+    if (window.__dispData) handler(window.__dispData);
+    return () => { window.__dispListeners = window.__dispListeners.filter(h => h !== handler); };
+  }, []);
+  return data;
+}
 
 function makeInitialSchedules() {
   return [];
