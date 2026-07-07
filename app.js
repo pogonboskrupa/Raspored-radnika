@@ -10436,11 +10436,38 @@ function fallbackCopyToClipboard(text, onDone, onFail) {
   }
   document.body.removeChild(ta);
 }
-function RasporedKamionaView(_ref46) {
+
+// Odjel se piše lokalno dok korisnik kuca; u globalni raspored (koji odmah
+// premješta red u novu grupu po odjelu) upisuje se tek na blur/Enter — inače
+// bi svaki taster premjestio red u drugu tabelu i input bi izgubio fokus.
+function OdjelInput(_ref46) {
+  let {
+    value,
+    onCommit
+  } = _ref46;
+  const [local, setLocal] = useState(value);
+  useEffect(() => {
+    setLocal(value);
+  }, [value]);
+  return /*#__PURE__*/React.createElement("input", {
+    className: "form-input",
+    list: "odjel-list-kamioni",
+    value: local,
+    placeholder: "npr. RISOVAC KRUPA 54",
+    onChange: e => setLocal(e.target.value),
+    onBlur: () => {
+      if (local !== value) onCommit(local);
+    },
+    onKeyDown: e => {
+      if (e.key === 'Enter') e.target.blur();
+    }
+  });
+}
+function RasporedKamionaView(_ref47) {
   let {
     truckRows,
     setTruckRows
-  } = _ref46;
+  } = _ref47;
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
@@ -10552,8 +10579,8 @@ function RasporedKamionaView(_ref46) {
       <th style="width:16%">Odjel</th><th style="width:12%">Sortiment</th><th style="width:18%">Kupac</th>
       <th style="width:14%">Ugovor</th><th style="width:14%">Broj dispozicije</th><th style="width:13%">Stanje dispozicije</th><th style="width:13%">Datum dispozicije</th>
     </tr></thead><tbody>`;
-    Object.entries(byOdjel).forEach(_ref47 => {
-      let [odjel, rows] = _ref47;
+    Object.entries(byOdjel).forEach(_ref48 => {
+      let [odjel, rows] = _ref48;
       rows.forEach((r, i) => {
         const found = findDispForKupac(r.kupac, r.sortiment);
         html += `<tr>`;
@@ -10578,8 +10605,8 @@ function RasporedKamionaView(_ref46) {
   const buildMessageText = () => {
     const byOdjel = groupByOdjel(dayRows);
     let text = `🚚 RASPORED KAMIONA – ${fmtDate(selectedDate)}\n`;
-    Object.entries(byOdjel).forEach(_ref48 => {
-      let [odjel, rows] = _ref48;
+    Object.entries(byOdjel).forEach(_ref49 => {
+      let [odjel, rows] = _ref49;
       text += `\n📍 ${odjel}\n`;
       rows.forEach((r, i) => {
         const found = findDispForKupac(r.kupac, r.sortiment);
@@ -10678,13 +10705,10 @@ function RasporedKamionaView(_ref46) {
       key: r.id
     }, /*#__PURE__*/React.createElement("td", {
       "data-label": "Odjel"
-    }, /*#__PURE__*/React.createElement("input", {
-      className: "form-input",
-      list: "odjel-list-kamioni",
+    }, /*#__PURE__*/React.createElement(OdjelInput, {
       value: r.odjel,
-      placeholder: "npr. RISOVAC KRUPA 54",
-      onChange: e => updateRow(r.id, {
-        odjel: e.target.value
+      onCommit: val => updateRow(r.id, {
+        odjel: val
       })
     })), /*#__PURE__*/React.createElement("td", {
       "data-label": "Sortiment"
@@ -10832,11 +10856,11 @@ function App() {
     }
   });
 }
-function AppMain(_ref49) {
+function AppMain(_ref50) {
   let {
     onLogout,
     currentUser
-  } = _ref49;
+  } = _ref50;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -11143,8 +11167,8 @@ function AppMain(_ref49) {
       'Neplaćeno': '📋 N'
     };
     const absentList = [];
-    Object.entries(godisnji || {}).forEach(_ref50 => {
-      let [wId, entries] = _ref50;
+    Object.entries(godisnji || {}).forEach(_ref51 => {
+      let [wId, entries] = _ref51;
       const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
       if (!entry) return;
       const w = workers.find(x => x.id === wId);
@@ -11177,14 +11201,14 @@ function AppMain(_ref49) {
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
     html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
-    Object.entries(byDept).forEach(_ref51 => {
-      let [deptId, jobs] = _ref51;
+    Object.entries(byDept).forEach(_ref52 => {
+      let [deptId, jobs] = _ref52;
       const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
       html += `<div class="dept">`;
       html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
       html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
-      Object.entries(jobs).forEach(_ref52 => {
-        let [jobType, rows] = _ref52;
+      Object.entries(jobs).forEach(_ref53 => {
+        let [jobType, rows] = _ref53;
         rows.forEach(row => {
           const workerNames = (row.allWorkers || []).map(wId => wName(wId));
           const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
@@ -11260,8 +11284,8 @@ function AppMain(_ref49) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref53 => {
-    let [k, l] = _ref53;
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref54 => {
+    let [k, l] = _ref54;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,

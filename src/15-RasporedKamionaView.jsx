@@ -15,6 +15,21 @@ function fallbackCopyToClipboard(text, onDone, onFail) {
   document.body.removeChild(ta);
 }
 
+// Odjel se piše lokalno dok korisnik kuca; u globalni raspored (koji odmah
+// premješta red u novu grupu po odjelu) upisuje se tek na blur/Enter — inače
+// bi svaki taster premjestio red u drugu tabelu i input bi izgubio fokus.
+function OdjelInput({ value, onCommit }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <input className="form-input" list="odjel-list-kamioni" value={local}
+      placeholder="npr. RISOVAC KRUPA 54"
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => { if (local !== value) onCommit(local); }}
+      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }} />
+  );
+}
+
 function RasporedKamionaView({ truckRows, setTruckRows }) {
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
@@ -240,9 +255,7 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                   return (
                     <tr key={r.id}>
                       <td data-label="Odjel">
-                        <input className="form-input" list="odjel-list-kamioni" value={r.odjel}
-                          placeholder="npr. RISOVAC KRUPA 54"
-                          onChange={e => updateRow(r.id, { odjel: e.target.value })} />
+                        <OdjelInput value={r.odjel} onCommit={val => updateRow(r.id, { odjel: val })} />
                       </td>
                       <td data-label="Sortiment">
                         <select className="form-select" value={r.sortiment} onChange={e => {
