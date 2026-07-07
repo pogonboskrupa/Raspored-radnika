@@ -10485,6 +10485,14 @@ function OdjelInput(_ref46) {
 // Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
 const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
 
+// Boja preostalog stanja dispozicije: crveno <25m³, zeleno >100m³, žuto (amber) između
+function balanceColor(bal) {
+  if (bal < 25) return 'var(--red)';
+  if (bal > 100) return 'var(--green)';
+  return 'var(--amber)';
+}
+const balanceCssClass = bal => bal < 25 ? 'low' : bal > 100 ? 'ok' : 'mid';
+
 // Zbirni broj kamiona po sortimentu za dati skup redova (za brzi pregled obima posla)
 function sortimentSummary(rows) {
   const counts = {};
@@ -10818,6 +10826,7 @@ function RasporedKamionaView(_ref49) {
       td{border:1px solid #bbb;padding:1.5mm 3mm;font-size:9.5pt;vertical-align:top}
       .warn{color:#8b2020;font-style:italic}
       .ok{color:#2d5a27;font-weight:700}
+      .mid{color:#b5620a;font-weight:700}
       .low{color:#8b2020;font-weight:700}
     </style></head><body>`;
     html += `<h1>RASPORED KAMIONA — ${fmtDate(selectedDate)}</h1>`;
@@ -10838,7 +10847,7 @@ function RasporedKamionaView(_ref49) {
         html += `<td>${r.kupac || '—'}</td>`;
         html += `<td>${found ? found.disp.ugovor || '—' : '—'}</td>`;
         html += `<td>${found ? found.disp.broj || '—' : '—'}</td>`;
-        html += found ? `<td class="${found.bal < 20 ? 'low' : 'ok'}">${found.bal.toFixed(2)} m³</td>` : `<td class="warn">⚠ Nema stanja!</td>`;
+        html += found ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³</td>` : `<td class="warn">⚠ Nema stanja!</td>`;
         html += `<td>${found ? fmtDate(found.disp.datum) : '—'}</td>`;
         html += `</tr>`;
       });
@@ -11160,7 +11169,12 @@ function RasporedKamionaView(_ref49) {
           color: 'var(--text-light)',
           marginRight: 4
         }
-      }, idx + 1, "."), /*#__PURE__*/React.createElement("strong", null, s.disp.kupac), " \u2014 ", s.bal.toFixed(2), " m\xB3 ", /*#__PURE__*/React.createElement("span", {
+      }, idx + 1, "."), /*#__PURE__*/React.createElement("strong", null, s.disp.kupac), " \u2014 ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: balanceColor(s.bal),
+          fontWeight: 700
+        }
+      }, s.bal.toFixed(2), " m\xB3"), " ", /*#__PURE__*/React.createElement("span", {
         style: {
           color: 'var(--text-muted)'
         }
@@ -11177,7 +11191,7 @@ function RasporedKamionaView(_ref49) {
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, found.disp.broj), " \xB7 ", found.disp.ugovor || '—'), /*#__PURE__*/React.createElement("div", {
         style: {
           fontWeight: 700,
-          color: found.bal < 20 ? 'var(--red)' : 'var(--green)'
+          color: balanceColor(found.bal)
         }
       }, found.bal.toFixed(2), " m\xB3"), /*#__PURE__*/React.createElement("div", {
         style: {
