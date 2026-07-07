@@ -10485,6 +10485,25 @@ function RasporedKamionaView(_ref46) {
     const withBalance = new Set(dispozicije.filter(d => getDispBalance(d, otpreme)[sortiment] > 0).map(d => d.kupac));
     return kupci.filter(k => withBalance.has(k));
   };
+
+  // Vizuelno grupiši redove trenutnog dana po odjelu (isti obrazac kao ScheduleView)
+  const groupedDayRows = useMemo(() => {
+    const order = [];
+    const map = {};
+    dayRows.forEach(r => {
+      const key = (r.odjel || '').trim() || '__BEZ_ODJELA__';
+      if (!map[key]) {
+        map[key] = [];
+        order.push(key);
+      }
+      map[key].push(r);
+    });
+    return order.map(key => ({
+      key,
+      label: key === '__BEZ_ODJELA__' ? 'Bez odjela' : key,
+      rows: map[key]
+    }));
+  }, [dayRows]);
   const addRow = () => {
     setTruckRows(prev => [...prev, {
       id: uid(),
@@ -10624,30 +10643,34 @@ function RasporedKamionaView(_ref46) {
   }, "+ Dodaj kamion"))), !dispData.ready && /*#__PURE__*/React.createElement("div", {
     className: "alert alert-warning"
   }, "\u26A1 Povezivanje sa sistemom dispozicija u toku \u2014 stanja i auto-prijedlozi \u0107e se pojaviti \u010Dim se u\u010Ditaju."), /*#__PURE__*/React.createElement("div", {
-    className: "card"
+    className: "section-header"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "card-header"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "card-title"
+    className: "section-title"
   }, "\uD83D\uDE9A Raspored kamiona \u2014 ", fmtDate(selectedDate)), /*#__PURE__*/React.createElement("span", {
     className: "tag"
-  }, dayRows.length, " kamiona")), /*#__PURE__*/React.createElement("div", {
-    className: "card-body",
-    style: {
-      padding: dayRows.length === 0 ? undefined : 0
-    }
-  }, dayRows.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, dayRows.length, " kamiona")), dayRows.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
   }, "\uD83D\uDE9A"), /*#__PURE__*/React.createElement("p", null, "Nema kamiona rasporeda za ovaj dan."), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm",
     onClick: addRow
-  }, "+ Dodaj kamion")) : /*#__PURE__*/React.createElement("table", {
+  }, "+ Dodaj kamion"))) : groupedDayRows.map(g => /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    key: g.key
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "dept-header"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDFD5\uFE0F"), /*#__PURE__*/React.createElement("span", {
+    className: "dept-name"
+  }, g.label), /*#__PURE__*/React.createElement("span", {
+    className: "dept-count"
+  }, g.rows.length, " ", g.rows.length === 1 ? 'kamion' : 'kamiona')), /*#__PURE__*/React.createElement("table", {
     className: "schedule-table"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Odjel"), /*#__PURE__*/React.createElement("th", null, "Sortiment"), /*#__PURE__*/React.createElement("th", null, "Prijedlog"), /*#__PURE__*/React.createElement("th", null, "Dispozicija"), /*#__PURE__*/React.createElement("th", {
     className: "no-print"
-  }, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, dayRows.map(r => {
+  }, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, g.rows.map(r => {
     const found = findDispForKupac(r.kupac, r.sortiment);
     const suggestions = findSuggestions(r.sortiment);
     const kupciOptions = kupciForSortiment(r.sortiment);

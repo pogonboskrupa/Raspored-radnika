@@ -71,6 +71,18 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
     return kupci.filter(k => withBalance.has(k));
   };
 
+  // Vizuelno grupiši redove trenutnog dana po odjelu (isti obrazac kao ScheduleView)
+  const groupedDayRows = useMemo(() => {
+    const order = [];
+    const map = {};
+    dayRows.forEach(r => {
+      const key = (r.odjel || '').trim() || '__BEZ_ODJELA__';
+      if (!map[key]) { map[key] = []; order.push(key); }
+      map[key].push(r);
+    });
+    return order.map(key => ({ key, label: key === '__BEZ_ODJELA__' ? 'Bez odjela' : key, rows: map[key] }));
+  }, [dayRows]);
+
   const addRow = () => {
     setTruckRows(prev => [...prev, { id: uid(), date: selectedDate, odjel: '', sortiment: '', kupac: '', createdAt: Date.now() }]);
   };
@@ -189,19 +201,27 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
         <div className="alert alert-warning">⚡ Povezivanje sa sistemom dispozicija u toku — stanja i auto-prijedlozi će se pojaviti čim se učitaju.</div>
       )}
 
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">🚚 Raspored kamiona — {fmtDate(selectedDate)}</div>
-          <span className="tag">{dayRows.length} kamiona</span>
+      <div className="section-header">
+        <div className="section-title">🚚 Raspored kamiona — {fmtDate(selectedDate)}</div>
+        <span className="tag">{dayRows.length} kamiona</span>
+      </div>
+
+      {dayRows.length === 0 ? (
+        <div className="card">
+          <div className="empty-state">
+            <span className="icon">🚚</span>
+            <p>Nema kamiona rasporeda za ovaj dan.</p>
+            <button className="btn btn-primary btn-sm" onClick={addRow}>+ Dodaj kamion</button>
+          </div>
         </div>
-        <div className="card-body" style={{ padding: dayRows.length === 0 ? undefined : 0 }}>
-          {dayRows.length === 0 ? (
-            <div className="empty-state">
-              <span className="icon">🚚</span>
-              <p>Nema kamiona rasporeda za ovaj dan.</p>
-              <button className="btn btn-primary btn-sm" onClick={addRow}>+ Dodaj kamion</button>
+      ) : (
+        groupedDayRows.map(g => (
+          <div className="card" key={g.key}>
+            <div className="dept-header">
+              <span>🏕️</span>
+              <span className="dept-name">{g.label}</span>
+              <span className="dept-count">{g.rows.length} {g.rows.length === 1 ? 'kamion' : 'kamiona'}</span>
             </div>
-          ) : (
             <table className="schedule-table">
               <thead>
                 <tr>
@@ -213,7 +233,7 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                 </tr>
               </thead>
               <tbody>
-                {dayRows.map(r => {
+                {g.rows.map(r => {
                   const found = findDispForKupac(r.kupac, r.sortiment);
                   const suggestions = findSuggestions(r.sortiment);
                   const kupciOptions = kupciForSortiment(r.sortiment);
@@ -286,9 +306,9 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
                 })}
               </tbody>
             </table>
-          )}
-        </div>
-      </div>
+          </div>
+        ))
+      )}
       <datalist id="odjel-list-kamioni">
         {odjeliList.map(o => <option key={o} value={o} />)}
       </datalist>
