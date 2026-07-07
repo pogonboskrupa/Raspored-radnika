@@ -40,6 +40,39 @@ if (FIREBASE_ENABLED) {
   firebase.initializeApp(FIREBASE_CONFIG);
 }
 </script>
+
+<!-- Read-only sync sa DISPOZICIJE aplikacijom (odvojeni Firebase projekat/Firestore) -->
+<!-- Koristi se za tab "Raspored kamiona": kupci, dispozicije i stanje se čitaju uživo odavde -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const DISPOZICIJE_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDqA6mIrhoC9m6QkO13pEU7rPVHWz6evTc",
+    authDomain: "dispozicije-krupa.firebaseapp.com",
+    projectId: "dispozicije-krupa",
+    storageBucket: "dispozicije-krupa.firebasestorage.app",
+    messagingSenderId: "584482793304",
+    appId: "1:584482793304:web:8b05fb6c645909d2f0672d",
+  };
+
+  window.__dispData = { dispozicije: [], otpreme: [], ready: false };
+  window.__dispListeners = window.__dispListeners || [];
+  const notifyDisp = () => { window.__dispListeners.forEach(fn => fn(window.__dispData)); };
+
+  const dispApp = initializeApp(DISPOZICIJE_FIREBASE_CONFIG, "dispozicijeApp");
+  const dispDb = getFirestore(dispApp);
+
+  onSnapshot(collection(dispDb, 'dispozicije'), snap => {
+    window.__dispData = { ...window.__dispData, dispozicije: snap.docs.map(d => d.data()), ready: true };
+    notifyDisp();
+  }, err => console.error('Greška pri čitanju dispozicija:', err));
+
+  onSnapshot(collection(dispDb, 'otpreme'), snap => {
+    window.__dispData = { ...window.__dispData, otpreme: snap.docs.map(d => d.data()), ready: true };
+    notifyDisp();
+  }, err => console.error('Greška pri čitanju otprema:', err));
+</script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
