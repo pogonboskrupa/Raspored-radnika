@@ -10486,6 +10486,145 @@ function OdjelInput(_ref46) {
 // Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
 const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
 
+// Prijedlog kupca za red: rangirana lista + dropdown svih kupaca, ili ručni unos
+// za kupca koji još ne postoji u DISPOZICIJE sistemu (dispozicija stiže naknadno).
+function PrijedlogCell(_ref47) {
+  let {
+    row,
+    suggestions,
+    kupci,
+    onSetKupac
+  } = _ref47;
+  const [manualMode, setManualMode] = useState(false);
+  const [manualText, setManualText] = useState('');
+  if (!row.sortiment) return /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-light)'
+    }
+  }, "\u2014");
+  if (row.kupac) {
+    return /*#__PURE__*/React.createElement("select", {
+      className: "form-select",
+      value: row.kupac,
+      onChange: e => onSetKupac(e.target.value),
+      style: {
+        fontWeight: 700,
+        color: 'var(--green)',
+        borderColor: 'var(--green)'
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "\u2014 ukloni odabir \u2014"), !kupci.includes(row.kupac) && /*#__PURE__*/React.createElement("option", {
+      value: row.kupac
+    }, row.kupac, " (bez dispozicije)"), kupci.map(k => /*#__PURE__*/React.createElement("option", {
+      key: k,
+      value: k
+    }, k)));
+  }
+  if (manualMode) {
+    const commit = () => {
+      if (!manualText.trim()) return;
+      onSetKupac(manualText.trim());
+      setManualMode(false);
+      setManualText('');
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '0.3rem'
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "form-input",
+      autoFocus: true,
+      value: manualText,
+      placeholder: "Ime kupca...",
+      onChange: e => setManualText(e.target.value),
+      onKeyDown: e => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') {
+          setManualMode(false);
+          setManualText('');
+        }
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-primary btn-sm no-print",
+      onClick: commit
+    }, "\u2713"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-ghost btn-sm no-print",
+      onClick: () => {
+        setManualMode(false);
+        setManualText('');
+      }
+    }, "\u2715"));
+  }
+  return /*#__PURE__*/React.createElement("div", null, suggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.15rem',
+      maxHeight: 170,
+      overflowY: 'auto',
+      marginBottom: '0.35rem'
+    }
+  }, suggestions.map((s, idx) => /*#__PURE__*/React.createElement("button", {
+    key: s.disp.id || s.disp.kupac,
+    type: "button",
+    onClick: () => onSetKupac(s.disp.kupac),
+    className: "btn btn-ghost btn-sm no-print",
+    title: "Klikni da odabere\u0161 ovog kupca",
+    style: {
+      justifyContent: 'flex-start',
+      textAlign: 'left',
+      padding: '0.15rem 0.4rem',
+      fontWeight: 500,
+      background: 'transparent',
+      color: 'var(--text)',
+      fontSize: '0.74rem',
+      lineHeight: 1.35,
+      whiteSpace: 'normal',
+      height: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--mono)',
+      color: 'var(--text-light)',
+      marginRight: 4
+    }
+  }, idx + 1, "."), /*#__PURE__*/React.createElement("strong", null, s.disp.kupac), " \u2014 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: balanceColor(s.bal),
+      fontWeight: 700
+    }
+  }, s.bal.toFixed(2), " m\xB3"), " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-muted)'
+    }
+  }, "(", fmtDate(s.disp.datum), ")")))), /*#__PURE__*/React.createElement("select", {
+    className: "form-select no-print",
+    value: "",
+    onChange: e => {
+      if (e.target.value) onSetKupac(e.target.value);
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, suggestions.length > 0 ? '— ili odaberi bilo kojeg kupca —' : '— odaberi kupca —'), kupci.map(k => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, k))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-ghost btn-sm no-print",
+    style: {
+      marginTop: '0.25rem',
+      fontSize: '0.7rem',
+      padding: '0.15rem 0.4rem',
+      color: 'var(--text-muted)'
+    },
+    onClick: () => setManualMode(true)
+  }, "\u270F\uFE0F Dodaj bez dispozicije (novi kupac)"));
+}
+
 // Boja preostalog stanja dispozicije: jarko crveno <25m³, zeleno >100m³, žuto (amber) između
 const BALANCE_LOW_RED = '#ff0000';
 function balanceColor(bal) {
@@ -10507,10 +10646,10 @@ function sortimentSummary(rows) {
     count: counts[f]
   }));
 }
-function SortimentSummaryLine(_ref47) {
+function SortimentSummaryLine(_ref48) {
   let {
     rows
-  } = _ref47;
+  } = _ref48;
   if (rows.length === 0) return null;
   const summary = sortimentSummary(rows);
   return /*#__PURE__*/React.createElement("div", {
@@ -10524,13 +10663,13 @@ function SortimentSummaryLine(_ref47) {
 
 // ─── STANJE NA DAN — poslovođa prijavi broj kamiona po sortimentu za odjel;
 // svaki prijavljeni kamion odmah postaje (nedodijeljen) red u Raspored kamiona ────
-function StanjeNaDanPanel(_ref48) {
+function StanjeNaDanPanel(_ref49) {
   let {
     selectedDate,
     dayRows,
     onSubmit,
     onDeleteRow
-  } = _ref48;
+  } = _ref49;
   const [odjel, setOdjel] = useState('');
   const [counts, setCounts] = useState({});
   const totalCount = SORTIMENT_FIELDS.reduce((s, f) => s + (parseInt(counts[f], 10) || 0), 0);
@@ -10664,7 +10803,7 @@ function StanjeNaDanPanel(_ref48) {
     onClick: () => onDeleteRow(r.id)
   }, "\uD83D\uDDD1\uFE0F")))))))));
 }
-function RasporedKamionaView(_ref49) {
+function RasporedKamionaView(_ref50) {
   let {
     truckRows,
     setTruckRows,
@@ -10673,7 +10812,7 @@ function RasporedKamionaView(_ref49) {
     setTruckGroupOtpremaci,
     isPoslovodja,
     currentUser
-  } = _ref49;
+  } = _ref50;
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
@@ -10714,13 +10853,6 @@ function RasporedKamionaView(_ref49) {
       if (result.length >= 10) break;
     }
     return result;
-  };
-
-  // Kupci koji imaju bar jednu dispoziciju sa pozitivnim stanjem za odabrani sortiment
-  const kupciForSortiment = sortiment => {
-    if (!sortiment) return kupci;
-    const withBalance = new Set(dispozicije.filter(d => getDispBalance(d, otpreme)[sortiment] > 0).map(d => d.kupac));
-    return kupci.filter(k => withBalance.has(k));
   };
 
   // Vizuelno grupiši redove trenutnog dana po odjelu (isti obrazac kao ScheduleView)
@@ -10827,6 +10959,7 @@ function RasporedKamionaView(_ref49) {
       th{background:#e8f0e6;border:1px solid #999;padding:1.5mm 3mm;text-align:left;font-size:9pt;font-weight:700}
       td{border:1px solid #bbb;padding:1.5mm 3mm;font-size:9.5pt;vertical-align:top}
       .warn{color:#8b2020;font-style:italic}
+      .pending{color:#999;font-style:italic}
       .ok{color:#2d5a27;font-weight:700}
       .mid{color:#b5620a;font-weight:700}
       .low{color:#ff0000;font-weight:700}
@@ -10849,7 +10982,7 @@ function RasporedKamionaView(_ref49) {
         html += `<td>${r.kupac || '—'}</td>`;
         html += `<td>${found ? found.disp.ugovor || '—' : '—'}</td>`;
         html += `<td>${found ? found.disp.broj || '—' : '—'}</td>`;
-        html += found ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³</td>` : `<td class="warn">⚠ Nema stanja!</td>`;
+        html += found ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³</td>` : `<td class="pending">u obradi</td>`;
         html += `<td>${found ? fmtDate(found.disp.datum) : '—'}</td>`;
         html += `</tr>`;
       });
@@ -10870,7 +11003,7 @@ function RasporedKamionaView(_ref49) {
       g.rows.forEach((r, i) => {
         const found = findDispForKupac(r.kupac, r.sortiment);
         text += `${i + 1}. ${SORTIMENT_LABELS[r.sortiment] || '—'} – ${r.kupac || '—'}\n`;
-        text += found ? `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³\n` : `   ⚠ Nema dispozicije sa stanjem!\n`;
+        text += found ? `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³\n` : `   Disp: — (u obradi)\n`;
       });
     });
     return text;
@@ -11080,7 +11213,6 @@ function RasporedKamionaView(_ref49) {
     }, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, g.rows.map(r => {
       const found = findDispForKupac(r.kupac, r.sortiment);
       const suggestions = findSuggestions(r.sortiment);
-      const kupciOptions = kupciForSortiment(r.sortiment);
       return /*#__PURE__*/React.createElement("tr", {
         key: r.id
       }, /*#__PURE__*/React.createElement("td", {
@@ -11095,15 +11227,9 @@ function RasporedKamionaView(_ref49) {
       }, /*#__PURE__*/React.createElement("select", {
         className: "form-select",
         value: r.sortiment,
-        onChange: e => {
-          const sortiment = e.target.value;
-          const validKupci = kupciForSortiment(sortiment);
-          const patch = {
-            sortiment
-          };
-          if (r.kupac && !validKupci.includes(r.kupac)) patch.kupac = '';
-          updateRow(r.id, patch);
-        }
+        onChange: e => updateRow(r.id, {
+          sortiment: e.target.value
+        })
       }, /*#__PURE__*/React.createElement("option", {
         value: ""
       }, "\u2014 odaberi \u2014"), SORTIMENT_FIELDS.map(f => /*#__PURE__*/React.createElement("option", {
@@ -11111,76 +11237,14 @@ function RasporedKamionaView(_ref49) {
         value: f
       }, SORTIMENT_LABELS[f])))), /*#__PURE__*/React.createElement("td", {
         "data-label": "Prijedlog"
-      }, !r.sortiment ? /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: 'var(--text-light)'
-        }
-      }, "\u2014") : r.kupac ? /*#__PURE__*/React.createElement("select", {
-        className: "form-select",
-        value: r.kupac,
-        onChange: e => updateRow(r.id, {
-          kupac: e.target.value
-        }),
-        style: {
-          fontWeight: 700,
-          color: 'var(--green)',
-          borderColor: 'var(--green)'
-        }
-      }, /*#__PURE__*/React.createElement("option", {
-        value: ""
-      }, "\u2014 ukloni odabir \u2014"), kupciOptions.map(k => /*#__PURE__*/React.createElement("option", {
-        key: k,
-        value: k
-      }, k))) : suggestions.length === 0 ? /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: 'var(--red)',
-          fontSize: '0.78rem',
-          fontWeight: 600
-        }
-      }, "Nema kupaca sa stanjem za ovaj sortiment.") : /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.15rem',
-          maxHeight: 170,
-          overflowY: 'auto'
-        }
-      }, suggestions.map((s, idx) => /*#__PURE__*/React.createElement("button", {
-        key: s.disp.id || s.disp.kupac,
-        type: "button",
-        onClick: () => updateRow(r.id, {
-          kupac: s.disp.kupac
-        }),
-        className: "btn btn-ghost btn-sm no-print",
-        title: "Klikni da odabere\u0161 ovog kupca",
-        style: {
-          justifyContent: 'flex-start',
-          textAlign: 'left',
-          padding: '0.15rem 0.4rem',
-          fontWeight: 500,
-          background: 'transparent',
-          color: 'var(--text)',
-          fontSize: '0.74rem',
-          lineHeight: 1.35,
-          whiteSpace: 'normal',
-          height: 'auto'
-        }
-      }, /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontFamily: 'var(--mono)',
-          color: 'var(--text-light)',
-          marginRight: 4
-        }
-      }, idx + 1, "."), /*#__PURE__*/React.createElement("strong", null, s.disp.kupac), " \u2014 ", /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: balanceColor(s.bal),
-          fontWeight: 700
-        }
-      }, s.bal.toFixed(2), " m\xB3"), " ", /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: 'var(--text-muted)'
-        }
-      }, "(", fmtDate(s.disp.datum), ")"))))), /*#__PURE__*/React.createElement("td", {
+      }, /*#__PURE__*/React.createElement(PrijedlogCell, {
+        row: r,
+        suggestions: suggestions,
+        kupci: kupci,
+        onSetKupac: k => updateRow(r.id, {
+          kupac: k
+        })
+      })), /*#__PURE__*/React.createElement("td", {
         "data-label": "Dispozicija"
       }, !r.kupac || !r.sortiment ? /*#__PURE__*/React.createElement("span", {
         style: {
@@ -11201,11 +11265,11 @@ function RasporedKamionaView(_ref49) {
         }
       }, fmtDate(found.disp.datum))) : /*#__PURE__*/React.createElement("span", {
         style: {
-          color: 'var(--red)',
+          color: 'var(--text-light)',
           fontSize: '0.78rem',
-          fontWeight: 600
+          fontStyle: 'italic'
         }
-      }, "\u26A0 Nema dispozicije sa stanjem!")), /*#__PURE__*/React.createElement("td", {
+      }, "\u2014 dispozicija u obradi \u2014")), /*#__PURE__*/React.createElement("td", {
         "data-label": "Akcije",
         className: "no-print"
       }, /*#__PURE__*/React.createElement("button", {
@@ -11242,11 +11306,11 @@ function App() {
     }
   });
 }
-function AppMain(_ref50) {
+function AppMain(_ref51) {
   let {
     onLogout,
     currentUser
-  } = _ref50;
+  } = _ref51;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -11555,8 +11619,8 @@ function AppMain(_ref50) {
       'Neplaćeno': '📋 N'
     };
     const absentList = [];
-    Object.entries(godisnji || {}).forEach(_ref51 => {
-      let [wId, entries] = _ref51;
+    Object.entries(godisnji || {}).forEach(_ref52 => {
+      let [wId, entries] = _ref52;
       const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
       if (!entry) return;
       const w = workers.find(x => x.id === wId);
@@ -11589,14 +11653,14 @@ function AppMain(_ref50) {
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
     html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
-    Object.entries(byDept).forEach(_ref52 => {
-      let [deptId, jobs] = _ref52;
+    Object.entries(byDept).forEach(_ref53 => {
+      let [deptId, jobs] = _ref53;
       const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
       html += `<div class="dept">`;
       html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
       html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
-      Object.entries(jobs).forEach(_ref53 => {
-        let [jobType, rows] = _ref53;
+      Object.entries(jobs).forEach(_ref54 => {
+        let [jobType, rows] = _ref54;
         rows.forEach(row => {
           const workerNames = (row.allWorkers || []).map(wId => wName(wId));
           const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
@@ -11687,11 +11751,11 @@ function AppMain(_ref50) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref54 => {
-    let [k] = _ref54;
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref55 => {
+    let [k] = _ref55;
     return !(isPoslovodja && (k === 'radnici' || k === 'odjeli'));
-  }).map(_ref55 => {
-    let [k, l] = _ref55;
+  }).map(_ref56 => {
+    let [k, l] = _ref56;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,
