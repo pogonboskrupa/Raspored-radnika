@@ -13,14 +13,18 @@ function hashPin(pin) {
 }
 
 // Korisnici — PIN-ovi su hashirani
+// role 'poslovodja' = read-only pristup cijeloj aplikaciji, osim podtaba "Stanje na dan"
+// (unutar Raspored kamiona) gdje poslovođa prijavljuje broj kamiona po odjelu/sortimentu.
 const USERS = [
   { name: 'AMRA',  hash: hashPin('5555'), icon: '👩' },
   { name: 'NEDIM', hash: hashPin('7777'), icon: '👨' },
   { name: 'IZET',  hash: hashPin('4444'), icon: '👨' },
-  { name: 'IRFAN',       hash: hashPin('1454'), icon: '👨' },
-  { name: 'JASMIN',      hash: hashPin('0307'), icon: '👨' },
-  { name: 'MEHMEDALIJA', hash: hashPin('2212'), icon: '👨' },
+  { name: 'IRFAN',       hash: hashPin('1454'), icon: '👨', role: 'poslovodja' },
+  { name: 'JASMIN',      hash: hashPin('0307'), icon: '👨', role: 'poslovodja' },
+  { name: 'MEHMEDALIJA', hash: hashPin('2212'), icon: '👨', role: 'poslovodja' },
 ];
+
+const getUserRole = name => USERS.find(u => u.name === name)?.role || 'admin';
 
 function LoginScreen({ onLogin }) {
   const [pin, setPin]       = useState('');

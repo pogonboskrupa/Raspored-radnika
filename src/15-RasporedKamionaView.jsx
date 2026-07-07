@@ -33,7 +33,106 @@ function OdjelInput({ value, onCommit }) {
 // Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
 const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
 
-function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpremaci, setTruckGroupOtpremaci }) {
+// ─── STANJE NA DAN — poslovođa prijavi broj kamiona po sortimentu za odjel;
+// svaki prijavljeni kamion odmah postaje (nedodijeljen) red u Raspored kamiona ────
+function StanjeNaDanPanel({ selectedDate, dayRows, onSubmit, onDeleteRow }) {
+  const [odjel, setOdjel] = useState('');
+  const [counts, setCounts] = useState({});
+
+  const totalCount = SORTIMENT_FIELDS.reduce((s, f) => s + (parseInt(counts[f], 10) || 0), 0);
+
+  const submit = () => {
+    if (!odjel.trim()) { showToast('Unesite odjel!', 'error'); return; }
+    if (totalCount === 0) { showToast('Unesite broj kamiona za bar jedan sortiment!', 'error'); return; }
+    const parsedCounts = Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, parseInt(counts[f], 10) || 0]));
+    const n = onSubmit(odjel.trim(), parsedCounts);
+    showToast(`Prijavljeno ${n} ${n === 1 ? 'kamion' : 'kamiona'} za ${odjel.trim()}!`, 'success');
+    setOdjel('');
+    setCounts({});
+  };
+
+  const grouped = useMemo(() => {
+    const order = [];
+    const map = {};
+    dayRows.forEach(r => {
+      const key = (r.odjel || '').trim() || '__BEZ_ODJELA__';
+      if (!map[key]) { map[key] = []; order.push(key); }
+      map[key].push(r);
+    });
+    return order.map(key => ({ key, label: key === '__BEZ_ODJELA__' ? 'Bez odjela' : key, rows: map[key] }));
+  }, [dayRows]);
+
+  return (
+    <div>
+      <div className="card">
+        <div className="card-header"><div className="card-title">📝 Prijavi stanje za {fmtDate(selectedDate)}</div></div>
+        <div className="card-body">
+          <div className="form-group">
+            <label className="form-label">Odjel *</label>
+            <input className="form-input" list="odjel-list-kamioni" value={odjel}
+              placeholder="npr. RISOVAC KRUPA 54"
+              onChange={e => setOdjel(e.target.value)} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.6rem', marginBottom: '0.9rem' }}>
+            {SORTIMENT_FIELDS.map(f => (
+              <div className="form-group" key={f} style={{ marginBottom: 0 }}>
+                <label className="form-label">{SORTIMENT_LABELS[f]}</label>
+                <input type="number" min="0" className="form-input" value={counts[f] || ''}
+                  placeholder="0"
+                  onChange={e => setCounts(c => ({ ...c, [f]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
+          <button className="btn btn-primary" onClick={submit}>💾 Prijavi stanje ({totalCount} {totalCount === 1 ? 'kamion' : 'kamiona'})</button>
+        </div>
+      </div>
+
+      <div className="section-header">
+        <div className="section-title">Prijavljeno za {fmtDate(selectedDate)}</div>
+        <span className="tag">{dayRows.length} kamiona</span>
+      </div>
+
+      {grouped.length === 0 ? (
+        <div className="card">
+          <div className="empty-state">
+            <span className="icon">📝</span>
+            <p>Još ništa nije prijavljeno za ovaj dan.</p>
+          </div>
+        </div>
+      ) : (
+        grouped.map(g => (
+          <div className="card" key={g.key}>
+            <div className="dept-header">
+              <span>🏕️</span>
+              <span className="dept-name">{g.label}</span>
+              <span className="dept-count">{g.rows.length} {g.rows.length === 1 ? 'kamion' : 'kamiona'}</span>
+            </div>
+            <table className="schedule-table">
+              <thead><tr><th>Sortiment</th><th>Kupac</th><th className="no-print">Akcije</th></tr></thead>
+              <tbody>
+                {g.rows.map(r => (
+                  <tr key={r.id}>
+                    <td data-label="Sortiment">{SORTIMENT_LABELS[r.sortiment] || '—'}</td>
+                    <td data-label="Kupac">
+                      {r.kupac || <span style={{ color: 'var(--text-light)', fontStyle: 'italic' }}>nedodijeljen</span>}
+                    </td>
+                    <td data-label="Akcije" className="no-print">
+                      {!r.kupac && (
+                        <button className="btn btn-danger btn-icon btn-sm" onClick={() => onDeleteRow(r.id)}>🗑️</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpremaci, setTruckGroupOtpremaci, isPoslovodja }) {
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
@@ -46,6 +145,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
   const wName = id => (workers || []).find(w => w.id === id)?.name || id;
 
   const [selectedDate, setSelectedDate] = useState(nextWorkingDay());
+  const [subTab, setSubTab] = useState(isPoslovodja ? 'stanje' : 'raspored');
 
   const dayRows = useMemo(() => truckRows.filter(r => r.date === selectedDate), [truckRows, selectedDate]);
 
@@ -122,6 +222,20 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
   };
   const updateRow = (id, patch) => setTruckRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
   const deleteRow = (id) => { if (confirm('Obrisati ovaj red?')) setTruckRows(prev => prev.filter(r => r.id !== id)); };
+
+  // Stanje na dan: poslovođa prijavi broj kamiona po sortimentu za odjel —
+  // za svaki kamion se odmah kreira nedodijeljen red u Raspored kamiona.
+  const addBulkRows = (odjel, counts) => {
+    const newRows = [];
+    SORTIMENT_FIELDS.forEach(f => {
+      const n = counts[f] || 0;
+      for (let i = 0; i < n; i++) {
+        newRows.push({ id: uid(), date: selectedDate, odjel, sortiment: f, kupac: '', createdAt: Date.now() });
+      }
+    });
+    if (newRows.length > 0) setTruckRows(prev => [...prev, ...newRows]);
+    return newRows.length;
+  };
 
   // Isti obrazac grupisanja kao groupedDayRows — koristi se za print/kopiraj/podijeli
   const groupByOdjel = (rows) => {
@@ -233,18 +347,33 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
           <div className="date-label">DATUM RASPOREDA</div>
           <input type="date" className="date-input" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary btn-sm no-print" onClick={handleCopyMessage}>📋 Kopiraj za poruku</button>
-          <button className="btn btn-secondary btn-sm no-print" onClick={handleShare}>📤 Pošalji (Viber/WhatsApp/Messenger)</button>
-          <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>🖨️ Štampaj za poslovođe</button>
-          <button className="btn btn-primary btn-sm no-print" onClick={addRow}>+ Dodaj kamion</button>
-        </div>
+        {subTab === 'raspored' && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary btn-sm no-print" onClick={handleCopyMessage}>📋 Kopiraj za poruku</button>
+            <button className="btn btn-secondary btn-sm no-print" onClick={handleShare}>📤 Pošalji (Viber/WhatsApp/Messenger)</button>
+            <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>🖨️ Štampaj za poslovođe</button>
+            {!isPoslovodja && (
+              <button className="btn btn-primary btn-sm no-print" onClick={addRow}>+ Dodaj kamion</button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="tabs no-print">
+        <button className={`tab ${subTab === 'raspored' ? 'active' : ''}`} onClick={() => setSubTab('raspored')}>🚚 Raspored kamiona</button>
+        <button className={`tab ${subTab === 'stanje' ? 'active' : ''}`} onClick={() => setSubTab('stanje')}>📝 Stanje na dan</button>
       </div>
 
       {!dispData.ready && (
         <div className="alert alert-warning">⚡ Povezivanje sa sistemom dispozicija u toku — stanja i auto-prijedlozi će se pojaviti čim se učitaju.</div>
       )}
 
+      {subTab === 'stanje' && (
+        <StanjeNaDanPanel selectedDate={selectedDate} dayRows={dayRows} onSubmit={addBulkRows} onDeleteRow={deleteRow} />
+      )}
+
+      {subTab === 'raspored' && (
+      <div style={isPoslovodja ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
       <div className="section-header">
         <div className="section-title">🚚 Raspored kamiona — {fmtDate(selectedDate)}</div>
         <span className="tag">{dayRows.length} kamiona</span>
@@ -378,6 +507,8 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
           </div>
           );
         })
+      )}
+      </div>
       )}
       <datalist id="odjel-list-kamioni">
         {odjeliList.map(o => <option key={o} value={o} />)}

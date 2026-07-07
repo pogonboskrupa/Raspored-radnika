@@ -379,6 +379,11 @@ function AppMain({ onLogout, currentUser }) {
   // Quick assign from panel click
   const onWorkerClick = (worker) => setQuickModal({ worker });
 
+  // Poslovođe imaju read-only pristup cijeloj aplikaciji, osim podtaba
+  // "Stanje na dan" unutar Raspored kamiona (to štiti RasporedKamionaView interno).
+  const isPoslovodja = getUserRole(currentUser) === 'poslovodja';
+  const readOnlyStyle = { pointerEvents: 'none', opacity: 0.6 };
+
   return (
     <div style={{width:'100%',maxWidth:'100vw',overflowX:'hidden'}}>
       {/* HEADER */}
@@ -409,6 +414,12 @@ function AppMain({ onLogout, currentUser }) {
         </nav>
       </header>
 
+      {isPoslovodja && (
+        <div style={{background:'#fdf0e0',color:'#7a3b00',padding:'0.5rem 1rem',fontSize:'0.8rem',fontWeight:600,textAlign:'center'}}>
+          👁️ Prijavljeni ste kao poslovođa — pregled je samo za čitanje. Stanje kamiona prijavljujete u Raspored kamiona → podtab "Stanje na dan".
+        </div>
+      )}
+
       {/* PWA INSTALL BANNER */}
       {showInstallBanner && (
         <div style={{
@@ -436,7 +447,7 @@ function AppMain({ onLogout, currentUser }) {
       <div className="app-layout">
         {/* SIDEBAR */}
         {activeTab === 'raspored' && (
-          <aside className="sidebar">
+          <aside className="sidebar" style={isPoslovodja ? readOnlyStyle : undefined}>
             <div className="sidebar-section">
               <div className="sidebar-label">Raspored za dan</div>
               <button className={`sidebar-item ${!sidebarFilter?'active':''}`} onClick={() => setSidebarFilter(null)}>
@@ -470,6 +481,7 @@ function AppMain({ onLogout, currentUser }) {
 
         {/* MAIN */}
         <main className="main-content">
+        <div style={isPoslovodja && activeTab !== 'kamioni' ? readOnlyStyle : undefined}>
           {activeTab === 'raspored' && (
             <ScheduleView
               selectedDate={selectedDate} setSelectedDate={setSelectedDate}
@@ -498,11 +510,6 @@ function AppMain({ onLogout, currentUser }) {
               customJobTypes={customJobTypes}
               setCustomJobTypes={setCustomJobTypes}
             />
-          )}
-          {activeTab === 'kamioni' && (
-            <RasporedKamionaView truckRows={truckRows} setTruckRows={setTruckRows}
-              workers={workers}
-              truckGroupOtpremaci={truckGroupOtpremaci} setTruckGroupOtpremaci={setTruckGroupOtpremaci} />
           )}
           {activeTab === 'radnici' && (
             <WorkersView workers={workers} setWorkers={setWorkers} schedules={schedules} />
@@ -537,10 +544,18 @@ function AppMain({ onLogout, currentUser }) {
           {activeTab === 'historija' && (
             <HistorijaView history={history} wName={wName} dName={dName} restoreVersion={restoreVersion} schedules={schedules} />
           )}
+        </div>
+          {activeTab === 'kamioni' && (
+            <RasporedKamionaView truckRows={truckRows} setTruckRows={setTruckRows}
+              workers={workers}
+              truckGroupOtpremaci={truckGroupOtpremaci} setTruckGroupOtpremaci={setTruckGroupOtpremaci}
+              isPoslovodja={isPoslovodja} />
+          )}
         </main>
 
         {/* RIGHT PANEL (schedule tab only) */}
         {activeTab === 'raspored' && (
+          <div style={isPoslovodja ? readOnlyStyle : undefined}>
           <RightPanel
             selectedDate={selectedDate}
             daySchedules={daySchedules}
@@ -559,11 +574,12 @@ function AppMain({ onLogout, currentUser }) {
             yesterday={yesterday()}
             onWorkerClick={onWorkerClick}
         />
+        </div>
         )}
       </div>
 
       {/* MOBILE FAB */}
-      {activeTab === 'raspored' && (
+      {activeTab === 'raspored' && !isPoslovodja && (
         <button className="mobile-fab" onClick={() => setModal({type:'entry', data:{date:selectedDate}})}>+</button>
       )}
 
