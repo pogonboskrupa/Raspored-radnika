@@ -10485,9 +10485,10 @@ function OdjelInput(_ref46) {
 // Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
 const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
 
-// Boja preostalog stanja dispozicije: crveno <25m³, zeleno >100m³, žuto (amber) između
+// Boja preostalog stanja dispozicije: jarko crveno <25m³, zeleno >100m³, žuto (amber) između
+const BALANCE_LOW_RED = '#ff0000';
 function balanceColor(bal) {
-  if (bal < 25) return 'var(--red)';
+  if (bal < 25) return BALANCE_LOW_RED;
   if (bal > 100) return 'var(--green)';
   return 'var(--amber)';
 }
@@ -10827,7 +10828,7 @@ function RasporedKamionaView(_ref49) {
       .warn{color:#8b2020;font-style:italic}
       .ok{color:#2d5a27;font-weight:700}
       .mid{color:#b5620a;font-weight:700}
-      .low{color:#8b2020;font-weight:700}
+      .low{color:#ff0000;font-weight:700}
     </style></head><body>`;
     html += `<h1>RASPORED KAMIONA — ${fmtDate(selectedDate)}</h1>`;
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
