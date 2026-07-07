@@ -5180,6 +5180,23 @@ function OdjelInput({ value, onCommit }) {
 // Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
 const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
 
+// Zbirni broj kamiona po sortimentu za dati skup redova (za brzi pregled obima posla)
+function sortimentSummary(rows) {
+  const counts = {};
+  rows.forEach(r => { if (r.sortiment) counts[r.sortiment] = (counts[r.sortiment] || 0) + 1; });
+  return SORTIMENT_FIELDS.filter(f => counts[f] > 0).map(f => ({ code: f, label: SORTIMENT_LABELS[f], count: counts[f] }));
+}
+
+function SortimentSummaryLine({ rows }) {
+  if (rows.length === 0) return null;
+  const summary = sortimentSummary(rows);
+  return (
+    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.9rem' }}>
+      🧾 Ukupno {rows.length} {rows.length === 1 ? 'kamion' : 'kamiona'} — {summary.map(s => `${s.count} ${s.label}`).join(', ')}
+    </div>
+  );
+}
+
 // ─── STANJE NA DAN — poslovođa prijavi broj kamiona po sortimentu za odjel;
 // svaki prijavljeni kamion odmah postaje (nedodijeljen) red u Raspored kamiona ────
 function StanjeNaDanPanel({ selectedDate, dayRows, onSubmit, onDeleteRow }) {
@@ -5191,9 +5208,15 @@ function StanjeNaDanPanel({ selectedDate, dayRows, onSubmit, onDeleteRow }) {
   const submit = () => {
     if (!odjel.trim()) { showToast('Unesite odjel!', 'error'); return; }
     if (totalCount === 0) { showToast('Unesite broj kamiona za bar jedan sortiment!', 'error'); return; }
+    const trimmed = odjel.trim();
+    const existing = dayRows.filter(r => (r.odjel || '').trim() === trimmed).length;
+    if (existing > 0) {
+      const ok = confirm(`Već postoji ${existing} ${existing === 1 ? 'kamion' : 'kamiona'} prijavljeno za "${trimmed}" danas. Dodati još ${totalCount}?`);
+      if (!ok) return;
+    }
     const parsedCounts = Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, parseInt(counts[f], 10) || 0]));
-    const n = onSubmit(odjel.trim(), parsedCounts);
-    showToast(`Prijavljeno ${n} ${n === 1 ? 'kamion' : 'kamiona'} za ${odjel.trim()}!`, 'success');
+    const n = onSubmit(trimmed, parsedCounts);
+    showToast(`Prijavljeno ${n} ${n === 1 ? 'kamion' : 'kamiona'} za ${trimmed}!`, 'success');
     setOdjel('');
     setCounts({});
   };
@@ -5238,6 +5261,7 @@ function StanjeNaDanPanel({ selectedDate, dayRows, onSubmit, onDeleteRow }) {
         <div className="section-title">Prijavljeno za {fmtDate(selectedDate)}</div>
         <span className="tag">{dayRows.length} kamiona</span>
       </div>
+      <SortimentSummaryLine rows={dayRows} />
 
       {grouped.length === 0 ? (
         <div className="card">
@@ -5295,6 +5319,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
   const [subTab, setSubTab] = useState(isPoslovodja ? 'stanje' : 'raspored');
 
   const dayRows = useMemo(() => truckRows.filter(r => r.date === selectedDate), [truckRows, selectedDate]);
+  const unassignedCount = useMemo(() => dayRows.filter(r => !r.kupac).length, [dayRows]);
 
   const kupci = useMemo(() =>
     [...new Set(dispozicije.map(d => d.kupac).filter(Boolean))].sort(),
@@ -5507,7 +5532,10 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
       </div>
 
       <div className="tabs no-print">
-        <button className={`tab ${subTab === 'raspored' ? 'active' : ''}`} onClick={() => setSubTab('raspored')}>🚚 Raspored kamiona</button>
+        <button className={`tab ${subTab === 'raspored' ? 'active' : ''}`} onClick={() => setSubTab('raspored')}>
+          🚚 Raspored kamiona
+          {unassignedCount > 0 && <span className="tag" style={{ marginLeft: 6, background: 'var(--amber-pale)', color: 'var(--amber)' }}>{unassignedCount}</span>}
+        </button>
         <button className={`tab ${subTab === 'stanje' ? 'active' : ''}`} onClick={() => setSubTab('stanje')}>📝 Stanje na dan</button>
       </div>
 
@@ -5524,7 +5552,11 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
       <div className="section-header">
         <div className="section-title">🚚 Raspored kamiona — {fmtDate(selectedDate)}</div>
         <span className="tag">{dayRows.length} kamiona</span>
+        {unassignedCount > 0 && (
+          <span className="tag" style={{ background: 'var(--amber-pale)', color: 'var(--amber)' }}>{unassignedCount} nedodijeljeno</span>
+        )}
       </div>
+      <SortimentSummaryLine rows={dayRows} />
 
       {dayRows.length === 0 ? (
         <div className="card">
@@ -6068,7 +6100,9 @@ function AppMain({ onLogout, currentUser }) {
           }
         </div>
         <nav className="nav-tabs">
-          {[['raspored','📋 Raspored'],['kamioni','🚚 Raspored kamiona'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']].map(([k,l]) =>
+          {[['raspored','📋 Raspored'],['kamioni','🚚 Raspored kamiona'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']]
+            .filter(([k]) => !(isPoslovodja && (k === 'radnici' || k === 'odjeli')))
+            .map(([k,l]) =>
             <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
           )}
           <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'0.4rem'}}>

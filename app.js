@@ -10485,15 +10485,42 @@ function OdjelInput(_ref46) {
 // Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
 const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
 
+// Zbirni broj kamiona po sortimentu za dati skup redova (za brzi pregled obima posla)
+function sortimentSummary(rows) {
+  const counts = {};
+  rows.forEach(r => {
+    if (r.sortiment) counts[r.sortiment] = (counts[r.sortiment] || 0) + 1;
+  });
+  return SORTIMENT_FIELDS.filter(f => counts[f] > 0).map(f => ({
+    code: f,
+    label: SORTIMENT_LABELS[f],
+    count: counts[f]
+  }));
+}
+function SortimentSummaryLine(_ref47) {
+  let {
+    rows
+  } = _ref47;
+  if (rows.length === 0) return null;
+  const summary = sortimentSummary(rows);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      color: 'var(--text-muted)',
+      marginBottom: '0.9rem'
+    }
+  }, "\uD83E\uDDFE Ukupno ", rows.length, " ", rows.length === 1 ? 'kamion' : 'kamiona', " \u2014 ", summary.map(s => `${s.count} ${s.label}`).join(', '));
+}
+
 // ─── STANJE NA DAN — poslovođa prijavi broj kamiona po sortimentu za odjel;
 // svaki prijavljeni kamion odmah postaje (nedodijeljen) red u Raspored kamiona ────
-function StanjeNaDanPanel(_ref47) {
+function StanjeNaDanPanel(_ref48) {
   let {
     selectedDate,
     dayRows,
     onSubmit,
     onDeleteRow
-  } = _ref47;
+  } = _ref48;
   const [odjel, setOdjel] = useState('');
   const [counts, setCounts] = useState({});
   const totalCount = SORTIMENT_FIELDS.reduce((s, f) => s + (parseInt(counts[f], 10) || 0), 0);
@@ -10506,9 +10533,15 @@ function StanjeNaDanPanel(_ref47) {
       showToast('Unesite broj kamiona za bar jedan sortiment!', 'error');
       return;
     }
+    const trimmed = odjel.trim();
+    const existing = dayRows.filter(r => (r.odjel || '').trim() === trimmed).length;
+    if (existing > 0) {
+      const ok = confirm(`Već postoji ${existing} ${existing === 1 ? 'kamion' : 'kamiona'} prijavljeno za "${trimmed}" danas. Dodati još ${totalCount}?`);
+      if (!ok) return;
+    }
     const parsedCounts = Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, parseInt(counts[f], 10) || 0]));
-    const n = onSubmit(odjel.trim(), parsedCounts);
-    showToast(`Prijavljeno ${n} ${n === 1 ? 'kamion' : 'kamiona'} za ${odjel.trim()}!`, 'success');
+    const n = onSubmit(trimmed, parsedCounts);
+    showToast(`Prijavljeno ${n} ${n === 1 ? 'kamion' : 'kamiona'} za ${trimmed}!`, 'success');
     setOdjel('');
     setCounts({});
   };
@@ -10581,7 +10614,9 @@ function StanjeNaDanPanel(_ref47) {
     className: "section-title"
   }, "Prijavljeno za ", fmtDate(selectedDate)), /*#__PURE__*/React.createElement("span", {
     className: "tag"
-  }, dayRows.length, " kamiona")), grouped.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, dayRows.length, " kamiona")), /*#__PURE__*/React.createElement(SortimentSummaryLine, {
+    rows: dayRows
+  }), grouped.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
@@ -10619,7 +10654,7 @@ function StanjeNaDanPanel(_ref47) {
     onClick: () => onDeleteRow(r.id)
   }, "\uD83D\uDDD1\uFE0F")))))))));
 }
-function RasporedKamionaView(_ref48) {
+function RasporedKamionaView(_ref49) {
   let {
     truckRows,
     setTruckRows,
@@ -10628,7 +10663,7 @@ function RasporedKamionaView(_ref48) {
     setTruckGroupOtpremaci,
     isPoslovodja,
     currentUser
-  } = _ref48;
+  } = _ref49;
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
@@ -10637,6 +10672,7 @@ function RasporedKamionaView(_ref48) {
   const [selectedDate, setSelectedDate] = useState(nextWorkingDay());
   const [subTab, setSubTab] = useState(isPoslovodja ? 'stanje' : 'raspored');
   const dayRows = useMemo(() => truckRows.filter(r => r.date === selectedDate), [truckRows, selectedDate]);
+  const unassignedCount = useMemo(() => dayRows.filter(r => !r.kupac).length, [dayRows]);
   const kupci = useMemo(() => [...new Set(dispozicije.map(d => d.kupac).filter(Boolean))].sort(), [dispozicije]);
 
   // Pamti sve prethodno unesene odjele (bilo kojeg dana) za autocomplete
@@ -10884,7 +10920,14 @@ function RasporedKamionaView(_ref48) {
   }, /*#__PURE__*/React.createElement("button", {
     className: `tab ${subTab === 'raspored' ? 'active' : ''}`,
     onClick: () => setSubTab('raspored')
-  }, "\uD83D\uDE9A Raspored kamiona"), /*#__PURE__*/React.createElement("button", {
+  }, "\uD83D\uDE9A Raspored kamiona", unassignedCount > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "tag",
+    style: {
+      marginLeft: 6,
+      background: 'var(--amber-pale)',
+      color: 'var(--amber)'
+    }
+  }, unassignedCount)), /*#__PURE__*/React.createElement("button", {
     className: `tab ${subTab === 'stanje' ? 'active' : ''}`,
     onClick: () => setSubTab('stanje')
   }, "\uD83D\uDCDD Stanje na dan")), !dispData.ready && /*#__PURE__*/React.createElement("div", {
@@ -10905,7 +10948,15 @@ function RasporedKamionaView(_ref48) {
     className: "section-title"
   }, "\uD83D\uDE9A Raspored kamiona \u2014 ", fmtDate(selectedDate)), /*#__PURE__*/React.createElement("span", {
     className: "tag"
-  }, dayRows.length, " kamiona")), dayRows.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, dayRows.length, " kamiona"), unassignedCount > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "tag",
+    style: {
+      background: 'var(--amber-pale)',
+      color: 'var(--amber)'
+    }
+  }, unassignedCount, " nedodijeljeno")), /*#__PURE__*/React.createElement(SortimentSummaryLine, {
+    rows: dayRows
+  }), dayRows.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
@@ -11175,11 +11226,11 @@ function App() {
     }
   });
 }
-function AppMain(_ref49) {
+function AppMain(_ref50) {
   let {
     onLogout,
     currentUser
-  } = _ref49;
+  } = _ref50;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -11488,8 +11539,8 @@ function AppMain(_ref49) {
       'Neplaćeno': '📋 N'
     };
     const absentList = [];
-    Object.entries(godisnji || {}).forEach(_ref50 => {
-      let [wId, entries] = _ref50;
+    Object.entries(godisnji || {}).forEach(_ref51 => {
+      let [wId, entries] = _ref51;
       const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
       if (!entry) return;
       const w = workers.find(x => x.id === wId);
@@ -11522,14 +11573,14 @@ function AppMain(_ref49) {
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
     html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
-    Object.entries(byDept).forEach(_ref51 => {
-      let [deptId, jobs] = _ref51;
+    Object.entries(byDept).forEach(_ref52 => {
+      let [deptId, jobs] = _ref52;
       const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
       html += `<div class="dept">`;
       html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
       html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
-      Object.entries(jobs).forEach(_ref52 => {
-        let [jobType, rows] = _ref52;
+      Object.entries(jobs).forEach(_ref53 => {
+        let [jobType, rows] = _ref53;
         rows.forEach(row => {
           const workerNames = (row.allWorkers || []).map(wId => wName(wId));
           const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
@@ -11613,8 +11664,11 @@ function AppMain(_ref49) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].map(_ref53 => {
-    let [k, l] = _ref53;
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref54 => {
+    let [k] = _ref54;
+    return !(isPoslovodja && (k === 'radnici' || k === 'odjeli'));
+  }).map(_ref55 => {
+    let [k, l] = _ref55;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,
