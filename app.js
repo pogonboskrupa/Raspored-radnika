@@ -10454,14 +10454,29 @@ function RasporedKamionaView(_ref46) {
     return candidates[0] || null;
   };
 
-  // Auto-prijedlog: najstarija dispozicija BILO KOJEG kupca sa stanjem >= 20m³ za sortiment
-  const findAutoSuggestion = sortiment => {
-    if (!sortiment) return null;
+  // Auto-prijedlog: do 10 kupaca (jedan po kupcu, najstarija dispozicija) sa stanjem >= 20m³, poredano po starosti
+  const findSuggestions = sortiment => {
+    if (!sortiment) return [];
     const candidates = dispozicije.map(d => ({
       disp: d,
       bal: getDispBalance(d, otpreme)[sortiment]
     })).filter(x => x.bal >= 20).sort((a, b) => (a.disp.datum || '').localeCompare(b.disp.datum || ''));
-    return candidates[0] || null;
+    const seen = new Set();
+    const result = [];
+    for (const c of candidates) {
+      if (seen.has(c.disp.kupac)) continue;
+      seen.add(c.disp.kupac);
+      result.push(c);
+      if (result.length >= 10) break;
+    }
+    return result;
+  };
+
+  // Kupci koji imaju bar jednu dispoziciju sa pozitivnim stanjem za odabrani sortiment
+  const kupciForSortiment = sortiment => {
+    if (!sortiment) return kupci;
+    const withBalance = new Set(dispozicije.filter(d => getDispBalance(d, otpreme)[sortiment] > 0).map(d => d.kupac));
+    return kupci.filter(k => withBalance.has(k));
   };
   const addRow = () => {
     setTruckRows(prev => [...prev, {
@@ -10607,7 +10622,8 @@ function RasporedKamionaView(_ref46) {
     className: "no-print"
   }, "Akcije"))), /*#__PURE__*/React.createElement("tbody", null, dayRows.map(r => {
     const found = findDispForKupac(r.kupac, r.sortiment);
-    const suggestion = findAutoSuggestion(r.sortiment);
+    const suggestions = findSuggestions(r.sortiment);
+    const kupciOptions = kupciForSortiment(r.sortiment);
     return /*#__PURE__*/React.createElement("tr", {
       key: r.id
     }, /*#__PURE__*/React.createElement("td", {
@@ -10625,9 +10641,15 @@ function RasporedKamionaView(_ref46) {
     }, /*#__PURE__*/React.createElement("select", {
       className: "form-select",
       value: r.sortiment,
-      onChange: e => updateRow(r.id, {
-        sortiment: e.target.value
-      })
+      onChange: e => {
+        const sortiment = e.target.value;
+        const validKupci = kupciForSortiment(sortiment);
+        const patch = {
+          sortiment
+        };
+        if (r.kupac && !validKupci.includes(r.kupac)) patch.kupac = '';
+        updateRow(r.id, patch);
+      }
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
     }, "\u2014 odaberi \u2014"), SORTIMENT_FIELDS.map(f => /*#__PURE__*/React.createElement("option", {
@@ -10643,10 +10665,16 @@ function RasporedKamionaView(_ref46) {
       })
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
-    }, "\u2014 odaberi kupca \u2014"), kupci.map(k => /*#__PURE__*/React.createElement("option", {
+    }, "\u2014 odaberi kupca \u2014"), kupciOptions.map(k => /*#__PURE__*/React.createElement("option", {
       key: k,
       value: k
-    }, k)))), /*#__PURE__*/React.createElement("td", {
+    }, k))), r.sortiment && kupciOptions.length === 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.7rem',
+        color: 'var(--red)',
+        marginTop: '0.2rem'
+      }
+    }, "Nema kupaca sa stanjem za ovaj sortiment.")), /*#__PURE__*/React.createElement("td", {
       "data-label": "Dispozicija"
     }, !r.kupac || !r.sortiment ? /*#__PURE__*/React.createElement("span", {
       style: {
@@ -10677,29 +10705,50 @@ function RasporedKamionaView(_ref46) {
       style: {
         color: 'var(--text-light)'
       }
-    }, "\u2014") : suggestion ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '0.8rem'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontWeight: 600
-      }
-    }, suggestion.disp.kupac), /*#__PURE__*/React.createElement("div", null, suggestion.disp.broj, " \xB7 ", /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--green)',
-        fontWeight: 700
-      }
-    }, suggestion.bal.toFixed(2), " m\xB3")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        color: 'var(--text-muted)'
-      }
-    }, fmtDate(suggestion.disp.datum))) : /*#__PURE__*/React.createElement("span", {
+    }, "\u2014") : suggestions.length === 0 ? /*#__PURE__*/React.createElement("span", {
       style: {
         color: 'var(--text-light)',
         fontSize: '0.8rem'
       }
-    }, "Nema prijedloga")), /*#__PURE__*/React.createElement("td", {
+    }, "Nema prijedloga") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.15rem',
+        maxHeight: 170,
+        overflowY: 'auto'
+      }
+    }, suggestions.map((s, idx) => /*#__PURE__*/React.createElement("button", {
+      key: s.disp.id || s.disp.kupac,
+      type: "button",
+      onClick: () => updateRow(r.id, {
+        kupac: s.disp.kupac
+      }),
+      className: "btn btn-ghost btn-sm no-print",
+      title: "Klikni da odabere\u0161 ovog kupca",
+      style: {
+        justifyContent: 'flex-start',
+        textAlign: 'left',
+        padding: '0.15rem 0.4rem',
+        fontWeight: r.kupac === s.disp.kupac ? 700 : 500,
+        background: r.kupac === s.disp.kupac ? 'var(--green-pale)' : 'transparent',
+        color: r.kupac === s.disp.kupac ? 'var(--green)' : 'var(--text)',
+        fontSize: '0.74rem',
+        lineHeight: 1.35,
+        whiteSpace: 'normal',
+        height: 'auto'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: 'var(--mono)',
+        color: 'var(--text-light)',
+        marginRight: 4
+      }
+    }, idx + 1, "."), /*#__PURE__*/React.createElement("strong", null, s.disp.kupac), " \u2014 ", s.bal.toFixed(2), " m\xB3 ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-muted)'
+      }
+    }, "(", fmtDate(s.disp.datum), ")"))))), /*#__PURE__*/React.createElement("td", {
       "data-label": "Akcije",
       className: "no-print"
     }, /*#__PURE__*/React.createElement("button", {
