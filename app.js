@@ -10626,7 +10626,8 @@ function RasporedKamionaView(_ref48) {
     workers,
     truckGroupOtpremaci,
     setTruckGroupOtpremaci,
-    isPoslovodja
+    isPoslovodja,
+    currentUser
   } = _ref48;
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
@@ -10739,7 +10740,8 @@ function RasporedKamionaView(_ref48) {
           odjel,
           sortiment: f,
           kupac: '',
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          reportedBy: currentUser || ''
         });
       }
     });
@@ -10916,6 +10918,7 @@ function RasporedKamionaView(_ref48) {
     const metaKey = otpremaciKey(selectedDate, g.key);
     const assignedIds = truckGroupOtpremaci[metaKey] || [];
     const availableOtpremaci = otpremaciList.filter(w => !assignedIds.includes(w.id));
+    const reporters = [...new Set(g.rows.map(r => r.reportedBy).filter(Boolean))];
     return /*#__PURE__*/React.createElement("div", {
       className: "card",
       key: g.key
@@ -10929,7 +10932,13 @@ function RasporedKamionaView(_ref48) {
       className: "dept-name"
     }, g.label), /*#__PURE__*/React.createElement("span", {
       className: "dept-count"
-    }, g.rows.length, " ", g.rows.length === 1 ? 'kamion' : 'kamiona'), /*#__PURE__*/React.createElement("div", {
+    }, g.rows.length, " ", g.rows.length === 1 ? 'kamion' : 'kamiona'), reporters.length > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.68rem',
+        color: 'rgba(255,255,255,0.8)',
+        fontFamily: 'var(--mono)'
+      }
+    }, "\uD83D\uDCDD Prijavio: ", reporters.join(', ')), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -11870,7 +11879,8 @@ function AppMain(_ref49) {
     workers: workers,
     truckGroupOtpremaci: truckGroupOtpremaci,
     setTruckGroupOtpremaci: setTruckGroupOtpremaci,
-    isPoslovodja: isPoslovodja
+    isPoslovodja: isPoslovodja,
+    currentUser: currentUser
   })), activeTab === 'raspored' && /*#__PURE__*/React.createElement("div", {
     style: isPoslovodja ? readOnlyStyle : undefined
   }, /*#__PURE__*/React.createElement(RightPanel, {

@@ -5279,7 +5279,7 @@ function StanjeNaDanPanel({ selectedDate, dayRows, onSubmit, onDeleteRow }) {
   );
 }
 
-function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpremaci, setTruckGroupOtpremaci, isPoslovodja }) {
+function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpremaci, setTruckGroupOtpremaci, isPoslovodja, currentUser }) {
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
@@ -5377,7 +5377,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
     SORTIMENT_FIELDS.forEach(f => {
       const n = counts[f] || 0;
       for (let i = 0; i < n; i++) {
-        newRows.push({ id: uid(), date: selectedDate, odjel, sortiment: f, kupac: '', createdAt: Date.now() });
+        newRows.push({ id: uid(), date: selectedDate, odjel, sortiment: f, kupac: '', createdAt: Date.now(), reportedBy: currentUser || '' });
       }
     });
     if (newRows.length > 0) setTruckRows(prev => [...prev, ...newRows]);
@@ -5539,12 +5539,18 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
           const metaKey = otpremaciKey(selectedDate, g.key);
           const assignedIds = truckGroupOtpremaci[metaKey] || [];
           const availableOtpremaci = otpremaciList.filter(w => !assignedIds.includes(w.id));
+          const reporters = [...new Set(g.rows.map(r => r.reportedBy).filter(Boolean))];
           return (
           <div className="card" key={g.key}>
             <div className="dept-header" style={{ flexWrap: 'wrap', rowGap: '0.4rem' }}>
               <span>🏕️</span>
               <span className="dept-name">{g.label}</span>
               <span className="dept-count">{g.rows.length} {g.rows.length === 1 ? 'kamion' : 'kamiona'}</span>
+              {reporters.length > 0 && (
+                <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--mono)' }}>
+                  📝 Prijavio: {reporters.join(', ')}
+                </span>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', marginLeft: '0.4rem' }}>
                 <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--mono)', letterSpacing: '0.05em' }}>OTPREMAČ:</span>
                 {assignedIds.map(wId => (
@@ -6214,7 +6220,7 @@ function AppMain({ onLogout, currentUser }) {
             <RasporedKamionaView truckRows={truckRows} setTruckRows={setTruckRows}
               workers={workers}
               truckGroupOtpremaci={truckGroupOtpremaci} setTruckGroupOtpremaci={setTruckGroupOtpremaci}
-              isPoslovodja={isPoslovodja} />
+              isPoslovodja={isPoslovodja} currentUser={currentUser} />
           )}
         </main>
 

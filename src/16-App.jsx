@@ -549,7 +549,7 @@ function AppMain({ onLogout, currentUser }) {
             <RasporedKamionaView truckRows={truckRows} setTruckRows={setTruckRows}
               workers={workers}
               truckGroupOtpremaci={truckGroupOtpremaci} setTruckGroupOtpremaci={setTruckGroupOtpremaci}
-              isPoslovodja={isPoslovodja} />
+              isPoslovodja={isPoslovodja} currentUser={currentUser} />
           )}
         </main>
 
