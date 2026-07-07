@@ -30,10 +30,20 @@ function OdjelInput({ value, onCommit }) {
   );
 }
 
-function RasporedKamionaView({ truckRows, setTruckRows }) {
+// Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
+const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
+
+function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpremaci, setTruckGroupOtpremaci }) {
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
+
+  const otpremaciList = useMemo(() =>
+    (workers || [])
+      .filter(w => w.category === 'otpremac' && w.status === 'aktivan')
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [workers]);
+  const wName = id => (workers || []).find(w => w.id === id)?.name || id;
 
   const [selectedDate, setSelectedDate] = useState(nextWorkingDay());
 
@@ -98,20 +108,36 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
     return order.map(key => ({ key, label: key === '__BEZ_ODJELA__' ? 'Bez odjela' : key, rows: map[key] }));
   }, [dayRows]);
 
+  const addOtpremac = (odjelKey, workerId) => {
+    const key = otpremaciKey(selectedDate, odjelKey);
+    setTruckGroupOtpremaci(prev => ({ ...prev, [key]: [...(prev[key] || []), workerId] }));
+  };
+  const removeOtpremac = (odjelKey, workerId) => {
+    const key = otpremaciKey(selectedDate, odjelKey);
+    setTruckGroupOtpremaci(prev => ({ ...prev, [key]: (prev[key] || []).filter(id => id !== workerId) }));
+  };
+
   const addRow = () => {
     setTruckRows(prev => [...prev, { id: uid(), date: selectedDate, odjel: '', sortiment: '', kupac: '', createdAt: Date.now() }]);
   };
   const updateRow = (id, patch) => setTruckRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
   const deleteRow = (id) => { if (confirm('Obrisati ovaj red?')) setTruckRows(prev => prev.filter(r => r.id !== id)); };
 
+  // Isti obrazac grupisanja kao groupedDayRows — koristi se za print/kopiraj/podijeli
   const groupByOdjel = (rows) => {
-    const grouped = {};
+    const order = [];
+    const map = {};
     rows.forEach(r => {
-      const key = r.odjel || '—';
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(r);
+      const key = (r.odjel || '').trim() || '__BEZ_ODJELA__';
+      if (!map[key]) { map[key] = []; order.push(key); }
+      map[key].push(r);
     });
-    return grouped;
+    return order.map(key => ({
+      key,
+      label: key === '__BEZ_ODJELA__' ? 'Bez odjela' : key,
+      rows: map[key],
+      otpremaci: (truckGroupOtpremaci[otpremaciKey(selectedDate, key)] || []).map(wName),
+    }));
   };
 
   const handlePrint = () => {
@@ -133,21 +159,24 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
     html += `<h1>RASPORED KAMIONA — ${fmtDate(selectedDate)}</h1>`;
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     html += `<table><thead><tr>
-      <th style="width:16%">Odjel</th><th style="width:12%">Sortiment</th><th style="width:18%">Kupac</th>
-      <th style="width:14%">Ugovor</th><th style="width:14%">Broj dispozicije</th><th style="width:13%">Stanje dispozicije</th><th style="width:13%">Datum dispozicije</th>
+      <th style="width:15%">Odjel</th><th style="width:14%">Otpremač</th><th style="width:11%">Sortiment</th><th style="width:16%">Kupac</th>
+      <th style="width:13%">Ugovor</th><th style="width:13%">Broj dispozicije</th><th style="width:9%">Stanje</th><th style="width:9%">Datum disp.</th>
     </tr></thead><tbody>`;
-    Object.entries(byOdjel).forEach(([odjel, rows]) => {
-      rows.forEach((r, i) => {
+    groupByOdjel(dayRows).forEach(g => {
+      g.rows.forEach((r, i) => {
         const found = findDispForKupac(r.kupac, r.sortiment);
         html += `<tr>`;
-        if (i === 0) html += `<td rowspan="${rows.length}"><strong>${odjel}</strong></td>`;
+        if (i === 0) {
+          html += `<td rowspan="${g.rows.length}"><strong>${g.label}</strong></td>`;
+          html += `<td rowspan="${g.rows.length}">${g.otpremaci.length ? g.otpremaci.join('<br>') : '—'}</td>`;
+        }
         html += `<td>${SORTIMENT_LABELS[r.sortiment] || '—'}</td>`;
         html += `<td>${r.kupac || '—'}</td>`;
         html += `<td>${found ? (found.disp.ugovor || '—') : '—'}</td>`;
         html += `<td>${found ? (found.disp.broj || '—') : '—'}</td>`;
         html += found
           ? `<td class="${found.bal < 20 ? 'low' : 'ok'}">${found.bal.toFixed(2)} m³</td>`
-          : `<td class="warn">⚠ Nema dispozicije sa stanjem!</td>`;
+          : `<td class="warn">⚠ Nema stanja!</td>`;
         html += `<td>${found ? fmtDate(found.disp.datum) : '—'}</td>`;
         html += `</tr>`;
       });
@@ -160,11 +189,11 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
   };
 
   const buildMessageText = () => {
-    const byOdjel = groupByOdjel(dayRows);
     let text = `🚚 RASPORED KAMIONA – ${fmtDate(selectedDate)}\n`;
-    Object.entries(byOdjel).forEach(([odjel, rows]) => {
-      text += `\n📍 ${odjel}\n`;
-      rows.forEach((r, i) => {
+    groupByOdjel(dayRows).forEach(g => {
+      text += `\n📍 ${g.label}\n`;
+      if (g.otpremaci.length) text += `👷 Otpremač: ${g.otpremaci.join(', ')}\n`;
+      g.rows.forEach((r, i) => {
         const found = findDispForKupac(r.kupac, r.sortiment);
         text += `${i + 1}. ${SORTIMENT_LABELS[r.sortiment] || '—'} – ${r.kupac || '—'}\n`;
         text += found
@@ -230,12 +259,39 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
           </div>
         </div>
       ) : (
-        groupedDayRows.map(g => (
+        groupedDayRows.map(g => {
+          const metaKey = otpremaciKey(selectedDate, g.key);
+          const assignedIds = truckGroupOtpremaci[metaKey] || [];
+          const availableOtpremaci = otpremaciList.filter(w => !assignedIds.includes(w.id));
+          return (
           <div className="card" key={g.key}>
-            <div className="dept-header">
+            <div className="dept-header" style={{ flexWrap: 'wrap', rowGap: '0.4rem' }}>
               <span>🏕️</span>
               <span className="dept-name">{g.label}</span>
               <span className="dept-count">{g.rows.length} {g.rows.length === 1 ? 'kamion' : 'kamiona'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', marginLeft: '0.4rem' }}>
+                <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--mono)', letterSpacing: '0.05em' }}>OTPREMAČ:</span>
+                {assignedIds.map(wId => (
+                  <span key={wId} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.22)',
+                    color: 'white', padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.72rem', fontWeight: 600,
+                  }}>
+                    {wName(wId)}
+                    <button type="button" className="no-print" onClick={() => removeOtpremac(g.key, wId)}
+                      style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, fontSize: '0.9rem', lineHeight: 1, opacity: 0.8 }}>×</button>
+                  </span>
+                ))}
+                {assignedIds.length === 0 && (
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>nije dodijeljen</span>
+                )}
+                {availableOtpremaci.length > 0 && (
+                  <select className="no-print" value="" onChange={e => { if (e.target.value) addOtpremac(g.key, e.target.value); }}
+                    style={{ fontSize: '0.72rem', padding: '0.15rem 0.4rem', borderRadius: 6, border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.12)', color: 'white' }}>
+                    <option value="" style={{ color: '#222' }}>+ Dodaj otpremača</option>
+                    {availableOtpremaci.map(w => <option key={w.id} value={w.id} style={{ color: '#222' }}>{w.name}</option>)}
+                  </select>
+                )}
+              </div>
             </div>
             <table className="schedule-table">
               <thead>
@@ -320,7 +376,8 @@ function RasporedKamionaView({ truckRows, setTruckRows }) {
               </tbody>
             </table>
           </div>
-        ))
+          );
+        })
       )}
       <datalist id="odjel-list-kamioni">
         {odjeliList.map(o => <option key={o} value={o} />)}

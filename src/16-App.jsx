@@ -24,6 +24,8 @@ function AppMain({ onLogout, currentUser }) {
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
   const [history, setHistory] = useStorage('sumarija_history', []);
   const [truckRows, setTruckRows] = useStorage('sumarija_truck_raspored', []);
+  // truckGroupOtpremaci: { "[date,odjelKey]": [workerId, ...] } — otpremači dodijeljeni odjelu za dan
+  const [truckGroupOtpremaci, setTruckGroupOtpremaci] = useStorage('sumarija_truck_grupa_otpremaci', {});
 
   // PWA install prompt
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
@@ -498,7 +500,9 @@ function AppMain({ onLogout, currentUser }) {
             />
           )}
           {activeTab === 'kamioni' && (
-            <RasporedKamionaView truckRows={truckRows} setTruckRows={setTruckRows} />
+            <RasporedKamionaView truckRows={truckRows} setTruckRows={setTruckRows}
+              workers={workers}
+              truckGroupOtpremaci={truckGroupOtpremaci} setTruckGroupOtpremaci={setTruckGroupOtpremaci} />
           )}
           {activeTab === 'radnici' && (
             <WorkersView workers={workers} setWorkers={setWorkers} schedules={schedules} />
