@@ -33,6 +33,13 @@ function OdjelInput({ value, onCommit }) {
 // Ključ za mapu otpremača po odjelu — [datum, odjelKey] kao JSON string (stabilan, bez kolizija na separatoru)
 const otpremaciKey = (date, odjelKey) => JSON.stringify([date, odjelKey]);
 
+// Normalizovano poređenje imena kupca — ručni unos ("asim komerc ") mora naći
+// dispoziciju kupca "ASIM KOMERC" iz DISPOZICIJE sistema.
+const normKupac = s => (s || '').trim().toUpperCase();
+
+// Escape za slobodan tekst (odjel, kupac) koji se ubacuje u print HTML
+const escHtml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 // Prijedlog kupca za red: rangirana lista + dropdown svih kupaca, ili ručni unos
 // za kupca koji još ne postoji u DISPOZICIJE sistemu (dispozicija stiže naknadno).
 function PrijedlogCell({ row, suggestions, kupci, onSetKupac }) {
@@ -46,7 +53,7 @@ function PrijedlogCell({ row, suggestions, kupci, onSetKupac }) {
       <select className="form-select" value={row.kupac} onChange={e => onSetKupac(e.target.value)}
         style={{ fontWeight: 700, color: 'var(--green)', borderColor: 'var(--green)' }}>
         <option value="">— ukloni odabir —</option>
-        {!kupci.includes(row.kupac) && <option value={row.kupac}>{row.kupac} (bez dispozicije)</option>}
+        {!kupci.some(k => normKupac(k) === normKupac(row.kupac)) && <option value={row.kupac}>{row.kupac} (bez dispozicije)</option>}
         {kupci.map(k => <option key={k} value={k}>{k}</option>)}
       </select>
     );
@@ -55,7 +62,9 @@ function PrijedlogCell({ row, suggestions, kupci, onSetKupac }) {
   if (manualMode) {
     const commit = () => {
       if (!manualText.trim()) return;
-      onSetKupac(manualText.trim());
+      // Velika slova — imena kupaca u DISPOZICIJE sistemu su velikim slovima,
+      // pa naknadno uplaćena dispozicija odmah matchira ovaj unos.
+      onSetKupac(manualText.trim().toUpperCase());
       setManualMode(false);
       setManualText('');
     };
@@ -136,7 +145,8 @@ function StanjeNaDanPanel({ selectedDate, dayRows, onSubmit, onDeleteRow }) {
   const [odjel, setOdjel] = useState('');
   const [counts, setCounts] = useState({});
 
-  const totalCount = SORTIMENT_FIELDS.reduce((s, f) => s + (parseInt(counts[f], 10) || 0), 0);
+  const parseCount = v => Math.max(0, parseInt(v, 10) || 0);
+  const totalCount = SORTIMENT_FIELDS.reduce((s, f) => s + parseCount(counts[f]), 0);
 
   const submit = () => {
     if (!odjel.trim()) { showToast('Unesite odjel!', 'error'); return; }
@@ -147,7 +157,7 @@ function StanjeNaDanPanel({ selectedDate, dayRows, onSubmit, onDeleteRow }) {
       const ok = confirm(`Već postoji ${existing} ${existing === 1 ? 'kamion' : 'kamiona'} prijavljeno za "${trimmed}" danas. Dodati još ${totalCount}?`);
       if (!ok) return;
     }
-    const parsedCounts = Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, parseInt(counts[f], 10) || 0]));
+    const parsedCounts = Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, parseCount(counts[f])]));
     const n = onSubmit(trimmed, parsedCounts);
     showToast(`Prijavljeno ${n} ${n === 1 ? 'kamion' : 'kamiona'} za ${trimmed}!`, 'success');
     setOdjel('');
@@ -266,8 +276,9 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
   // Najstarija dispozicija ODABRANOG kupca sa pozitivnim stanjem za odabrani sortiment
   const findDispForKupac = (kupac, sortiment) => {
     if (!kupac || !sortiment) return null;
+    const nk = normKupac(kupac);
     const candidates = dispozicije
-      .filter(d => d.kupac === kupac)
+      .filter(d => normKupac(d.kupac) === nk)
       .map(d => ({ disp: d, bal: getDispBalance(d, otpreme)[sortiment] }))
       .filter(x => x.bal > 0)
       .sort((a, b) => (a.disp.datum || '').localeCompare(b.disp.datum || ''));
@@ -319,6 +330,26 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
   const updateRow = (id, patch) => setTruckRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
   const deleteRow = (id) => { if (confirm('Obrisati ovaj red?')) setTruckRows(prev => prev.filter(r => r.id !== id)); };
 
+  // Promjena odjela na redu: ako je to bio zadnji red stare grupe (npr. ispravka
+  // tipfelera), dodijeljeni otpremači prate red u novu grupu umjesto da nestanu.
+  const commitOdjel = (row, newVal) => {
+    const oldKey = (row.odjel || '').trim() || '__BEZ_ODJELA__';
+    const newKey = (newVal || '').trim() || '__BEZ_ODJELA__';
+    updateRow(row.id, { odjel: newVal });
+    if (oldKey === newKey) return;
+    const othersInOldGroup = dayRows.some(r => r.id !== row.id && ((r.odjel || '').trim() || '__BEZ_ODJELA__') === oldKey);
+    if (othersInOldGroup) return;
+    const oldStorageKey = otpremaciKey(selectedDate, oldKey);
+    const newStorageKey = otpremaciKey(selectedDate, newKey);
+    setTruckGroupOtpremaci(prev => {
+      const moving = prev[oldStorageKey] || [];
+      if (moving.length === 0) return prev;
+      const next = { ...prev, [newStorageKey]: [...new Set([...(prev[newStorageKey] || []), ...moving])] };
+      delete next[oldStorageKey];
+      return next;
+    });
+  };
+
   // Stanje na dan: poslovođa prijavi broj kamiona po sortimentu za odjel —
   // za svaki kamion se odmah kreira nedodijeljen red u Raspored kamiona.
   const addBulkRows = (odjel, counts) => {
@@ -351,7 +382,6 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
   };
 
   const handlePrint = () => {
-    const byOdjel = groupByOdjel(dayRows);
     let html = `<html><head><meta charset="UTF-8"/><title>Raspored kamiona ${fmtDate(selectedDate)}</title>
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
@@ -379,22 +409,23 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
         const found = findDispForKupac(r.kupac, r.sortiment);
         html += `<tr>`;
         if (i === 0) {
-          html += `<td rowspan="${g.rows.length}"><strong>${g.label}</strong></td>`;
-          html += `<td rowspan="${g.rows.length}">${g.otpremaci.length ? g.otpremaci.join('<br>') : '—'}</td>`;
+          html += `<td rowspan="${g.rows.length}"><strong>${escHtml(g.label)}</strong></td>`;
+          html += `<td rowspan="${g.rows.length}">${g.otpremaci.length ? g.otpremaci.map(escHtml).join('<br>') : '—'}</td>`;
         }
         html += `<td>${SORTIMENT_LABELS[r.sortiment] || '—'}</td>`;
-        html += `<td>${r.kupac || '—'}</td>`;
-        html += `<td>${found ? (found.disp.ugovor || '—') : '—'}</td>`;
-        html += `<td>${found ? (found.disp.broj || '—') : '—'}</td>`;
+        html += `<td>${escHtml(r.kupac) || '—'}</td>`;
+        html += `<td>${found ? (escHtml(found.disp.ugovor) || '—') : '—'}</td>`;
+        html += `<td>${found ? (escHtml(found.disp.broj) || '—') : '—'}</td>`;
         html += found
           ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³</td>`
-          : `<td class="pending">u obradi</td>`;
+          : r.kupac ? `<td class="pending">u obradi</td>` : `<td>—</td>`;
         html += `<td>${found ? fmtDate(found.disp.datum) : '—'}</td>`;
         html += `</tr>`;
       });
     });
     html += `</tbody></table></body></html>`;
     const win = window.open('', '_blank');
+    if (!win) { showToast('Preglednik je blokirao prozor za štampu — dozvolite pop-up prozore za ovu stranicu.', 'error'); return; }
     win.document.write(html);
     win.document.close();
     win.onload = () => { win.print(); };
@@ -408,9 +439,11 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
       g.rows.forEach((r, i) => {
         const found = findDispForKupac(r.kupac, r.sortiment);
         text += `${i + 1}. ${SORTIMENT_LABELS[r.sortiment] || '—'} – ${r.kupac || '—'}\n`;
-        text += found
-          ? `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³\n`
-          : `   Disp: — (u obradi)\n`;
+        if (found) {
+          text += `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³\n`;
+        } else if (r.kupac) {
+          text += `   Disp: — (u obradi)\n`;
+        }
       });
     });
     return text;
@@ -434,7 +467,8 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
     if (navigator.share) {
       navigator.share({ text }).catch(() => {});
     } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      const win = window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      if (!win) showToast('Preglednik je blokirao prozor — dozvolite pop-up prozore ili koristite "Kopiraj za poruku".', 'error');
     }
   };
 
@@ -474,7 +508,9 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
       )}
 
       {subTab === 'raspored' && (
-      <div style={isPoslovodja ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
+      <div
+        ref={el => { if (!el) return; if (isPoslovodja) el.setAttribute('inert', ''); else el.removeAttribute('inert'); }}
+        style={isPoslovodja ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
       <div className="section-header">
         <div className="section-title">🚚 Raspored kamiona — {fmtDate(selectedDate)}</div>
         <span className="tag">{dayRows.length} kamiona</span>
@@ -550,7 +586,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
                   return (
                     <tr key={r.id}>
                       <td data-label="Odjel">
-                        <OdjelInput value={r.odjel} onCommit={val => updateRow(r.id, { odjel: val })} />
+                        <OdjelInput value={r.odjel} onCommit={val => commitOdjel(r, val)} />
                       </td>
                       <td data-label="Sortiment">
                         <select className="form-select" value={r.sortiment} onChange={e => updateRow(r.id, { sortiment: e.target.value })}>

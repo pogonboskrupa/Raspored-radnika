@@ -383,6 +383,9 @@ function AppMain({ onLogout, currentUser }) {
   // "Stanje na dan" unutar Raspored kamiona (to štiti RasporedKamionaView interno).
   const isPoslovodja = getUserRole(currentUser) === 'poslovodja';
   const readOnlyStyle = { pointerEvents: 'none', opacity: 0.6 };
+  // inert blokira i fokus/tastaturu (pointerEvents:none blokira samo miš);
+  // React 18 ne poznaje inert prop pa se postavlja direktno na DOM element
+  const readOnlyRef = el => { if (!el) return; if (isPoslovodja) el.setAttribute('inert', ''); else el.removeAttribute('inert'); };
 
   return (
     <div style={{width:'100%',maxWidth:'100vw',overflowX:'hidden'}}>
@@ -450,7 +453,7 @@ function AppMain({ onLogout, currentUser }) {
       <div className="app-layout">
         {/* SIDEBAR */}
         {activeTab === 'raspored' && (
-          <aside className="sidebar" style={isPoslovodja ? readOnlyStyle : undefined}>
+          <aside className="sidebar" ref={readOnlyRef} style={isPoslovodja ? readOnlyStyle : undefined}>
             <div className="sidebar-section">
               <div className="sidebar-label">Raspored za dan</div>
               <button className={`sidebar-item ${!sidebarFilter?'active':''}`} onClick={() => setSidebarFilter(null)}>
@@ -484,7 +487,9 @@ function AppMain({ onLogout, currentUser }) {
 
         {/* MAIN */}
         <main className="main-content">
-        <div style={isPoslovodja && activeTab !== 'kamioni' ? readOnlyStyle : undefined}>
+        <div
+          ref={el => { if (!el) return; if (isPoslovodja && activeTab !== 'kamioni') el.setAttribute('inert', ''); else el.removeAttribute('inert'); }}
+          style={isPoslovodja && activeTab !== 'kamioni' ? readOnlyStyle : undefined}>
           {activeTab === 'raspored' && (
             <ScheduleView
               selectedDate={selectedDate} setSelectedDate={setSelectedDate}
@@ -558,7 +563,7 @@ function AppMain({ onLogout, currentUser }) {
 
         {/* RIGHT PANEL (schedule tab only) */}
         {activeTab === 'raspored' && (
-          <div style={isPoslovodja ? readOnlyStyle : undefined}>
+          <div ref={readOnlyRef} style={isPoslovodja ? readOnlyStyle : undefined}>
           <RightPanel
             selectedDate={selectedDate}
             daySchedules={daySchedules}
