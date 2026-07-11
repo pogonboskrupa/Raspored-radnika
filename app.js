@@ -10719,9 +10719,10 @@ function Zadnjih10DanaPanel(_ref48) {
     return Object.values(map).sort((a, b) => b.count - a.count || b.m3 - a.m3);
   }, [rows]);
 
-  // Zadnja 3-4 radna dana — "ko je bio na otpremi a ko nije" prikaz.
-  const RECENT_N = Math.min(4, days.length);
+  // Zadnjih 10 radnih dana — "ko je bio na otpremi a ko nije" prikaz.
+  const RECENT_N = Math.min(10, days.length);
   const recentDaysChrono = useMemo(() => [...days.slice(0, RECENT_N)].reverse(), [days]); // najstariji lijevo
+  const recentPeriodLabel = recentDaysChrono.length ? `${fmtDate(recentDaysChrono[0])} – ${fmtDate(recentDaysChrono[recentDaysChrono.length - 1])}` : '';
   const attendance = useMemo(() => {
     const recentSet = new Set(recentDaysChrono);
     const map = {};
@@ -10762,7 +10763,7 @@ function Zadnjih10DanaPanel(_ref48) {
     </style></head><body>`;
     html += `<h1>OTPREMA — ZADNJIH 10 RADNIH DANA</h1>`;
     html += `<div class="subtitle">Šumarija Bosanska Krupa · ${periodLabel} · Ukupno ${stats.otprema} otprema · ${stats.m3.toFixed(2)} m³</div>`;
-    html += `<h2>Ko je bio na otpremi — zadnja ${recentDaysChrono.length} radna dana</h2><table><thead><tr><th>Kupac</th>${recentDaysChrono.map(dt => `<th class="num">${fmtDate(dt)}</th>`).join('')}</tr></thead><tbody>`;
+    html += `<h2>Ko je bio na otpremi — zadnjih ${recentDaysChrono.length} radnih dana (${recentPeriodLabel})</h2><table><thead><tr><th>Kupac</th>${recentDaysChrono.map(dt => `<th class="num">${fmtDate(dt)}</th>`).join('')}</tr></thead><tbody>`;
     attendanceKupci.forEach(k => {
       html += `<tr><td>${escHtml(k.kupac)}</td>${recentDaysChrono.map(dt => {
         const cell = attendance[k.kupac]?.[dt];
@@ -10921,7 +10922,9 @@ function Zadnjih10DanaPanel(_ref48) {
     className: "card-header"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card-title"
-  }, "\uD83D\uDC65 Ko je bio na otpremi \u2014 zadnja ", recentDaysChrono.length, " radna dana")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDC65 Ko je bio na otpremi \u2014 zadnjih ", recentDaysChrono.length, " radnih dana"), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, recentPeriodLabel)), /*#__PURE__*/React.createElement("div", {
     style: {
       overflowX: 'auto'
     }

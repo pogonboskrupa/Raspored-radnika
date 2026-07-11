@@ -176,9 +176,12 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
     return Object.values(map).sort((a, b) => b.count - a.count || b.m3 - a.m3);
   }, [rows]);
 
-  // Zadnja 3-4 radna dana — "ko je bio na otpremi a ko nije" prikaz.
-  const RECENT_N = Math.min(4, days.length);
+  // Zadnjih 10 radnih dana — "ko je bio na otpremi a ko nije" prikaz.
+  const RECENT_N = Math.min(10, days.length);
   const recentDaysChrono = useMemo(() => [...days.slice(0, RECENT_N)].reverse(), [days]); // najstariji lijevo
+  const recentPeriodLabel = recentDaysChrono.length
+    ? `${fmtDate(recentDaysChrono[0])} – ${fmtDate(recentDaysChrono[recentDaysChrono.length - 1])}`
+    : '';
   const attendance = useMemo(() => {
     const recentSet = new Set(recentDaysChrono);
     const map = {};
@@ -219,7 +222,7 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
     </style></head><body>`;
     html += `<h1>OTPREMA — ZADNJIH 10 RADNIH DANA</h1>`;
     html += `<div class="subtitle">Šumarija Bosanska Krupa · ${periodLabel} · Ukupno ${stats.otprema} otprema · ${stats.m3.toFixed(2)} m³</div>`;
-    html += `<h2>Ko je bio na otpremi — zadnja ${recentDaysChrono.length} radna dana</h2><table><thead><tr><th>Kupac</th>${recentDaysChrono.map(dt => `<th class="num">${fmtDate(dt)}</th>`).join('')}</tr></thead><tbody>`;
+    html += `<h2>Ko je bio na otpremi — zadnjih ${recentDaysChrono.length} radnih dana (${recentPeriodLabel})</h2><table><thead><tr><th>Kupac</th>${recentDaysChrono.map(dt => `<th class="num">${fmtDate(dt)}</th>`).join('')}</tr></thead><tbody>`;
     attendanceKupci.forEach(k => {
       html += `<tr><td>${escHtml(k.kupac)}</td>${recentDaysChrono.map(dt => {
         const cell = attendance[k.kupac]?.[dt];
@@ -286,10 +289,11 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                 </div>
               </div>
 
-              {/* KO JE BIO NA OTPREMI — zadnja 3-4 radna dana */}
+              {/* KO JE BIO NA OTPREMI — zadnjih 10 radnih dana */}
               <div className="card">
                 <div className="card-header">
-                  <div className="card-title">👥 Ko je bio na otpremi — zadnja {recentDaysChrono.length} radna dana</div>
+                  <div className="card-title">👥 Ko je bio na otpremi — zadnjih {recentDaysChrono.length} radnih dana</div>
+                  <span className="tag">{recentPeriodLabel}</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
