@@ -27,6 +27,37 @@ function AppMain({ onLogout, currentUser }) {
   // truckGroupOtpremaci: { "[date,odjelKey]": [workerId, ...] } — otpremači dodijeljeni odjelu za dan
   const [truckGroupOtpremaci, setTruckGroupOtpremaci] = useStorage('sumarija_truck_grupa_otpremaci', {});
 
+  // Automatsko čišćenje starih zapisa rasporeda kamiona (> 90 dana) — pokreće se
+  // jednom po sesiji, tek kad Firebase/localStorage dostavi stvarne podatke (da
+  // se slučajno ne obriše nešto prije nego što stigne sync sa servera).
+  const truckCleanupDone = useRef(false);
+  useEffect(() => {
+    if (truckCleanupDone.current) return;
+    if (truckRows.length === 0 && Object.keys(truckGroupOtpremaci).length === 0) return;
+    truckCleanupDone.current = true;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - TRUCK_RETENTION_DAYS);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    if (truckRows.some(r => r.date < cutoffStr)) {
+      setTruckRows(prev => prev.filter(r => r.date >= cutoffStr));
+    }
+    const staleMeta = Object.keys(truckGroupOtpremaci).some(key => {
+      try { const [date] = JSON.parse(key); return date < cutoffStr; } catch (e) { return false; }
+    });
+    if (staleMeta) {
+      setTruckGroupOtpremaci(prev => {
+        const next = {};
+        Object.entries(prev).forEach(([key, val]) => {
+          try {
+            const [date] = JSON.parse(key);
+            if (date >= cutoffStr) next[key] = val;
+          } catch (e) { next[key] = val; }
+        });
+        return next;
+      });
+    }
+  }, [truckRows, truckGroupOtpremaci]);
+
   // PWA install prompt
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);

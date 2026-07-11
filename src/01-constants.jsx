@@ -123,6 +123,9 @@ const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Poš
 
 const APP_VERSION = '1.1.0';
 
+// Koliko dana čuvamo redove rasporeda kamiona prije automatskog čišćenja
+const TRUCK_RETENTION_DAYS = 90;
+
 // ─── SORTIMENTI (dijeli šifre polja sa DISPOZICIJE aplikacijom — dispozicije-krupa) ──
 const SORTIMENT_FIELDS = ['tc', 'rud', 'cd', 'cc', 'tl', 'fl', 'oc', 'od'];
 const SORTIMENT_LABELS = {

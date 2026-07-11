@@ -392,6 +392,9 @@ const INITIAL_DEPARTMENTS = [];
 const JOB_TYPES = ['Primka', 'Otprema', 'Teren', 'Kancelarija', 'Prerada', 'Pošumljavanje', 'Doznaka stabala', 'Sektor ekologije', 'Kiša', 'Farbanje sjekačkih linija', 'Ostalo'];
 const APP_VERSION = '1.1.0';
 
+// Koliko dana čuvamo redove rasporeda kamiona prije automatskog čišćenja
+const TRUCK_RETENTION_DAYS = 90;
+
 // ─── SORTIMENTI (dijeli šifre polja sa DISPOZICIJE aplikacijom — dispozicije-krupa) ──
 const SORTIMENT_FIELDS = ['tc', 'rud', 'cd', 'cc', 'tl', 'fl', 'oc', 'od'];
 const SORTIMENT_LABELS = {
@@ -10830,6 +10833,25 @@ function RasporedKamionaView(_ref50) {
   const wName = id => (workers || []).find(w => w.id === id)?.name || id;
   const [selectedDate, setSelectedDate] = useState(nextWorkingDay());
   const [subTab, setSubTab] = useState(isPoslovodja ? 'stanje' : 'raspored');
+
+  // Ako PWA ostane otvorena preko noći, "sljedeći radni dan" izračunat pri
+  // otvaranju zastari. Pri povratku u aplikaciju (fokus/vidljivost) osvježi
+  // datum na novi "sljedeći radni dan" — ali samo ako ga korisnik u međuvremenu
+  // nije ručno promijenio (eksplicitan flag, ne poređenje vrijednosti — updater
+  // funkcije u setState moraju biti čiste, bez sporednih efekata poput mutacije refa).
+  const userChangedDateRef = useRef(false);
+  useEffect(() => {
+    const refreshDate = () => {
+      if (userChangedDateRef.current) return;
+      setSelectedDate(nextWorkingDay());
+    };
+    document.addEventListener('visibilitychange', refreshDate);
+    window.addEventListener('focus', refreshDate);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshDate);
+      window.removeEventListener('focus', refreshDate);
+    };
+  }, []);
   const dayRows = useMemo(() => truckRows.filter(r => r.date === selectedDate), [truckRows, selectedDate]);
   const unassignedCount = useMemo(() => dayRows.filter(r => !r.kupac).length, [dayRows]);
   const kupci = useMemo(() => [...new Set(dispozicije.map(d => d.kupac).filter(Boolean))].sort(), [dispozicije]);
@@ -10884,6 +10906,18 @@ function RasporedKamionaView(_ref50) {
       rows: map[key]
     }));
   }, [dayRows]);
+
+  // Koliko puta je ista KONKRETNA dispozicija već iskorištena za druge kamione istog dana —
+  // stanje u DISPOZICIJE sistemu pada tek kad se otprema stvarno evidentira tamo, pa dva
+  // kamiona istog dana mogu "vidjeti" isti (još neumanjeni) balans iste dispozicije.
+  const dispUsageMap = useMemo(() => {
+    const usage = {};
+    dayRows.forEach(r => {
+      const f = findDispForKupac(r.kupac, r.sortiment);
+      if (f) usage[f.disp.id] = (usage[f.disp.id] || 0) + 1;
+    });
+    return usage;
+  }, [dayRows, dispozicije, otpreme]);
   const addOtpremac = (odjelKey, workerId) => {
     const key = otpremaciKey(selectedDate, odjelKey);
     setTruckGroupOtpremaci(prev => ({
@@ -11017,7 +11051,7 @@ function RasporedKamionaView(_ref50) {
         html += `<td>${escHtml(r.kupac) || '—'}</td>`;
         html += `<td>${found ? escHtml(found.disp.ugovor) || '—' : '—'}</td>`;
         html += `<td>${found ? escHtml(found.disp.broj) || '—' : '—'}</td>`;
-        html += found ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³</td>` : r.kupac ? `<td class="pending">u obradi</td>` : `<td>—</td>`;
+        html += found ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³${dispUsageMap[found.disp.id] > 1 ? ` <span class="mid">(dijeli ${dispUsageMap[found.disp.id]}×)</span>` : ''}</td>` : r.kupac ? `<td class="pending">u obradi</td>` : `<td>—</td>`;
         html += `<td>${found ? fmtDate(found.disp.datum) : '—'}</td>`;
         html += `</tr>`;
       });
@@ -11043,7 +11077,8 @@ function RasporedKamionaView(_ref50) {
         const found = findDispForKupac(r.kupac, r.sortiment);
         text += `${i + 1}. ${SORTIMENT_LABELS[r.sortiment] || '—'} – ${r.kupac || '—'}\n`;
         if (found) {
-          text += `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³\n`;
+          const shared = dispUsageMap[found.disp.id] > 1 ? ` ⚠ dijeli ${dispUsageMap[found.disp.id]}×` : '';
+          text += `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³${shared}\n`;
         } else if (r.kupac) {
           text += `   Disp: — (u obradi)\n`;
         }
@@ -11083,7 +11118,10 @@ function RasporedKamionaView(_ref50) {
     type: "date",
     className: "date-input",
     value: selectedDate,
-    onChange: e => setSelectedDate(e.target.value)
+    onChange: e => {
+      userChangedDateRef.current = true;
+      setSelectedDate(e.target.value);
+    }
   })), subTab === 'raspored' && /*#__PURE__*/React.createElement("div", {
     style: {
       marginLeft: 'auto',
@@ -11309,7 +11347,13 @@ function RasporedKamionaView(_ref50) {
         style: {
           color: 'var(--text-muted)'
         }
-      }, fmtDate(found.disp.datum))) : /*#__PURE__*/React.createElement("span", {
+      }, fmtDate(found.disp.datum)), dispUsageMap[found.disp.id] > 1 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          color: 'var(--amber)',
+          fontWeight: 600,
+          marginTop: '0.15rem'
+        }
+      }, "\u26A0 Dijeli sa jo\u0161 ", dispUsageMap[found.disp.id] - 1, " ", dispUsageMap[found.disp.id] - 1 === 1 ? 'kamionom' : 'kamiona', " danas")) : /*#__PURE__*/React.createElement("span", {
         style: {
           color: 'var(--text-light)',
           fontSize: '0.78rem',
@@ -11364,6 +11408,45 @@ function AppMain(_ref51) {
   const [truckRows, setTruckRows] = useStorage('sumarija_truck_raspored', []);
   // truckGroupOtpremaci: { "[date,odjelKey]": [workerId, ...] } — otpremači dodijeljeni odjelu za dan
   const [truckGroupOtpremaci, setTruckGroupOtpremaci] = useStorage('sumarija_truck_grupa_otpremaci', {});
+
+  // Automatsko čišćenje starih zapisa rasporeda kamiona (> 90 dana) — pokreće se
+  // jednom po sesiji, tek kad Firebase/localStorage dostavi stvarne podatke (da
+  // se slučajno ne obriše nešto prije nego što stigne sync sa servera).
+  const truckCleanupDone = useRef(false);
+  useEffect(() => {
+    if (truckCleanupDone.current) return;
+    if (truckRows.length === 0 && Object.keys(truckGroupOtpremaci).length === 0) return;
+    truckCleanupDone.current = true;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - TRUCK_RETENTION_DAYS);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    if (truckRows.some(r => r.date < cutoffStr)) {
+      setTruckRows(prev => prev.filter(r => r.date >= cutoffStr));
+    }
+    const staleMeta = Object.keys(truckGroupOtpremaci).some(key => {
+      try {
+        const [date] = JSON.parse(key);
+        return date < cutoffStr;
+      } catch (e) {
+        return false;
+      }
+    });
+    if (staleMeta) {
+      setTruckGroupOtpremaci(prev => {
+        const next = {};
+        Object.entries(prev).forEach(_ref52 => {
+          let [key, val] = _ref52;
+          try {
+            const [date] = JSON.parse(key);
+            if (date >= cutoffStr) next[key] = val;
+          } catch (e) {
+            next[key] = val;
+          }
+        });
+        return next;
+      });
+    }
+  }, [truckRows, truckGroupOtpremaci]);
 
   // PWA install prompt
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
@@ -11665,8 +11748,8 @@ function AppMain(_ref51) {
       'Neplaćeno': '📋 N'
     };
     const absentList = [];
-    Object.entries(godisnji || {}).forEach(_ref52 => {
-      let [wId, entries] = _ref52;
+    Object.entries(godisnji || {}).forEach(_ref53 => {
+      let [wId, entries] = _ref53;
       const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
       if (!entry) return;
       const w = workers.find(x => x.id === wId);
@@ -11699,14 +11782,14 @@ function AppMain(_ref51) {
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
     html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
-    Object.entries(byDept).forEach(_ref53 => {
-      let [deptId, jobs] = _ref53;
+    Object.entries(byDept).forEach(_ref54 => {
+      let [deptId, jobs] = _ref54;
       const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
       html += `<div class="dept">`;
       html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
       html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
-      Object.entries(jobs).forEach(_ref54 => {
-        let [jobType, rows] = _ref54;
+      Object.entries(jobs).forEach(_ref55 => {
+        let [jobType, rows] = _ref55;
         rows.forEach(row => {
           const workerNames = (row.allWorkers || []).map(wId => wName(wId));
           const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
@@ -11803,11 +11886,11 @@ function AppMain(_ref51) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref55 => {
-    let [k] = _ref55;
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref56 => {
+    let [k] = _ref56;
     return !(isPoslovodja && (k === 'radnici' || k === 'odjeli'));
-  }).map(_ref56 => {
-    let [k, l] = _ref56;
+  }).map(_ref57 => {
+    let [k, l] = _ref57;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,

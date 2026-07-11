@@ -261,6 +261,25 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
   const [selectedDate, setSelectedDate] = useState(nextWorkingDay());
   const [subTab, setSubTab] = useState(isPoslovodja ? 'stanje' : 'raspored');
 
+  // Ako PWA ostane otvorena preko noći, "sljedeći radni dan" izračunat pri
+  // otvaranju zastari. Pri povratku u aplikaciju (fokus/vidljivost) osvježi
+  // datum na novi "sljedeći radni dan" — ali samo ako ga korisnik u međuvremenu
+  // nije ručno promijenio (eksplicitan flag, ne poređenje vrijednosti — updater
+  // funkcije u setState moraju biti čiste, bez sporednih efekata poput mutacije refa).
+  const userChangedDateRef = useRef(false);
+  useEffect(() => {
+    const refreshDate = () => {
+      if (userChangedDateRef.current) return;
+      setSelectedDate(nextWorkingDay());
+    };
+    document.addEventListener('visibilitychange', refreshDate);
+    window.addEventListener('focus', refreshDate);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshDate);
+      window.removeEventListener('focus', refreshDate);
+    };
+  }, []);
+
   const dayRows = useMemo(() => truckRows.filter(r => r.date === selectedDate), [truckRows, selectedDate]);
   const unassignedCount = useMemo(() => dayRows.filter(r => !r.kupac).length, [dayRows]);
 
@@ -314,6 +333,18 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
     });
     return order.map(key => ({ key, label: key === '__BEZ_ODJELA__' ? 'Bez odjela' : key, rows: map[key] }));
   }, [dayRows]);
+
+  // Koliko puta je ista KONKRETNA dispozicija već iskorištena za druge kamione istog dana —
+  // stanje u DISPOZICIJE sistemu pada tek kad se otprema stvarno evidentira tamo, pa dva
+  // kamiona istog dana mogu "vidjeti" isti (još neumanjeni) balans iste dispozicije.
+  const dispUsageMap = useMemo(() => {
+    const usage = {};
+    dayRows.forEach(r => {
+      const f = findDispForKupac(r.kupac, r.sortiment);
+      if (f) usage[f.disp.id] = (usage[f.disp.id] || 0) + 1;
+    });
+    return usage;
+  }, [dayRows, dispozicije, otpreme]);
 
   const addOtpremac = (odjelKey, workerId) => {
     const key = otpremaciKey(selectedDate, odjelKey);
@@ -417,7 +448,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
         html += `<td>${found ? (escHtml(found.disp.ugovor) || '—') : '—'}</td>`;
         html += `<td>${found ? (escHtml(found.disp.broj) || '—') : '—'}</td>`;
         html += found
-          ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³</td>`
+          ? `<td class="${balanceCssClass(found.bal)}">${found.bal.toFixed(2)} m³${dispUsageMap[found.disp.id] > 1 ? ` <span class="mid">(dijeli ${dispUsageMap[found.disp.id]}×)</span>` : ''}</td>`
           : r.kupac ? `<td class="pending">u obradi</td>` : `<td>—</td>`;
         html += `<td>${found ? fmtDate(found.disp.datum) : '—'}</td>`;
         html += `</tr>`;
@@ -440,7 +471,8 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
         const found = findDispForKupac(r.kupac, r.sortiment);
         text += `${i + 1}. ${SORTIMENT_LABELS[r.sortiment] || '—'} – ${r.kupac || '—'}\n`;
         if (found) {
-          text += `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³\n`;
+          const shared = dispUsageMap[found.disp.id] > 1 ? ` ⚠ dijeli ${dispUsageMap[found.disp.id]}×` : '';
+          text += `   Disp: ${found.disp.broj} od ${fmtDate(found.disp.datum)} · Ugovor: ${found.disp.ugovor || '—'} · Stanje: ${found.bal.toFixed(2)} m³${shared}\n`;
         } else if (r.kupac) {
           text += `   Disp: — (u obradi)\n`;
         }
@@ -477,7 +509,8 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
       <div className="date-bar">
         <div>
           <div className="date-label">DATUM RASPOREDA</div>
-          <input type="date" className="date-input" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
+          <input type="date" className="date-input" value={selectedDate}
+            onChange={e => { userChangedDateRef.current = true; setSelectedDate(e.target.value); }} />
         </div>
         {subTab === 'raspored' && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -605,6 +638,11 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
                               <div><strong>{found.disp.broj}</strong> · {found.disp.ugovor || '—'}</div>
                               <div style={{ fontWeight: 700, color: balanceColor(found.bal) }}>{found.bal.toFixed(2)} m³</div>
                               <div style={{ color: 'var(--text-muted)' }}>{fmtDate(found.disp.datum)}</div>
+                              {dispUsageMap[found.disp.id] > 1 && (
+                                <div style={{ color: 'var(--amber)', fontWeight: 600, marginTop: '0.15rem' }}>
+                                  ⚠ Dijeli sa još {dispUsageMap[found.disp.id] - 1} {dispUsageMap[found.disp.id] - 1 === 1 ? 'kamionom' : 'kamiona'} danas
+                                </div>
+                              )}
                             </div>
                           ) : <span style={{ color: 'var(--text-light)', fontSize: '0.78rem', fontStyle: 'italic' }}>— dispozicija u obradi —</span>
                         }
