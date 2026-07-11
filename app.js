@@ -10719,10 +10719,10 @@ function Zadnjih10DanaPanel(_ref48) {
     return Object.values(map).sort((a, b) => b.count - a.count || b.m3 - a.m3);
   }, [rows]);
 
-  // Zadnjih 10 radnih dana — "ko je bio na otpremi a ko nije" prikaz.
-  const RECENT_N = Math.min(10, days.length);
-  const recentDaysChrono = useMemo(() => [...days.slice(0, RECENT_N)].reverse(), [days]); // najstariji lijevo
-  const recentPeriodLabel = recentDaysChrono.length ? `${fmtDate(recentDaysChrono[0])} – ${fmtDate(recentDaysChrono[recentDaysChrono.length - 1])}` : '';
+  // Zadnjih 10 radnih dana (bez današnjeg — otprema tog dana još nije završena) —
+  // "ko je bio na otpremi a ko nije" prikaz. Najsvježiji dan je krajnje lijevo.
+  const recentDaysChrono = useMemo(() => days.filter(d => d !== anchor), [days, anchor]); // najnoviji lijevo
+  const recentPeriodLabel = recentDaysChrono.length ? `${fmtDate(recentDaysChrono[recentDaysChrono.length - 1])} – ${fmtDate(recentDaysChrono[0])}` : '';
   const attendance = useMemo(() => {
     const recentSet = new Set(recentDaysChrono);
     const map = {};
