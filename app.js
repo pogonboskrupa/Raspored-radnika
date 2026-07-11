@@ -10707,13 +10707,9 @@ function Zadnjih10DanaPanel(_ref48) {
       if (!map[k]) map[k] = {
         kupac: k,
         count: 0,
-        m3: 0,
-        byFieldCount: Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, 0]))
+        m3: 0
       };
       map[k].count++;
-      SORTIMENT_FIELDS.forEach(f => {
-        if ((o[f] || 0) > 0) map[k].byFieldCount[f]++;
-      });
       map[k].m3 += recTotalM3(o);
     });
     return Object.values(map).sort((a, b) => b.count - a.count || b.m3 - a.m3);
@@ -10750,6 +10746,29 @@ function Zadnjih10DanaPanel(_ref48) {
     if (aRecent !== bRecent) return aRecent ? -1 : 1;
     return b.count - a.count;
   }), [perKupac, attendance, recentDaysChrono]);
+
+  // Po sortimentu → po danu (najsvježiji prvi) → spisak kupaca koji su tog dana otpremili taj sortiment.
+  const bySortimentDay = useMemo(() => {
+    const result = {};
+    activeSortiments.forEach(f => {
+      const byDate = {};
+      rows.forEach(o => {
+        if (!recentDaysChrono.includes(o.datum)) return;
+        const v = o[f] || 0;
+        if (v <= 0) return;
+        if (!byDate[o.datum]) byDate[o.datum] = [];
+        byDate[o.datum].push({
+          kupac: o.kupac || '—',
+          m3: v
+        });
+      });
+      result[f] = recentDaysChrono.filter(dt => byDate[dt]).map(dt => ({
+        date: dt,
+        kupci: byDate[dt].sort((a, b) => b.m3 - a.m3)
+      }));
+    });
+    return result;
+  }, [rows, recentDaysChrono, activeSortiments]);
   const periodLabel = `${fmtDate(days[days.length - 1])} – ${fmtDate(days[0])}`;
   const handlePrintPregled = () => {
     let html = `<html><head><meta charset="UTF-8"/><title>Otprema zadnjih 10 dana</title>
@@ -10779,11 +10798,20 @@ function Zadnjih10DanaPanel(_ref48) {
       }).join('')}</tr>`;
     });
     html += `</tbody></table>`;
-    html += `<h2>Po kupcima — broj otprema po sortimentu</h2><table><thead><tr><th>Kupac</th>${activeSortiments.map(f => `<th class="num">${SORTIMENT_LABELS[f]}</th>`).join('')}<th class="num">Ukupno m³</th><th class="num">Br. otp.</th></tr></thead><tbody>`;
-    perKupac.forEach(k => {
-      html += `<tr><td>${escHtml(k.kupac)}</td>${activeSortiments.map(f => `<td class="num">${k.byFieldCount[f] > 0 ? k.byFieldCount[f] : '—'}</td>`).join('')}<td class="num"><strong>${k.m3.toFixed(2)}</strong></td><td class="num">${k.count}</td></tr>`;
+    html += `<h2>Otprema po sortimentu — ko je bio (${recentPeriodLabel})</h2>`;
+    activeSortiments.forEach(f => {
+      html += `<h2 style="font-size:10pt;margin-top:3mm">${SORTIMENT_LABELS[f]}</h2>`;
+      if (bySortimentDay[f].length === 0) {
+        html += `<div style="font-size:9pt;color:#888;margin-bottom:2mm">Nema otprema u ovom periodu.</div>`;
+      } else {
+        html += `<table><thead><tr><th style="width:18%">Datum</th><th>Kupci</th></tr></thead><tbody>`;
+        bySortimentDay[f].forEach(d => {
+          html += `<tr><td>${fmtDate(d.date)}</td><td>${d.kupci.map(k => `${escHtml(k.kupac)} (${k.m3.toFixed(1)}m³)`).join(', ')}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      }
     });
-    html += `</tbody></table></body></html>`;
+    html += `</body></html>`;
     const win = window.open('', '_blank');
     if (!win) {
       showToast('Preglednik je blokirao prozor za štampu — dozvolite pop-up prozore.', 'error');
@@ -10795,18 +10823,10 @@ function Zadnjih10DanaPanel(_ref48) {
       win.print();
     };
   };
-  const thNum = {
-    textAlign: 'right'
-  };
   const tdBase = {
     padding: '0.45rem 0.7rem',
     borderBottom: '1px solid #ece9e2',
     fontSize: '0.83rem'
-  };
-  const tdNum = {
-    ...tdBase,
-    textAlign: 'right',
-    fontFamily: 'var(--mono)'
   };
   const headTh = {
     padding: '0.5rem 0.7rem',
@@ -11005,112 +11025,56 @@ function Zadnjih10DanaPanel(_ref48) {
       }
     }, "\u2014"));
   }))))))), /*#__PURE__*/React.createElement("div", {
-    className: "card"
+    className: "section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "\uD83C\uDF32 Otprema po sortimentu \u2014 ko je bio zadnjih ", recentDaysChrono.length, " radnih dana"), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, recentPeriodLabel)), activeSortiments.map(f => /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    key: f
   }, /*#__PURE__*/React.createElement("div", {
     className: "card-header"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card-title"
-  }, "\uD83E\uDD1D Otprema po kupcima \u2014 broj otprema po sortimentu"), /*#__PURE__*/React.createElement("span", {
+  }, SORTIMENT_LABELS[f]), /*#__PURE__*/React.createElement("span", {
     className: "tag"
-  }, perKupac.length, " kupaca")), /*#__PURE__*/React.createElement("div", {
+  }, bySortimentDay[f].reduce((s, d) => s + d.kupci.length, 0), " otprema")), /*#__PURE__*/React.createElement("div", {
+    className: "card-body"
+  }, bySortimentDay[f].length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
-      overflowX: 'auto'
+      color: 'var(--text-light)',
+      fontSize: '0.85rem',
+      fontStyle: 'italic'
     }
-  }, /*#__PURE__*/React.createElement("table", {
+  }, "Nema otprema u ovom periodu.") : bySortimentDay[f].map(d => /*#__PURE__*/React.createElement("div", {
+    key: d.date,
     style: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      minWidth: 600
+      marginBottom: '0.8rem'
     }
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      ...headTh,
-      textAlign: 'left',
-      position: 'sticky',
-      left: 0,
-      background: '#f0ede6',
-      zIndex: 1
-    }
-  }, "Kupac"), activeSortiments.map(f => /*#__PURE__*/React.createElement("th", {
-    key: f,
-    style: {
-      ...headTh,
-      ...thNum
-    }
-  }, SORTIMENT_LABELS[f])), /*#__PURE__*/React.createElement("th", {
-    style: {
-      ...headTh,
-      ...thNum
-    }
-  }, "Ukupno m\xB3"), /*#__PURE__*/React.createElement("th", {
-    style: {
-      ...headTh,
-      ...thNum
-    }
-  }, "Br. otp."))), /*#__PURE__*/React.createElement("tbody", null, perKupac.map((k, i) => /*#__PURE__*/React.createElement("tr", {
-    key: k.kupac,
-    style: {
-      background: i % 2 ? '#fafaf6' : 'transparent'
-    }
-  }, /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...tdBase,
-      fontWeight: 600,
-      position: 'sticky',
-      left: 0,
-      background: i % 2 ? '#fafaf6' : 'var(--surface)',
-      zIndex: 1
-    }
-  }, k.kupac), activeSortiments.map(f => /*#__PURE__*/React.createElement("td", {
-    key: f,
-    style: {
-      ...tdNum,
-      color: k.byFieldCount[f] > 0 ? 'var(--text)' : 'var(--text-light)'
-    }
-  }, k.byFieldCount[f] > 0 ? k.byFieldCount[f] : '·')), /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...tdNum,
       fontWeight: 700,
-      color: 'var(--green)'
+      fontSize: '0.78rem',
+      color: 'var(--text-muted)',
+      fontFamily: 'var(--mono)',
+      marginBottom: '0.3rem'
     }
-  }, k.m3.toFixed(2)), /*#__PURE__*/React.createElement("td", {
+  }, fmtDate(d.date)), /*#__PURE__*/React.createElement("div", {
     style: {
-      ...tdNum,
-      fontWeight: 700
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.4rem'
     }
-  }, k.count)))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+  }, d.kupci.map((k, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "tag",
     style: {
-      borderTop: '2px solid var(--border-dark)'
+      background: 'var(--green-pale)',
+      color: 'var(--green)',
+      fontWeight: 600
     }
-  }, /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...tdBase,
-      fontWeight: 700,
-      position: 'sticky',
-      left: 0,
-      background: 'var(--surface)'
-    }
-  }, "UKUPNO"), activeSortiments.map(f => {
-    const t = perKupac.reduce((s, k) => s + k.byFieldCount[f], 0);
-    return /*#__PURE__*/React.createElement("td", {
-      key: f,
-      style: {
-        ...tdNum,
-        fontWeight: 700
-      }
-    }, t || '·');
-  }), /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...tdNum,
-      fontWeight: 700,
-      color: 'var(--green)'
-    }
-  }, stats.m3.toFixed(2)), /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...tdNum,
-      fontWeight: 700
-    }
-  }, stats.otprema)))))))));
+  }, k.kupac, " \xB7 ", k.m3.toFixed(0), "m\xB3")))))))))));
 }
 
 // Zbirni broj kamiona po sortimentu za dati skup redova (za brzi pregled obima posla)
