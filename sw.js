@@ -1,4 +1,4 @@
-// Šumarija Bos.Krupa - raspored radnika — Service Worker
+// Raspored Pogon Bos.Krupa — Service Worker
 const CACHE = 'sumarija-v1';
 
 // Resources to cache on install

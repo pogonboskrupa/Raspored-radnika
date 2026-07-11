@@ -58,10 +58,7 @@ function LoginScreen({ onLogin }) {
         <div style={{textAlign:'center',marginBottom:'1.75rem'}}>
           <img src="1774102184971~2.png" alt="Raspored Radnika" style={{width:96,height:96,borderRadius:18,marginBottom:'0.5rem',boxShadow:'0 4px 16px rgba(0,0,0,0.15)'}} />
           <div style={{fontFamily:'var(--mono)',fontWeight:800,fontSize:'1.1rem',color:'var(--green)',letterSpacing:'-0.03em'}}>
-            Šumarija Bos.Krupa
-          </div>
-          <div style={{fontFamily:'var(--mono)',fontSize:'0.7rem',color:'var(--text-muted)',marginTop:'0.2rem'}}>
-            raspored radnika
+            Raspored Pogon Bos.Krupa
           </div>
         </div>
 

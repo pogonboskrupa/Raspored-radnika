@@ -813,14 +813,7 @@ function LoginScreen(_ref) {
       color: 'var(--green)',
       letterSpacing: '-0.03em'
     }
-  }, "\u0160umarija Bos.Krupa"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: 'var(--mono)',
-      fontSize: '0.7rem',
-      color: 'var(--text-muted)',
-      marginTop: '0.2rem'
-    }
-  }, "raspored radnika")), /*#__PURE__*/React.createElement("div", {
+  }, "Raspored Pogon Bos.Krupa")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'center',
@@ -12337,7 +12330,7 @@ function AppMain(_ref52) {
     className: "app-title"
   }, /*#__PURE__*/React.createElement("span", {
     className: "icon"
-  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "\u0160umarija Bos.Krupa"), /*#__PURE__*/React.createElement("span", {
+  }, "\uD83C\uDF32"), /*#__PURE__*/React.createElement("span", null, "Raspored Pogon Bos.Krupa"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: '0.6rem',
       color: 'rgba(255,255,255,0.55)',
