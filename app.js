@@ -10732,10 +10732,15 @@ function Zadnjih10DanaPanel(_ref48) {
       if (!map[k]) map[k] = {};
       if (!map[k][o.datum]) map[k][o.datum] = {
         count: 0,
-        m3: 0
+        m3: 0,
+        bySortiment: {}
       };
       map[k][o.datum].count++;
       map[k][o.datum].m3 += recTotalM3(o);
+      SORTIMENT_FIELDS.forEach(f => {
+        const v = o[f] || 0;
+        if (v > 0) map[k][o.datum].bySortiment[f] = (map[k][o.datum].bySortiment[f] || 0) + v;
+      });
     });
     return map;
   }, [rows, recentDaysChrono]);
@@ -10767,7 +10772,10 @@ function Zadnjih10DanaPanel(_ref48) {
     attendanceKupci.forEach(k => {
       html += `<tr><td>${escHtml(k.kupac)}</td>${recentDaysChrono.map(dt => {
         const cell = attendance[k.kupac]?.[dt];
-        return `<td class="num">${cell ? '✓ ' + cell.m3.toFixed(1) + 'm³' : '—'}</td>`;
+        return `<td class="num">${cell ? Object.entries(cell.bySortiment).map(_ref49 => {
+          let [f, v] = _ref49;
+          return `${SORTIMENT_LABELS[f]} ${v.toFixed(1)}m³`;
+        }).join('<br>') : '—'}</td>`;
       }).join('')}</tr>`;
     });
     html += `</tbody></table>`;
@@ -10972,20 +10980,26 @@ function Zadnjih10DanaPanel(_ref48) {
       key: dt,
       style: {
         ...tdBase,
-        textAlign: 'center'
+        textAlign: 'center',
+        minWidth: 90
       }
-    }, cell ? /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--green)',
-        fontWeight: 700
-      }
-    }, "\u2713"), ' ', /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '0.7rem',
-        color: 'var(--text-muted)',
-        fontFamily: 'var(--mono)'
-      }
-    }, cell.m3.toFixed(0), "m\xB3")) : /*#__PURE__*/React.createElement("span", {
+    }, cell ? /*#__PURE__*/React.createElement("div", null, Object.entries(cell.bySortiment).map(_ref50 => {
+      let [f, v] = _ref50;
+      return /*#__PURE__*/React.createElement("div", {
+        key: f,
+        style: {
+          fontSize: '0.7rem',
+          color: 'var(--text)',
+          fontFamily: 'var(--mono)',
+          whiteSpace: 'nowrap'
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: 'var(--green)',
+          fontWeight: 700
+        }
+      }, "\u2713"), " ", SORTIMENT_LABELS[f], " ", v.toFixed(0), "m\xB3");
+    })) : /*#__PURE__*/React.createElement("span", {
       style: {
         color: 'var(--text-light)'
       }
@@ -11111,10 +11125,10 @@ function sortimentSummary(rows) {
     count: counts[f]
   }));
 }
-function SortimentSummaryLine(_ref49) {
+function SortimentSummaryLine(_ref51) {
   let {
     rows
-  } = _ref49;
+  } = _ref51;
   if (rows.length === 0) return null;
   const summary = sortimentSummary(rows);
   return /*#__PURE__*/React.createElement("div", {
@@ -11128,13 +11142,13 @@ function SortimentSummaryLine(_ref49) {
 
 // ─── STANJE NA DAN — poslovođa prijavi broj kamiona po sortimentu za odjel;
 // svaki prijavljeni kamion odmah postaje (nedodijeljen) red u Raspored kamiona ────
-function StanjeNaDanPanel(_ref50) {
+function StanjeNaDanPanel(_ref52) {
   let {
     selectedDate,
     dayRows,
     onSubmit,
     onDeleteRow
-  } = _ref50;
+  } = _ref52;
   const [odjel, setOdjel] = useState('');
   const [counts, setCounts] = useState({});
   const parseCount = v => Math.max(0, parseInt(v, 10) || 0);
@@ -11269,7 +11283,7 @@ function StanjeNaDanPanel(_ref50) {
     onClick: () => onDeleteRow(r.id)
   }, "\uD83D\uDDD1\uFE0F")))))))));
 }
-function RasporedKamionaView(_ref51) {
+function RasporedKamionaView(_ref53) {
   let {
     truckRows,
     setTruckRows,
@@ -11278,7 +11292,7 @@ function RasporedKamionaView(_ref51) {
     setTruckGroupOtpremaci,
     isPoslovodja,
     currentUser
-  } = _ref51;
+  } = _ref53;
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
@@ -11855,11 +11869,11 @@ function App() {
     }
   });
 }
-function AppMain(_ref52) {
+function AppMain(_ref54) {
   let {
     onLogout,
     currentUser
-  } = _ref52;
+  } = _ref54;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -11893,8 +11907,8 @@ function AppMain(_ref52) {
     if (staleMeta) {
       setTruckGroupOtpremaci(prev => {
         const next = {};
-        Object.entries(prev).forEach(_ref53 => {
-          let [key, val] = _ref53;
+        Object.entries(prev).forEach(_ref55 => {
+          let [key, val] = _ref55;
           try {
             const [date] = JSON.parse(key);
             if (date >= cutoffStr) next[key] = val;
@@ -12207,8 +12221,8 @@ function AppMain(_ref52) {
       'Neplaćeno': '📋 N'
     };
     const absentList = [];
-    Object.entries(godisnji || {}).forEach(_ref54 => {
-      let [wId, entries] = _ref54;
+    Object.entries(godisnji || {}).forEach(_ref56 => {
+      let [wId, entries] = _ref56;
       const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
       if (!entry) return;
       const w = workers.find(x => x.id === wId);
@@ -12241,14 +12255,14 @@ function AppMain(_ref52) {
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
     html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
-    Object.entries(byDept).forEach(_ref55 => {
-      let [deptId, jobs] = _ref55;
+    Object.entries(byDept).forEach(_ref57 => {
+      let [deptId, jobs] = _ref57;
       const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
       html += `<div class="dept">`;
       html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
       html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
-      Object.entries(jobs).forEach(_ref56 => {
-        let [jobType, rows] = _ref56;
+      Object.entries(jobs).forEach(_ref58 => {
+        let [jobType, rows] = _ref58;
         rows.forEach(row => {
           const workerNames = (row.allWorkers || []).map(wId => wName(wId));
           const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
@@ -12345,11 +12359,11 @@ function AppMain(_ref52) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref57 => {
-    let [k] = _ref57;
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref59 => {
+    let [k] = _ref59;
     return !(isPoslovodja && (k === 'radnici' || k === 'odjeli'));
-  }).map(_ref58 => {
-    let [k, l] = _ref58;
+  }).map(_ref60 => {
+    let [k, l] = _ref60;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,

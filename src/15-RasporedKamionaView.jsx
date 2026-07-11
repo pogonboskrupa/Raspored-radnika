@@ -189,9 +189,13 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
       if (!recentSet.has(o.datum)) return;
       const k = o.kupac || '—';
       if (!map[k]) map[k] = {};
-      if (!map[k][o.datum]) map[k][o.datum] = { count: 0, m3: 0 };
+      if (!map[k][o.datum]) map[k][o.datum] = { count: 0, m3: 0, bySortiment: {} };
       map[k][o.datum].count++;
       map[k][o.datum].m3 += recTotalM3(o);
+      SORTIMENT_FIELDS.forEach(f => {
+        const v = o[f] || 0;
+        if (v > 0) map[k][o.datum].bySortiment[f] = (map[k][o.datum].bySortiment[f] || 0) + v;
+      });
     });
     return map;
   }, [rows, recentDaysChrono]);
@@ -226,7 +230,7 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
     attendanceKupci.forEach(k => {
       html += `<tr><td>${escHtml(k.kupac)}</td>${recentDaysChrono.map(dt => {
         const cell = attendance[k.kupac]?.[dt];
-        return `<td class="num">${cell ? '✓ ' + cell.m3.toFixed(1) + 'm³' : '—'}</td>`;
+        return `<td class="num">${cell ? Object.entries(cell.bySortiment).map(([f, v]) => `${SORTIMENT_LABELS[f]} ${v.toFixed(1)}m³`).join('<br>') : '—'}</td>`;
       }).join('')}</tr>`;
     });
     html += `</tbody></table>`;
@@ -317,12 +321,15 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                           {recentDaysChrono.map(dt => {
                             const cell = attendance[k.kupac]?.[dt];
                             return (
-                              <td key={dt} style={{ ...tdBase, textAlign: 'center' }}>
+                              <td key={dt} style={{ ...tdBase, textAlign: 'center', minWidth: 90 }}>
                                 {cell ? (
-                                  <span>
-                                    <span style={{ color: 'var(--green)', fontWeight: 700 }}>✓</span>{' '}
-                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>{cell.m3.toFixed(0)}m³</span>
-                                  </span>
+                                  <div>
+                                    {Object.entries(cell.bySortiment).map(([f, v]) => (
+                                      <div key={f} style={{ fontSize: '0.7rem', color: 'var(--text)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
+                                        <span style={{ color: 'var(--green)', fontWeight: 700 }}>✓</span> {SORTIMENT_LABELS[f]} {v.toFixed(0)}m³
+                                      </div>
+                                    ))}
+                                  </div>
                                 ) : <span style={{ color: 'var(--text-light)' }}>—</span>}
                               </td>
                             );
