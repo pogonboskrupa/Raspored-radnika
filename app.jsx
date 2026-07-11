@@ -5400,15 +5400,18 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
     </style></head><body>`;
     html += `<h1>OTPREMA — ZADNJIH 10 RADNIH DANA</h1>`;
     html += `<div class="subtitle">Šumarija Bosanska Krupa · ${periodLabel} · Ukupno ${stats.otprema} otprema · ${stats.m3.toFixed(2)} m³</div>`;
-    html += `<h2>Ko je bio na otpremi — zadnjih ${recentDaysChrono.length} radnih dana (${recentPeriodLabel})</h2><table><thead><tr><th>Kupac</th>${recentDaysChrono.map(dt => `<th class="num">${fmtDate(dt)}</th>`).join('')}</tr></thead><tbody>`;
+    html += `<h2>Ko je bio na otpremi — ${recentPeriodLabel}</h2><table><thead><tr><th>Kupac</th>${recentDaysChrono.map(dt => {
+      const dow = new Date(dt + 'T00:00:00').getDay();
+      return `<th class="num">${DAY_ABBR[dow]}<br>${dt.slice(5).split('-').reverse().join('.')}</th>`;
+    }).join('')}</tr></thead><tbody>`;
     attendanceKupci.forEach(k => {
       html += `<tr><td>${escHtml(k.kupac)}</td>${recentDaysChrono.map(dt => {
         const cell = attendance[k.kupac]?.[dt];
-        return `<td class="num">${cell ? Object.entries(cell.bySortiment).map(([f, v]) => `${SORTIMENT_LABELS[f]} ${v.toFixed(1)}m³`).join('<br>') : '—'}</td>`;
+        return `<td class="num">${cell ? '✓ ' + cell.m3.toFixed(0) + 'm³' : '—'}</td>`;
       }).join('')}</tr>`;
     });
     html += `</tbody></table>`;
-    html += `<h2>Otprema po sortimentu — ko je bio (${recentPeriodLabel})</h2>`;
+    html += `<h2>Razrada po sortimentu — ${recentPeriodLabel}</h2>`;
     activeSortiments.forEach(f => {
       html += `<h2 style="font-size:10pt;margin-top:3mm">${SORTIMENT_LABELS[f]}</h2>`;
       if (bySortimentDay[f].length === 0) {
@@ -5449,7 +5452,6 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
             <div className="stat-card"><div className="stat-value">{stats.otprema}</div><div className="stat-label">Otprema (kamiona)</div></div>
             <div className="stat-card"><div className="stat-value">{stats.m3.toFixed(0)}</div><div className="stat-label">Ukupno m³</div></div>
             <div className="stat-card"><div className="stat-value">{stats.kupci}</div><div className="stat-label">Kupaca</div></div>
-            <div className="stat-card"><div className="stat-value" style={{ fontSize: '1rem', paddingTop: '0.3rem' }}>{periodLabel}</div><div className="stat-label">Period (10 radnih dana)</div></div>
           </div>
 
           {rows.length === 0 ? (
@@ -5474,10 +5476,10 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                 </div>
               </div>
 
-              {/* KO JE BIO NA OTPREMI — zadnjih 10 radnih dana */}
+              {/* KO JE BIO NA OTPREMI — presence grid (detalji po sortimentu su u sekciji ispod) */}
               <div className="card">
                 <div className="card-header">
-                  <div className="card-title">👥 Ko je bio na otpremi — zadnjih {recentDaysChrono.length} radnih dana</div>
+                  <div className="card-title">👥 Ko je bio na otpremi</div>
                   <span className="tag">{recentPeriodLabel}</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
@@ -5488,7 +5490,7 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                         {recentDaysChrono.map(dt => {
                           const dow = new Date(dt + 'T00:00:00').getDay();
                           return (
-                            <th key={dt} style={{ ...headTh, textAlign: 'center' }}>
+                            <th key={dt} style={{ ...headTh, textAlign: 'center', minWidth: 52 }}>
                               {DAY_ABBR[dow]}<br />{dt.slice(5).split('-').reverse().join('.')}
                             </th>
                           );
@@ -5498,20 +5500,17 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                     <tbody>
                       {attendanceKupci.map((k, i) => (
                         <tr key={k.kupac} style={{ background: i % 2 ? '#fafaf6' : 'transparent' }}>
-                          <td style={{ ...tdBase, fontWeight: 600, position: 'sticky', left: 0, background: i % 2 ? '#fafaf6' : 'var(--surface)', zIndex: 1 }}>{k.kupac}</td>
+                          <td style={{ ...tdBase, fontWeight: 600, position: 'sticky', left: 0, background: i % 2 ? '#fafaf6' : 'var(--surface)', zIndex: 1, whiteSpace: 'nowrap' }}>{k.kupac}</td>
                           {recentDaysChrono.map(dt => {
                             const cell = attendance[k.kupac]?.[dt];
                             return (
-                              <td key={dt} style={{ ...tdBase, textAlign: 'center', minWidth: 90 }}>
+                              <td key={dt} style={{ ...tdBase, textAlign: 'center', padding: '0.3rem', background: cell ? 'var(--green-pale)' : undefined }}>
                                 {cell ? (
-                                  <div>
-                                    {Object.entries(cell.bySortiment).map(([f, v]) => (
-                                      <div key={f} style={{ fontSize: '0.7rem', color: 'var(--text)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
-                                        <span style={{ color: 'var(--green)', fontWeight: 700 }}>✓</span> {SORTIMENT_LABELS[f]} {v.toFixed(0)}m³
-                                      </div>
-                                    ))}
+                                  <div style={{ lineHeight: 1.15 }}>
+                                    <div style={{ color: 'var(--green)', fontWeight: 700, fontSize: '0.9rem' }}>✓</div>
+                                    <div style={{ fontSize: '0.66rem', color: 'var(--green)', fontFamily: 'var(--mono)' }}>{cell.m3.toFixed(0)}m³</div>
                                   </div>
-                                ) : <span style={{ color: 'var(--text-light)' }}>—</span>}
+                                ) : <span style={{ color: 'var(--border-dark)' }}>·</span>}
                               </td>
                             );
                           })}
@@ -5520,41 +5519,53 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                     </tbody>
                   </table>
                 </div>
+                <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', color: 'var(--text-light)', borderTop: '1px solid var(--border)' }}>
+                  ✓ = bio na otpremi tog dana (m³ = ukupno). Koji sortiment — vidi razradu ispod.
+                </div>
               </div>
 
-              {/* PO SORTIMENTU — ko je otpremao, po danu (zadnjih 10 radnih dana) */}
+              {/* PO SORTIMENTU — razrada: ko je otpremao koji sortiment, po danu */}
               <div className="section-header">
-                <div className="section-title">🌲 Otprema po sortimentu — ko je bio zadnjih {recentDaysChrono.length} radnih dana</div>
+                <div className="section-title">🌲 Razrada po sortimentu</div>
                 <span className="tag">{recentPeriodLabel}</span>
               </div>
-              {activeSortiments.map(f => (
+              {activeSortiments.map(f => {
+                const totalM3 = bySortimentDay[f].reduce((s, d) => s + d.kupci.reduce((ss, k) => ss + k.m3, 0), 0);
+                const totalOtp = bySortimentDay[f].reduce((s, d) => s + d.kupci.length, 0);
+                return (
                 <div className="card" key={f}>
-                  <div className="card-header">
-                    <div className="card-title">{SORTIMENT_LABELS[f]}</div>
-                    <span className="tag">{bySortimentDay[f].reduce((s, d) => s + d.kupci.length, 0)} otprema</span>
+                  <div className="card-header" style={{ background: 'var(--green-pale)' }}>
+                    <div className="card-title" style={{ color: 'var(--green)' }}>{SORTIMENT_LABELS[f]}</div>
+                    <span className="tag" style={{ background: 'var(--surface)' }}>{totalOtp} otp. · {totalM3.toFixed(0)} m³</span>
                   </div>
-                  <div className="card-body">
+                  <div className="card-body" style={{ padding: 0 }}>
                     {bySortimentDay[f].length === 0 ? (
-                      <div style={{ color: 'var(--text-light)', fontSize: '0.85rem', fontStyle: 'italic' }}>Nema otprema u ovom periodu.</div>
+                      <div style={{ color: 'var(--text-light)', fontSize: '0.85rem', fontStyle: 'italic', padding: '0.75rem 1rem' }}>Nema otprema u ovom periodu.</div>
                     ) : (
-                      bySortimentDay[f].map(d => (
-                        <div key={d.date} style={{ marginBottom: '0.8rem' }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: '0.3rem' }}>
-                            {fmtDate(d.date)}
+                      bySortimentDay[f].map((d, di) => {
+                        const dow = new Date(d.date + 'T00:00:00').getDay();
+                        return (
+                          <div key={d.date} style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '0.6rem', alignItems: 'center', padding: '0.55rem 1rem', borderTop: di ? '1px solid #ece9e2' : undefined }}>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, lineHeight: 1.2 }}>
+                              <span style={{ color: 'var(--text-light)', fontSize: '0.62rem', letterSpacing: '0.04em' }}>{DAY_ABBR[dow]}</span><br />
+                              {d.date.slice(5).split('-').reverse().join('.')}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                              {d.kupci.map((k, i) => (
+                                <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.3rem', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 20, padding: '0.15rem 0.6rem', fontSize: '0.8rem' }}>
+                                  <strong>{k.kupac}</strong>
+                                  <span style={{ color: 'var(--green)', fontWeight: 700, fontFamily: 'var(--mono)', fontSize: '0.75rem' }}>{k.m3.toFixed(0)}m³</span>
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                            {d.kupci.map((k, i) => (
-                              <span key={i} className="tag" style={{ background: 'var(--green-pale)', color: 'var(--green)', fontWeight: 600 }}>
-                                {k.kupac} · {k.m3.toFixed(0)}m³
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </>
           )}
         </>
