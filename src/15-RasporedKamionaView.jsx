@@ -131,7 +131,7 @@ function lastWorkingDays(n, endStr) {
   const d = new Date(endStr + 'T00:00:00');
   while (days.length < n) {
     const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) days.push(d.toISOString().split('T')[0]);
+    if (dow !== 0 && dow !== 6) days.push(ymdLocal(d));
     d.setDate(d.getDate() - 1);
   }
   return days;

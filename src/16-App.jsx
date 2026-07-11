@@ -37,7 +37,7 @@ function AppMain({ onLogout, currentUser }) {
     truckCleanupDone.current = true;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - TRUCK_RETENTION_DAYS);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = ymdLocal(cutoff);
     if (truckRows.some(r => r.date < cutoffStr)) {
       setTruckRows(prev => prev.filter(r => r.date >= cutoffStr));
     }

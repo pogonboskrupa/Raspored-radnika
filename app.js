@@ -407,17 +407,22 @@ const SORTIMENT_LABELS = {
   oc: 'Ogr.Cij.',
   od: 'Ogr.Dugi'
 };
-const today = () => new Date().toISOString().split('T')[0];
+
+// YYYY-MM-DD iz LOKALNIH komponenti datuma — toISOString() vraća UTC i zna
+// pomjeriti datum unazad za jedan dan istočno od Greenwicha (npr. Bosna,
+// UTC+1/+2), naročito u ranim jutarnjim satima po lokalnom vremenu.
+const ymdLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const today = () => ymdLocal(new Date());
 const yesterday = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().split('T')[0];
+  return ymdLocal(d);
 };
 const nextWorkingDay = () => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
+  return ymdLocal(d);
 };
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -10655,7 +10660,7 @@ function lastWorkingDays(n, endStr) {
   const d = new Date(endStr + 'T00:00:00');
   while (days.length < n) {
     const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) days.push(d.toISOString().split('T')[0]);
+    if (dow !== 0 && dow !== 6) days.push(ymdLocal(d));
     d.setDate(d.getDate() - 1);
   }
   return days;
@@ -11824,7 +11829,7 @@ function AppMain(_ref52) {
     truckCleanupDone.current = true;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - TRUCK_RETENTION_DAYS);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = ymdLocal(cutoff);
     if (truckRows.some(r => r.date < cutoffStr)) {
       setTruckRows(prev => prev.filter(r => r.date >= cutoffStr));
     }
