@@ -10666,7 +10666,6 @@ function lastWorkingDays(n, endStr) {
   return days;
 }
 const recTotalM3 = o => SORTIMENT_FIELDS.reduce((s, f) => s + (o[f] || 0), 0);
-const fmtM3 = n => n > 0 ? n.toFixed(2) : '';
 function Zadnjih10DanaPanel(_ref48) {
   let {
     otpreme,
@@ -10698,24 +10697,9 @@ function Zadnjih10DanaPanel(_ref48) {
     };
   }), [days, rows]); // hronološki (najstariji lijevo)
 
-  const perSortiment = useMemo(() => SORTIMENT_FIELDS.map(f => {
-    let count = 0,
-      m3 = 0;
-    rows.forEach(o => {
-      const v = o[f] || 0;
-      if (v > 0) {
-        count++;
-        m3 += v;
-      }
-    });
-    return {
-      code: f,
-      label: SORTIMENT_LABELS[f],
-      count,
-      m3
-    };
-  }), [rows]);
-  const maxSortM3 = Math.max(1, ...perSortiment.map(s => s.m3));
+  // Sortimenti koji se uopšte pojavljuju u posljednjih 10 radnih dana — prazne
+  // kolone (sortiment bez ijedne otpreme) se ne prikazuju u tabeli po kupcima.
+  const activeSortiments = useMemo(() => SORTIMENT_FIELDS.filter(f => rows.some(o => (o[f] || 0) > 0)), [rows]);
   const perKupac = useMemo(() => {
     const map = {};
     rows.forEach(o => {
@@ -10724,16 +10708,42 @@ function Zadnjih10DanaPanel(_ref48) {
         kupac: k,
         count: 0,
         m3: 0,
-        byField: Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, 0]))
+        byFieldCount: Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, 0]))
       };
       map[k].count++;
       SORTIMENT_FIELDS.forEach(f => {
-        map[k].byField[f] += o[f] || 0;
+        if ((o[f] || 0) > 0) map[k].byFieldCount[f]++;
       });
       map[k].m3 += recTotalM3(o);
     });
-    return Object.values(map).sort((a, b) => b.m3 - a.m3 || b.count - a.count);
+    return Object.values(map).sort((a, b) => b.count - a.count || b.m3 - a.m3);
   }, [rows]);
+
+  // Zadnja 3-4 radna dana — "ko je bio na otpremi a ko nije" prikaz.
+  const RECENT_N = Math.min(4, days.length);
+  const recentDaysChrono = useMemo(() => [...days.slice(0, RECENT_N)].reverse(), [days]); // najstariji lijevo
+  const attendance = useMemo(() => {
+    const recentSet = new Set(recentDaysChrono);
+    const map = {};
+    rows.forEach(o => {
+      if (!recentSet.has(o.datum)) return;
+      const k = o.kupac || '—';
+      if (!map[k]) map[k] = {};
+      if (!map[k][o.datum]) map[k][o.datum] = {
+        count: 0,
+        m3: 0
+      };
+      map[k][o.datum].count++;
+      map[k][o.datum].m3 += recTotalM3(o);
+    });
+    return map;
+  }, [rows, recentDaysChrono]);
+  const attendanceKupci = useMemo(() => [...perKupac].sort((a, b) => {
+    const aRecent = recentDaysChrono.some(dt => attendance[a.kupac]?.[dt]);
+    const bRecent = recentDaysChrono.some(dt => attendance[b.kupac]?.[dt]);
+    if (aRecent !== bRecent) return aRecent ? -1 : 1;
+    return b.count - a.count;
+  }), [perKupac, attendance, recentDaysChrono]);
   const periodLabel = `${fmtDate(days[days.length - 1])} – ${fmtDate(days[0])}`;
   const handlePrintPregled = () => {
     let html = `<html><head><meta charset="UTF-8"/><title>Otprema zadnjih 10 dana</title>
@@ -10752,15 +10762,17 @@ function Zadnjih10DanaPanel(_ref48) {
     </style></head><body>`;
     html += `<h1>OTPREMA — ZADNJIH 10 RADNIH DANA</h1>`;
     html += `<div class="subtitle">Šumarija Bosanska Krupa · ${periodLabel} · Ukupno ${stats.otprema} otprema · ${stats.m3.toFixed(2)} m³</div>`;
-    html += `<h2>Po sortimentima</h2><table><thead><tr><th>Sortiment</th><th class="num">Br. otprema</th><th class="num">Ukupno m³</th></tr></thead><tbody>`;
-    perSortiment.forEach(s => {
-      html += `<tr><td>${s.label}</td><td class="num">${s.count || '—'}</td><td class="num">${s.m3 > 0 ? s.m3.toFixed(2) : '—'}</td></tr>`;
+    html += `<h2>Ko je bio na otpremi — zadnja ${recentDaysChrono.length} radna dana</h2><table><thead><tr><th>Kupac</th>${recentDaysChrono.map(dt => `<th class="num">${fmtDate(dt)}</th>`).join('')}</tr></thead><tbody>`;
+    attendanceKupci.forEach(k => {
+      html += `<tr><td>${escHtml(k.kupac)}</td>${recentDaysChrono.map(dt => {
+        const cell = attendance[k.kupac]?.[dt];
+        return `<td class="num">${cell ? '✓ ' + cell.m3.toFixed(1) + 'm³' : '—'}</td>`;
+      }).join('')}</tr>`;
     });
-    html += `<tr class="total"><td>UKUPNO</td><td class="num">${stats.otprema}</td><td class="num">${stats.m3.toFixed(2)}</td></tr>`;
     html += `</tbody></table>`;
-    html += `<h2>Po kupcima</h2><table><thead><tr><th>Kupac</th>${SORTIMENT_FIELDS.map(f => `<th class="num">${SORTIMENT_LABELS[f]}</th>`).join('')}<th class="num">Ukupno m³</th><th class="num">Br. otp.</th></tr></thead><tbody>`;
+    html += `<h2>Po kupcima — broj otprema po sortimentu</h2><table><thead><tr><th>Kupac</th>${activeSortiments.map(f => `<th class="num">${SORTIMENT_LABELS[f]}</th>`).join('')}<th class="num">Ukupno m³</th><th class="num">Br. otp.</th></tr></thead><tbody>`;
     perKupac.forEach(k => {
-      html += `<tr><td>${escHtml(k.kupac)}</td>${SORTIMENT_FIELDS.map(f => `<td class="num">${k.byField[f] > 0 ? k.byField[f].toFixed(2) : '—'}</td>`).join('')}<td class="num"><strong>${k.m3.toFixed(2)}</strong></td><td class="num">${k.count}</td></tr>`;
+      html += `<tr><td>${escHtml(k.kupac)}</td>${activeSortiments.map(f => `<td class="num">${k.byFieldCount[f] > 0 ? k.byFieldCount[f] : '—'}</td>`).join('')}<td class="num"><strong>${k.m3.toFixed(2)}</strong></td><td class="num">${k.count}</td></tr>`;
     });
     html += `</tbody></table></body></html>`;
     const win = window.open('', '_blank');
@@ -10909,48 +10921,7 @@ function Zadnjih10DanaPanel(_ref48) {
     className: "card-header"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card-title"
-  }, "\uD83C\uDF32 Otprema po sortimentima")), /*#__PURE__*/React.createElement("table", {
-    className: "schedule-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Sortiment"), /*#__PURE__*/React.createElement("th", null, "Br. otprema"), /*#__PURE__*/React.createElement("th", null, "Ukupno m\xB3"), /*#__PURE__*/React.createElement("th", null, "Udio"))), /*#__PURE__*/React.createElement("tbody", null, perSortiment.map(s => /*#__PURE__*/React.createElement("tr", {
-    key: s.code
-  }, /*#__PURE__*/React.createElement("td", {
-    "data-label": "Sortiment",
-    style: {
-      fontWeight: 600
-    }
-  }, s.label), /*#__PURE__*/React.createElement("td", {
-    "data-label": "Br. otprema",
-    style: {
-      fontFamily: 'var(--mono)'
-    }
-  }, s.count || '—'), /*#__PURE__*/React.createElement("td", {
-    "data-label": "Ukupno m\xB3",
-    style: {
-      fontFamily: 'var(--mono)',
-      fontWeight: 700
-    }
-  }, s.m3 > 0 ? s.m3.toFixed(2) : '—'), /*#__PURE__*/React.createElement("td", {
-    "data-label": "Udio",
-    style: {
-      minWidth: 120
-    }
-  }, s.m3 > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: 'var(--green-pale)',
-      borderRadius: 4,
-      height: 14,
-      width: `${Math.max(6, s.m3 / maxSortM3 * 100)}%`
-    },
-    title: `${(s.m3 / stats.m3 * 100).toFixed(1)}%`
-  }))))))), /*#__PURE__*/React.createElement("div", {
-    className: "card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "card-header"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "card-title"
-  }, "\uD83E\uDD1D Otprema po kupcima"), /*#__PURE__*/React.createElement("span", {
-    className: "tag"
-  }, perKupac.length, " kupaca")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDC65 Ko je bio na otpremi \u2014 zadnja ", recentDaysChrono.length, " radna dana")), /*#__PURE__*/React.createElement("div", {
     style: {
       overflowX: 'auto'
     }
@@ -10958,7 +10929,7 @@ function Zadnjih10DanaPanel(_ref48) {
     style: {
       width: '100%',
       borderCollapse: 'collapse',
-      minWidth: 720
+      minWidth: 480
     }
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: {
@@ -10969,7 +10940,81 @@ function Zadnjih10DanaPanel(_ref48) {
       background: '#f0ede6',
       zIndex: 1
     }
-  }, "Kupac"), SORTIMENT_FIELDS.map(f => /*#__PURE__*/React.createElement("th", {
+  }, "Kupac"), recentDaysChrono.map(dt => {
+    const dow = new Date(dt + 'T00:00:00').getDay();
+    return /*#__PURE__*/React.createElement("th", {
+      key: dt,
+      style: {
+        ...headTh,
+        textAlign: 'center'
+      }
+    }, DAY_ABBR[dow], /*#__PURE__*/React.createElement("br", null), dt.slice(5).split('-').reverse().join('.'));
+  }))), /*#__PURE__*/React.createElement("tbody", null, attendanceKupci.map((k, i) => /*#__PURE__*/React.createElement("tr", {
+    key: k.kupac,
+    style: {
+      background: i % 2 ? '#fafaf6' : 'transparent'
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...tdBase,
+      fontWeight: 600,
+      position: 'sticky',
+      left: 0,
+      background: i % 2 ? '#fafaf6' : 'var(--surface)',
+      zIndex: 1
+    }
+  }, k.kupac), recentDaysChrono.map(dt => {
+    const cell = attendance[k.kupac]?.[dt];
+    return /*#__PURE__*/React.createElement("td", {
+      key: dt,
+      style: {
+        ...tdBase,
+        textAlign: 'center'
+      }
+    }, cell ? /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--green)',
+        fontWeight: 700
+      }
+    }, "\u2713"), ' ', /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.7rem',
+        color: 'var(--text-muted)',
+        fontFamily: 'var(--mono)'
+      }
+    }, cell.m3.toFixed(0), "m\xB3")) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--text-light)'
+      }
+    }, "\u2014"));
+  }))))))), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-title"
+  }, "\uD83E\uDD1D Otprema po kupcima \u2014 broj otprema po sortimentu"), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, perKupac.length, " kupaca")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      minWidth: 600
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...headTh,
+      textAlign: 'left',
+      position: 'sticky',
+      left: 0,
+      background: '#f0ede6',
+      zIndex: 1
+    }
+  }, "Kupac"), activeSortiments.map(f => /*#__PURE__*/React.createElement("th", {
     key: f,
     style: {
       ...headTh,
@@ -10999,13 +11044,13 @@ function Zadnjih10DanaPanel(_ref48) {
       background: i % 2 ? '#fafaf6' : 'var(--surface)',
       zIndex: 1
     }
-  }, k.kupac), SORTIMENT_FIELDS.map(f => /*#__PURE__*/React.createElement("td", {
+  }, k.kupac), activeSortiments.map(f => /*#__PURE__*/React.createElement("td", {
     key: f,
     style: {
       ...tdNum,
-      color: k.byField[f] > 0 ? 'var(--text)' : 'var(--text-light)'
+      color: k.byFieldCount[f] > 0 ? 'var(--text)' : 'var(--text-light)'
     }
-  }, k.byField[f] > 0 ? k.byField[f].toFixed(2) : '·')), /*#__PURE__*/React.createElement("td", {
+  }, k.byFieldCount[f] > 0 ? k.byFieldCount[f] : '·')), /*#__PURE__*/React.createElement("td", {
     style: {
       ...tdNum,
       fontWeight: 700,
@@ -11013,7 +11058,8 @@ function Zadnjih10DanaPanel(_ref48) {
     }
   }, k.m3.toFixed(2)), /*#__PURE__*/React.createElement("td", {
     style: {
-      ...tdNum
+      ...tdNum,
+      fontWeight: 700
     }
   }, k.count)))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
     style: {
@@ -11027,15 +11073,15 @@ function Zadnjih10DanaPanel(_ref48) {
       left: 0,
       background: 'var(--surface)'
     }
-  }, "UKUPNO"), SORTIMENT_FIELDS.map(f => {
-    const t = perSortiment.find(s => s.code === f).m3;
+  }, "UKUPNO"), activeSortiments.map(f => {
+    const t = perKupac.reduce((s, k) => s + k.byFieldCount[f], 0);
     return /*#__PURE__*/React.createElement("td", {
       key: f,
       style: {
         ...tdNum,
         fontWeight: 700
       }
-    }, t > 0 ? t.toFixed(2) : '·');
+    }, t || '·');
   }), /*#__PURE__*/React.createElement("td", {
     style: {
       ...tdNum,
