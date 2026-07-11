@@ -122,6 +122,217 @@ function balanceColor(bal) {
 }
 const balanceCssClass = bal => (bal < 25 ? 'low' : bal > 100 ? 'ok' : 'mid');
 
+// ─── PREGLED ZADNJIH 10 RADNIH DANA (admin) ───────────────────────────────────
+const DAY_ABBR = ['NED', 'PON', 'UTO', 'SRI', 'ČET', 'PET', 'SUB'];
+
+// Zadnjih n radnih dana (bez subote/nedjelje) zaključno sa endStr — najnoviji prvi
+function lastWorkingDays(n, endStr) {
+  const days = [];
+  const d = new Date(endStr + 'T00:00:00');
+  while (days.length < n) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) days.push(d.toISOString().split('T')[0]);
+    d.setDate(d.getDate() - 1);
+  }
+  return days;
+}
+
+const recTotalM3 = o => SORTIMENT_FIELDS.reduce((s, f) => s + (o[f] || 0), 0);
+const fmtM3 = n => (n > 0 ? n.toFixed(2) : '');
+
+function Zadnjih10DanaPanel({ otpreme, ready }) {
+  const anchor = today();
+  const days = useMemo(() => lastWorkingDays(10, anchor), [anchor]); // najnoviji prvi
+  const daysSet = useMemo(() => new Set(days), [days]);
+  const rows = useMemo(() => (otpreme || []).filter(o => o.datum && daysSet.has(o.datum)), [otpreme, daysSet]);
+
+  const stats = useMemo(() => {
+    const kupci = new Set();
+    let m3 = 0;
+    rows.forEach(o => { if (o.kupac) kupci.add(o.kupac); m3 += recTotalM3(o); });
+    return { otprema: rows.length, m3, kupci: kupci.size };
+  }, [rows]);
+
+  const perDay = useMemo(() =>
+    [...days].reverse().map(dt => {
+      const dRows = rows.filter(o => o.datum === dt);
+      return { date: dt, count: dRows.length, m3: dRows.reduce((s, o) => s + recTotalM3(o), 0) };
+    }), [days, rows]); // hronološki (najstariji lijevo)
+
+  const perSortiment = useMemo(() =>
+    SORTIMENT_FIELDS.map(f => {
+      let count = 0, m3 = 0;
+      rows.forEach(o => { const v = o[f] || 0; if (v > 0) { count++; m3 += v; } });
+      return { code: f, label: SORTIMENT_LABELS[f], count, m3 };
+    }), [rows]);
+  const maxSortM3 = Math.max(1, ...perSortiment.map(s => s.m3));
+
+  const perKupac = useMemo(() => {
+    const map = {};
+    rows.forEach(o => {
+      const k = o.kupac || '—';
+      if (!map[k]) map[k] = { kupac: k, count: 0, m3: 0, byField: Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, 0])) };
+      map[k].count++;
+      SORTIMENT_FIELDS.forEach(f => { map[k].byField[f] += (o[f] || 0); });
+      map[k].m3 += recTotalM3(o);
+    });
+    return Object.values(map).sort((a, b) => b.m3 - a.m3 || b.count - a.count);
+  }, [rows]);
+
+  const periodLabel = `${fmtDate(days[days.length - 1])} – ${fmtDate(days[0])}`;
+
+  const handlePrintPregled = () => {
+    let html = `<html><head><meta charset="UTF-8"/><title>Otprema zadnjih 10 dana</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      @page{size:A4 landscape;margin:10mm}
+      body{font-family:Arial,sans-serif;font-size:10.5pt;padding:8mm;color:#222}
+      h1{font-size:15pt;margin-bottom:1mm;text-align:center}
+      h2{font-size:11pt;margin:5mm 0 1.5mm}
+      .subtitle{font-size:10pt;text-align:center;color:#555;margin-bottom:5mm}
+      table{border-collapse:collapse;width:100%;margin-bottom:2mm}
+      th{background:#e8f0e6;border:1px solid #999;padding:1.2mm 2.5mm;text-align:left;font-size:8.5pt;font-weight:700}
+      td{border:1px solid #bbb;padding:1.2mm 2.5mm;font-size:9pt}
+      td.num,th.num{text-align:right}
+      tr.total td{font-weight:700;background:#f3f1ea}
+    </style></head><body>`;
+    html += `<h1>OTPREMA — ZADNJIH 10 RADNIH DANA</h1>`;
+    html += `<div class="subtitle">Šumarija Bosanska Krupa · ${periodLabel} · Ukupno ${stats.otprema} otprema · ${stats.m3.toFixed(2)} m³</div>`;
+    html += `<h2>Po sortimentima</h2><table><thead><tr><th>Sortiment</th><th class="num">Br. otprema</th><th class="num">Ukupno m³</th></tr></thead><tbody>`;
+    perSortiment.forEach(s => {
+      html += `<tr><td>${s.label}</td><td class="num">${s.count || '—'}</td><td class="num">${s.m3 > 0 ? s.m3.toFixed(2) : '—'}</td></tr>`;
+    });
+    html += `<tr class="total"><td>UKUPNO</td><td class="num">${stats.otprema}</td><td class="num">${stats.m3.toFixed(2)}</td></tr>`;
+    html += `</tbody></table>`;
+    html += `<h2>Po kupcima</h2><table><thead><tr><th>Kupac</th>${SORTIMENT_FIELDS.map(f => `<th class="num">${SORTIMENT_LABELS[f]}</th>`).join('')}<th class="num">Ukupno m³</th><th class="num">Br. otp.</th></tr></thead><tbody>`;
+    perKupac.forEach(k => {
+      html += `<tr><td>${escHtml(k.kupac)}</td>${SORTIMENT_FIELDS.map(f => `<td class="num">${k.byField[f] > 0 ? k.byField[f].toFixed(2) : '—'}</td>`).join('')}<td class="num"><strong>${k.m3.toFixed(2)}</strong></td><td class="num">${k.count}</td></tr>`;
+    });
+    html += `</tbody></table></body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Preglednik je blokirao prozor za štampu — dozvolite pop-up prozore.', 'error'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => { win.print(); };
+  };
+
+  const thNum = { textAlign: 'right' };
+  const tdBase = { padding: '0.45rem 0.7rem', borderBottom: '1px solid #ece9e2', fontSize: '0.83rem' };
+  const tdNum = { ...tdBase, textAlign: 'right', fontFamily: 'var(--mono)' };
+  const headTh = { padding: '0.5rem 0.7rem', background: '#f0ede6', fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', fontWeight: 600, whiteSpace: 'nowrap' };
+
+  return (
+    <div>
+      <div className="section-header">
+        <div className="section-title">📊 Otprema — zadnjih 10 radnih dana</div>
+        <span className="tag">{periodLabel}</span>
+        <button className="btn btn-secondary btn-sm no-print" style={{ marginLeft: 'auto' }} onClick={handlePrintPregled}>🖨️ Štampaj</button>
+      </div>
+
+      {!ready ? (
+        <div className="alert alert-warning">⚡ Povezivanje sa sistemom dispozicija u toku — podaci o otpremama će se pojaviti čim se učitaju.</div>
+      ) : (
+        <>
+          {/* STAT KARTICE */}
+          <div className="stats-row">
+            <div className="stat-card"><div className="stat-value">{stats.otprema}</div><div className="stat-label">Otprema (kamiona)</div></div>
+            <div className="stat-card"><div className="stat-value">{stats.m3.toFixed(0)}</div><div className="stat-label">Ukupno m³</div></div>
+            <div className="stat-card"><div className="stat-value">{stats.kupci}</div><div className="stat-label">Kupaca</div></div>
+            <div className="stat-card"><div className="stat-value" style={{ fontSize: '1rem', paddingTop: '0.3rem' }}>{periodLabel}</div><div className="stat-label">Period (10 radnih dana)</div></div>
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="card"><div className="empty-state"><span className="icon">📭</span><p>Nema evidentiranih otprema u zadnjih 10 radnih dana.</p></div></div>
+          ) : (
+            <>
+              {/* PO DANIMA */}
+              <div className="card">
+                <div className="card-header"><div className="card-title">📅 Otprema po danima</div></div>
+                <div className="card-body" style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
+                  {perDay.map(d => {
+                    const dow = new Date(d.date + 'T00:00:00').getDay();
+                    return (
+                      <div key={d.date} style={{ flex: '1 0 90px', minWidth: 90, border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.6rem', textAlign: 'center', background: d.count ? 'var(--surface)' : 'var(--bg)' }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.06em', color: 'var(--text-light)' }}>{DAY_ABBR[dow]}</div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>{d.date.slice(5).split('-').reverse().join('.')}</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: '1.1rem', fontWeight: 700, color: d.count ? 'var(--green)' : 'var(--text-light)' }}>{d.m3 > 0 ? d.m3.toFixed(0) : '—'}</div>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-light)' }}>m³ · {d.count} otp.</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* PO SORTIMENTIMA */}
+              <div className="card">
+                <div className="card-header"><div className="card-title">🌲 Otprema po sortimentima</div></div>
+                <table className="schedule-table">
+                  <thead><tr><th>Sortiment</th><th>Br. otprema</th><th>Ukupno m³</th><th>Udio</th></tr></thead>
+                  <tbody>
+                    {perSortiment.map(s => (
+                      <tr key={s.code}>
+                        <td data-label="Sortiment" style={{ fontWeight: 600 }}>{s.label}</td>
+                        <td data-label="Br. otprema" style={{ fontFamily: 'var(--mono)' }}>{s.count || '—'}</td>
+                        <td data-label="Ukupno m³" style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{s.m3 > 0 ? s.m3.toFixed(2) : '—'}</td>
+                        <td data-label="Udio" style={{ minWidth: 120 }}>
+                          {s.m3 > 0 && (
+                            <div style={{ background: 'var(--green-pale)', borderRadius: 4, height: 14, width: `${Math.max(6, (s.m3 / maxSortM3) * 100)}%` }} title={`${((s.m3 / stats.m3) * 100).toFixed(1)}%`} />
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PO KUPCIMA (cross-tab) */}
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-title">🤝 Otprema po kupcima</div>
+                  <span className="tag">{perKupac.length} kupaca</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...headTh, textAlign: 'left', position: 'sticky', left: 0, background: '#f0ede6', zIndex: 1 }}>Kupac</th>
+                        {SORTIMENT_FIELDS.map(f => <th key={f} style={{ ...headTh, ...thNum }}>{SORTIMENT_LABELS[f]}</th>)}
+                        <th style={{ ...headTh, ...thNum }}>Ukupno m³</th>
+                        <th style={{ ...headTh, ...thNum }}>Br. otp.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {perKupac.map((k, i) => (
+                        <tr key={k.kupac} style={{ background: i % 2 ? '#fafaf6' : 'transparent' }}>
+                          <td style={{ ...tdBase, fontWeight: 600, position: 'sticky', left: 0, background: i % 2 ? '#fafaf6' : 'var(--surface)', zIndex: 1 }}>{k.kupac}</td>
+                          {SORTIMENT_FIELDS.map(f => <td key={f} style={{ ...tdNum, color: k.byField[f] > 0 ? 'var(--text)' : 'var(--text-light)' }}>{k.byField[f] > 0 ? k.byField[f].toFixed(2) : '·'}</td>)}
+                          <td style={{ ...tdNum, fontWeight: 700, color: 'var(--green)' }}>{k.m3.toFixed(2)}</td>
+                          <td style={{ ...tdNum }}>{k.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid var(--border-dark)' }}>
+                        <td style={{ ...tdBase, fontWeight: 700, position: 'sticky', left: 0, background: 'var(--surface)' }}>UKUPNO</td>
+                        {SORTIMENT_FIELDS.map(f => {
+                          const t = perSortiment.find(s => s.code === f).m3;
+                          return <td key={f} style={{ ...tdNum, fontWeight: 700 }}>{t > 0 ? t.toFixed(2) : '·'}</td>;
+                        })}
+                        <td style={{ ...tdNum, fontWeight: 700, color: 'var(--green)' }}>{stats.m3.toFixed(2)}</td>
+                        <td style={{ ...tdNum, fontWeight: 700 }}>{stats.otprema}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // Zbirni broj kamiona po sortimentu za dati skup redova (za brzi pregled obima posla)
 function sortimentSummary(rows) {
   const counts = {};
@@ -506,23 +717,25 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
 
   return (
     <div>
-      <div className="date-bar">
-        <div>
-          <div className="date-label">DATUM RASPOREDA</div>
-          <input type="date" className="date-input" value={selectedDate}
-            onChange={e => { userChangedDateRef.current = true; setSelectedDate(e.target.value); }} />
-        </div>
-        {subTab === 'raspored' && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary btn-sm no-print" onClick={handleCopyMessage}>📋 Kopiraj za poruku</button>
-            <button className="btn btn-secondary btn-sm no-print" onClick={handleShare}>📤 Pošalji (Viber/WhatsApp/Messenger)</button>
-            <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>🖨️ Štampaj za poslovođe</button>
-            {!isPoslovodja && (
-              <button className="btn btn-primary btn-sm no-print" onClick={addRow}>+ Dodaj kamion</button>
-            )}
+      {subTab !== 'pregled10' && (
+        <div className="date-bar">
+          <div>
+            <div className="date-label">DATUM RASPOREDA</div>
+            <input type="date" className="date-input" value={selectedDate}
+              onChange={e => { userChangedDateRef.current = true; setSelectedDate(e.target.value); }} />
           </div>
-        )}
-      </div>
+          {subTab === 'raspored' && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary btn-sm no-print" onClick={handleCopyMessage}>📋 Kopiraj za poruku</button>
+              <button className="btn btn-secondary btn-sm no-print" onClick={handleShare}>📤 Pošalji (Viber/WhatsApp/Messenger)</button>
+              <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>🖨️ Štampaj za poslovođe</button>
+              {!isPoslovodja && (
+                <button className="btn btn-primary btn-sm no-print" onClick={addRow}>+ Dodaj kamion</button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="tabs no-print">
         <button className={`tab ${subTab === 'raspored' ? 'active' : ''}`} onClick={() => setSubTab('raspored')}>
@@ -530,10 +743,17 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
           {unassignedCount > 0 && <span className="tag" style={{ marginLeft: 6, background: 'var(--amber-pale)', color: 'var(--amber)' }}>{unassignedCount}</span>}
         </button>
         <button className={`tab ${subTab === 'stanje' ? 'active' : ''}`} onClick={() => setSubTab('stanje')}>📝 Stanje na dan</button>
+        {!isPoslovodja && (
+          <button className={`tab ${subTab === 'pregled10' ? 'active' : ''}`} onClick={() => setSubTab('pregled10')}>📊 Zadnjih 10 dana</button>
+        )}
       </div>
 
-      {!dispData.ready && (
+      {!dispData.ready && subTab !== 'pregled10' && (
         <div className="alert alert-warning">⚡ Povezivanje sa sistemom dispozicija u toku — stanja i auto-prijedlozi će se pojaviti čim se učitaju.</div>
+      )}
+
+      {subTab === 'pregled10' && !isPoslovodja && (
+        <Zadnjih10DanaPanel otpreme={otpreme} ready={dispData.ready} />
       )}
 
       {subTab === 'stanje' && (

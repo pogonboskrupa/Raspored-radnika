@@ -10646,6 +10646,405 @@ function balanceColor(bal) {
 }
 const balanceCssClass = bal => bal < 25 ? 'low' : bal > 100 ? 'ok' : 'mid';
 
+// ─── PREGLED ZADNJIH 10 RADNIH DANA (admin) ───────────────────────────────────
+const DAY_ABBR = ['NED', 'PON', 'UTO', 'SRI', 'ČET', 'PET', 'SUB'];
+
+// Zadnjih n radnih dana (bez subote/nedjelje) zaključno sa endStr — najnoviji prvi
+function lastWorkingDays(n, endStr) {
+  const days = [];
+  const d = new Date(endStr + 'T00:00:00');
+  while (days.length < n) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) days.push(d.toISOString().split('T')[0]);
+    d.setDate(d.getDate() - 1);
+  }
+  return days;
+}
+const recTotalM3 = o => SORTIMENT_FIELDS.reduce((s, f) => s + (o[f] || 0), 0);
+const fmtM3 = n => n > 0 ? n.toFixed(2) : '';
+function Zadnjih10DanaPanel(_ref48) {
+  let {
+    otpreme,
+    ready
+  } = _ref48;
+  const anchor = today();
+  const days = useMemo(() => lastWorkingDays(10, anchor), [anchor]); // najnoviji prvi
+  const daysSet = useMemo(() => new Set(days), [days]);
+  const rows = useMemo(() => (otpreme || []).filter(o => o.datum && daysSet.has(o.datum)), [otpreme, daysSet]);
+  const stats = useMemo(() => {
+    const kupci = new Set();
+    let m3 = 0;
+    rows.forEach(o => {
+      if (o.kupac) kupci.add(o.kupac);
+      m3 += recTotalM3(o);
+    });
+    return {
+      otprema: rows.length,
+      m3,
+      kupci: kupci.size
+    };
+  }, [rows]);
+  const perDay = useMemo(() => [...days].reverse().map(dt => {
+    const dRows = rows.filter(o => o.datum === dt);
+    return {
+      date: dt,
+      count: dRows.length,
+      m3: dRows.reduce((s, o) => s + recTotalM3(o), 0)
+    };
+  }), [days, rows]); // hronološki (najstariji lijevo)
+
+  const perSortiment = useMemo(() => SORTIMENT_FIELDS.map(f => {
+    let count = 0,
+      m3 = 0;
+    rows.forEach(o => {
+      const v = o[f] || 0;
+      if (v > 0) {
+        count++;
+        m3 += v;
+      }
+    });
+    return {
+      code: f,
+      label: SORTIMENT_LABELS[f],
+      count,
+      m3
+    };
+  }), [rows]);
+  const maxSortM3 = Math.max(1, ...perSortiment.map(s => s.m3));
+  const perKupac = useMemo(() => {
+    const map = {};
+    rows.forEach(o => {
+      const k = o.kupac || '—';
+      if (!map[k]) map[k] = {
+        kupac: k,
+        count: 0,
+        m3: 0,
+        byField: Object.fromEntries(SORTIMENT_FIELDS.map(f => [f, 0]))
+      };
+      map[k].count++;
+      SORTIMENT_FIELDS.forEach(f => {
+        map[k].byField[f] += o[f] || 0;
+      });
+      map[k].m3 += recTotalM3(o);
+    });
+    return Object.values(map).sort((a, b) => b.m3 - a.m3 || b.count - a.count);
+  }, [rows]);
+  const periodLabel = `${fmtDate(days[days.length - 1])} – ${fmtDate(days[0])}`;
+  const handlePrintPregled = () => {
+    let html = `<html><head><meta charset="UTF-8"/><title>Otprema zadnjih 10 dana</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      @page{size:A4 landscape;margin:10mm}
+      body{font-family:Arial,sans-serif;font-size:10.5pt;padding:8mm;color:#222}
+      h1{font-size:15pt;margin-bottom:1mm;text-align:center}
+      h2{font-size:11pt;margin:5mm 0 1.5mm}
+      .subtitle{font-size:10pt;text-align:center;color:#555;margin-bottom:5mm}
+      table{border-collapse:collapse;width:100%;margin-bottom:2mm}
+      th{background:#e8f0e6;border:1px solid #999;padding:1.2mm 2.5mm;text-align:left;font-size:8.5pt;font-weight:700}
+      td{border:1px solid #bbb;padding:1.2mm 2.5mm;font-size:9pt}
+      td.num,th.num{text-align:right}
+      tr.total td{font-weight:700;background:#f3f1ea}
+    </style></head><body>`;
+    html += `<h1>OTPREMA — ZADNJIH 10 RADNIH DANA</h1>`;
+    html += `<div class="subtitle">Šumarija Bosanska Krupa · ${periodLabel} · Ukupno ${stats.otprema} otprema · ${stats.m3.toFixed(2)} m³</div>`;
+    html += `<h2>Po sortimentima</h2><table><thead><tr><th>Sortiment</th><th class="num">Br. otprema</th><th class="num">Ukupno m³</th></tr></thead><tbody>`;
+    perSortiment.forEach(s => {
+      html += `<tr><td>${s.label}</td><td class="num">${s.count || '—'}</td><td class="num">${s.m3 > 0 ? s.m3.toFixed(2) : '—'}</td></tr>`;
+    });
+    html += `<tr class="total"><td>UKUPNO</td><td class="num">${stats.otprema}</td><td class="num">${stats.m3.toFixed(2)}</td></tr>`;
+    html += `</tbody></table>`;
+    html += `<h2>Po kupcima</h2><table><thead><tr><th>Kupac</th>${SORTIMENT_FIELDS.map(f => `<th class="num">${SORTIMENT_LABELS[f]}</th>`).join('')}<th class="num">Ukupno m³</th><th class="num">Br. otp.</th></tr></thead><tbody>`;
+    perKupac.forEach(k => {
+      html += `<tr><td>${escHtml(k.kupac)}</td>${SORTIMENT_FIELDS.map(f => `<td class="num">${k.byField[f] > 0 ? k.byField[f].toFixed(2) : '—'}</td>`).join('')}<td class="num"><strong>${k.m3.toFixed(2)}</strong></td><td class="num">${k.count}</td></tr>`;
+    });
+    html += `</tbody></table></body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) {
+      showToast('Preglednik je blokirao prozor za štampu — dozvolite pop-up prozore.', 'error');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => {
+      win.print();
+    };
+  };
+  const thNum = {
+    textAlign: 'right'
+  };
+  const tdBase = {
+    padding: '0.45rem 0.7rem',
+    borderBottom: '1px solid #ece9e2',
+    fontSize: '0.83rem'
+  };
+  const tdNum = {
+    ...tdBase,
+    textAlign: 'right',
+    fontFamily: 'var(--mono)'
+  };
+  const headTh = {
+    padding: '0.5rem 0.7rem',
+    background: '#f0ede6',
+    fontFamily: 'var(--mono)',
+    fontSize: '0.62rem',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--text-muted)',
+    borderBottom: '1px solid var(--border)',
+    fontWeight: 600,
+    whiteSpace: 'nowrap'
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "\uD83D\uDCCA Otprema \u2014 zadnjih 10 radnih dana"), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, periodLabel), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm no-print",
+    style: {
+      marginLeft: 'auto'
+    },
+    onClick: handlePrintPregled
+  }, "\uD83D\uDDA8\uFE0F \u0160tampaj")), !ready ? /*#__PURE__*/React.createElement("div", {
+    className: "alert alert-warning"
+  }, "\u26A1 Povezivanje sa sistemom dispozicija u toku \u2014 podaci o otpremama \u0107e se pojaviti \u010Dim se u\u010Ditaju.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "stats-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value"
+  }, stats.otprema), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, "Otprema (kamiona)")), /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value"
+  }, stats.m3.toFixed(0)), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, "Ukupno m\xB3")), /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value"
+  }, stats.kupci), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, "Kupaca")), /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-value",
+    style: {
+      fontSize: '1rem',
+      paddingTop: '0.3rem'
+    }
+  }, periodLabel), /*#__PURE__*/React.createElement("div", {
+    className: "stat-label"
+  }, "Period (10 radnih dana)"))), rows.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "icon"
+  }, "\uD83D\uDCED"), /*#__PURE__*/React.createElement("p", null, "Nema evidentiranih otprema u zadnjih 10 radnih dana."))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-title"
+  }, "\uD83D\uDCC5 Otprema po danima")), /*#__PURE__*/React.createElement("div", {
+    className: "card-body",
+    style: {
+      display: 'flex',
+      gap: '0.5rem',
+      overflowX: 'auto',
+      paddingBottom: '0.75rem'
+    }
+  }, perDay.map(d => {
+    const dow = new Date(d.date + 'T00:00:00').getDay();
+    return /*#__PURE__*/React.createElement("div", {
+      key: d.date,
+      style: {
+        flex: '1 0 90px',
+        minWidth: 90,
+        border: '1px solid var(--border)',
+        borderRadius: 8,
+        padding: '0.5rem 0.6rem',
+        textAlign: 'center',
+        background: d.count ? 'var(--surface)' : 'var(--bg)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '0.6rem',
+        letterSpacing: '0.06em',
+        color: 'var(--text-light)'
+      }
+    }, DAY_ABBR[dow]), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        color: 'var(--text-muted)',
+        marginBottom: '0.3rem'
+      }
+    }, d.date.slice(5).split('-').reverse().join('.')), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'var(--mono)',
+        fontSize: '1.1rem',
+        fontWeight: 700,
+        color: d.count ? 'var(--green)' : 'var(--text-light)'
+      }
+    }, d.m3 > 0 ? d.m3.toFixed(0) : '—'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.62rem',
+        color: 'var(--text-light)'
+      }
+    }, "m\xB3 \xB7 ", d.count, " otp."));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-title"
+  }, "\uD83C\uDF32 Otprema po sortimentima")), /*#__PURE__*/React.createElement("table", {
+    className: "schedule-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Sortiment"), /*#__PURE__*/React.createElement("th", null, "Br. otprema"), /*#__PURE__*/React.createElement("th", null, "Ukupno m\xB3"), /*#__PURE__*/React.createElement("th", null, "Udio"))), /*#__PURE__*/React.createElement("tbody", null, perSortiment.map(s => /*#__PURE__*/React.createElement("tr", {
+    key: s.code
+  }, /*#__PURE__*/React.createElement("td", {
+    "data-label": "Sortiment",
+    style: {
+      fontWeight: 600
+    }
+  }, s.label), /*#__PURE__*/React.createElement("td", {
+    "data-label": "Br. otprema",
+    style: {
+      fontFamily: 'var(--mono)'
+    }
+  }, s.count || '—'), /*#__PURE__*/React.createElement("td", {
+    "data-label": "Ukupno m\xB3",
+    style: {
+      fontFamily: 'var(--mono)',
+      fontWeight: 700
+    }
+  }, s.m3 > 0 ? s.m3.toFixed(2) : '—'), /*#__PURE__*/React.createElement("td", {
+    "data-label": "Udio",
+    style: {
+      minWidth: 120
+    }
+  }, s.m3 > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'var(--green-pale)',
+      borderRadius: 4,
+      height: 14,
+      width: `${Math.max(6, s.m3 / maxSortM3 * 100)}%`
+    },
+    title: `${(s.m3 / stats.m3 * 100).toFixed(1)}%`
+  }))))))), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-title"
+  }, "\uD83E\uDD1D Otprema po kupcima"), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, perKupac.length, " kupaca")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      minWidth: 720
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...headTh,
+      textAlign: 'left',
+      position: 'sticky',
+      left: 0,
+      background: '#f0ede6',
+      zIndex: 1
+    }
+  }, "Kupac"), SORTIMENT_FIELDS.map(f => /*#__PURE__*/React.createElement("th", {
+    key: f,
+    style: {
+      ...headTh,
+      ...thNum
+    }
+  }, SORTIMENT_LABELS[f])), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...headTh,
+      ...thNum
+    }
+  }, "Ukupno m\xB3"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...headTh,
+      ...thNum
+    }
+  }, "Br. otp."))), /*#__PURE__*/React.createElement("tbody", null, perKupac.map((k, i) => /*#__PURE__*/React.createElement("tr", {
+    key: k.kupac,
+    style: {
+      background: i % 2 ? '#fafaf6' : 'transparent'
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...tdBase,
+      fontWeight: 600,
+      position: 'sticky',
+      left: 0,
+      background: i % 2 ? '#fafaf6' : 'var(--surface)',
+      zIndex: 1
+    }
+  }, k.kupac), SORTIMENT_FIELDS.map(f => /*#__PURE__*/React.createElement("td", {
+    key: f,
+    style: {
+      ...tdNum,
+      color: k.byField[f] > 0 ? 'var(--text)' : 'var(--text-light)'
+    }
+  }, k.byField[f] > 0 ? k.byField[f].toFixed(2) : '·')), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...tdNum,
+      fontWeight: 700,
+      color: 'var(--green)'
+    }
+  }, k.m3.toFixed(2)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...tdNum
+    }
+  }, k.count)))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderTop: '2px solid var(--border-dark)'
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...tdBase,
+      fontWeight: 700,
+      position: 'sticky',
+      left: 0,
+      background: 'var(--surface)'
+    }
+  }, "UKUPNO"), SORTIMENT_FIELDS.map(f => {
+    const t = perSortiment.find(s => s.code === f).m3;
+    return /*#__PURE__*/React.createElement("td", {
+      key: f,
+      style: {
+        ...tdNum,
+        fontWeight: 700
+      }
+    }, t > 0 ? t.toFixed(2) : '·');
+  }), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...tdNum,
+      fontWeight: 700,
+      color: 'var(--green)'
+    }
+  }, stats.m3.toFixed(2)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...tdNum,
+      fontWeight: 700
+    }
+  }, stats.otprema)))))))));
+}
+
 // Zbirni broj kamiona po sortimentu za dati skup redova (za brzi pregled obima posla)
 function sortimentSummary(rows) {
   const counts = {};
@@ -10658,10 +11057,10 @@ function sortimentSummary(rows) {
     count: counts[f]
   }));
 }
-function SortimentSummaryLine(_ref48) {
+function SortimentSummaryLine(_ref49) {
   let {
     rows
-  } = _ref48;
+  } = _ref49;
   if (rows.length === 0) return null;
   const summary = sortimentSummary(rows);
   return /*#__PURE__*/React.createElement("div", {
@@ -10675,13 +11074,13 @@ function SortimentSummaryLine(_ref48) {
 
 // ─── STANJE NA DAN — poslovođa prijavi broj kamiona po sortimentu za odjel;
 // svaki prijavljeni kamion odmah postaje (nedodijeljen) red u Raspored kamiona ────
-function StanjeNaDanPanel(_ref49) {
+function StanjeNaDanPanel(_ref50) {
   let {
     selectedDate,
     dayRows,
     onSubmit,
     onDeleteRow
-  } = _ref49;
+  } = _ref50;
   const [odjel, setOdjel] = useState('');
   const [counts, setCounts] = useState({});
   const parseCount = v => Math.max(0, parseInt(v, 10) || 0);
@@ -10816,7 +11215,7 @@ function StanjeNaDanPanel(_ref49) {
     onClick: () => onDeleteRow(r.id)
   }, "\uD83D\uDDD1\uFE0F")))))))));
 }
-function RasporedKamionaView(_ref50) {
+function RasporedKamionaView(_ref51) {
   let {
     truckRows,
     setTruckRows,
@@ -10825,7 +11224,7 @@ function RasporedKamionaView(_ref50) {
     setTruckGroupOtpremaci,
     isPoslovodja,
     currentUser
-  } = _ref50;
+  } = _ref51;
   const dispData = useDispozicijeData();
   const dispozicije = dispData.dispozicije || [];
   const otpreme = dispData.otpreme || [];
@@ -11110,7 +11509,7 @@ function RasporedKamionaView(_ref50) {
       if (!win) showToast('Preglednik je blokirao prozor — dozvolite pop-up prozore ili koristite "Kopiraj za poruku".', 'error');
     }
   };
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", null, subTab !== 'pregled10' && /*#__PURE__*/React.createElement("div", {
     className: "date-bar"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "date-label"
@@ -11156,9 +11555,15 @@ function RasporedKamionaView(_ref50) {
   }, unassignedCount)), /*#__PURE__*/React.createElement("button", {
     className: `tab ${subTab === 'stanje' ? 'active' : ''}`,
     onClick: () => setSubTab('stanje')
-  }, "\uD83D\uDCDD Stanje na dan")), !dispData.ready && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCDD Stanje na dan"), !isPoslovodja && /*#__PURE__*/React.createElement("button", {
+    className: `tab ${subTab === 'pregled10' ? 'active' : ''}`,
+    onClick: () => setSubTab('pregled10')
+  }, "\uD83D\uDCCA Zadnjih 10 dana")), !dispData.ready && subTab !== 'pregled10' && /*#__PURE__*/React.createElement("div", {
     className: "alert alert-warning"
-  }, "\u26A1 Povezivanje sa sistemom dispozicija u toku \u2014 stanja i auto-prijedlozi \u0107e se pojaviti \u010Dim se u\u010Ditaju."), subTab === 'stanje' && /*#__PURE__*/React.createElement(StanjeNaDanPanel, {
+  }, "\u26A1 Povezivanje sa sistemom dispozicija u toku \u2014 stanja i auto-prijedlozi \u0107e se pojaviti \u010Dim se u\u010Ditaju."), subTab === 'pregled10' && !isPoslovodja && /*#__PURE__*/React.createElement(Zadnjih10DanaPanel, {
+    otpreme: otpreme,
+    ready: dispData.ready
+  }), subTab === 'stanje' && /*#__PURE__*/React.createElement(StanjeNaDanPanel, {
     selectedDate: selectedDate,
     dayRows: dayRows,
     onSubmit: addBulkRows,
@@ -11396,11 +11801,11 @@ function App() {
     }
   });
 }
-function AppMain(_ref51) {
+function AppMain(_ref52) {
   let {
     onLogout,
     currentUser
-  } = _ref51;
+  } = _ref52;
   const [workers, setWorkers] = useStorage('sumarija_workers', INITIAL_WORKERS);
   const [departments, setDepartments] = useStorage('sumarija_depts', INITIAL_DEPARTMENTS);
   const [schedules, setSchedules] = useStorage('sumarija_schedules', makeInitialSchedules());
@@ -11434,8 +11839,8 @@ function AppMain(_ref51) {
     if (staleMeta) {
       setTruckGroupOtpremaci(prev => {
         const next = {};
-        Object.entries(prev).forEach(_ref52 => {
-          let [key, val] = _ref52;
+        Object.entries(prev).forEach(_ref53 => {
+          let [key, val] = _ref53;
           try {
             const [date] = JSON.parse(key);
             if (date >= cutoffStr) next[key] = val;
@@ -11748,8 +12153,8 @@ function AppMain(_ref51) {
       'Neplaćeno': '📋 N'
     };
     const absentList = [];
-    Object.entries(godisnji || {}).forEach(_ref53 => {
-      let [wId, entries] = _ref53;
+    Object.entries(godisnji || {}).forEach(_ref54 => {
+      let [wId, entries] = _ref54;
       const entry = entries.find(e => e.date === selectedDate) || entries.find(e => e.open && e.dateOd && e.dateOd <= selectedDate);
       if (!entry) return;
       const w = workers.find(x => x.id === wId);
@@ -11782,14 +12187,14 @@ function AppMain(_ref51) {
     html += `<div class="subtitle">Šumarija Bosanska Krupa</div>`;
     const totalWorkers = new Set(allToday.flatMap(s => s.allWorkers || [])).size;
     html += `<div class="summary">Ukupno raspoređeno: <strong>${totalWorkers}</strong> radnika · Odsutno: <strong>${absentList.length}</strong></div>`;
-    Object.entries(byDept).forEach(_ref54 => {
-      let [deptId, jobs] = _ref54;
+    Object.entries(byDept).forEach(_ref55 => {
+      let [deptId, jobs] = _ref55;
       const deptWorkerCount = new Set(Object.values(jobs).flat().flatMap(s => s.allWorkers || [])).size;
       html += `<div class="dept">`;
       html += `<div class="dept-name">🏕️ ${dName(deptId)} — ${deptWorkerCount} radnika</div>`;
       html += `<table><thead><tr><th style="width:18%">Vrsta posla</th><th>Radnici</th><th style="width:20%">Vozilo</th><th style="width:15%">Napomena</th></tr></thead><tbody>`;
-      Object.entries(jobs).forEach(_ref55 => {
-        let [jobType, rows] = _ref55;
+      Object.entries(jobs).forEach(_ref56 => {
+        let [jobType, rows] = _ref56;
         rows.forEach(row => {
           const workerNames = (row.allWorkers || []).map(wId => wName(wId));
           const vIds = row.vehicleIds?.length ? row.vehicleIds : row.vehicleId ? [row.vehicleId] : [];
@@ -11886,11 +12291,11 @@ function AppMain(_ref51) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref56 => {
-    let [k] = _ref56;
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref57 => {
+    let [k] = _ref57;
     return !(isPoslovodja && (k === 'radnici' || k === 'odjeli'));
-  }).map(_ref57 => {
-    let [k, l] = _ref57;
+  }).map(_ref58 => {
+    let [k, l] = _ref58;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       className: `nav-tab ${activeTab === k ? 'active' : ''}`,
