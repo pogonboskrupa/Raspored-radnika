@@ -5292,8 +5292,10 @@ function lastWorkingDays(n, endStr) {
 
 const recTotalM3 = o => SORTIMENT_FIELDS.reduce((s, f) => s + (o[f] || 0), 0);
 
-// Dosljedna boja po kupcu (isto ime = ista boja svugdje na stranici) — lakše
-// prepoznavanje kupca na prvi pogled kroz listu bez čitanja svakog imena.
+// Paleta boja za razlikovanje kupaca — dodjeljuje se po redoslijedu pojavljivanja
+// (unutar tabele/sortimenta), NE globalno po imenu kupca, tako da dva kupca koja se
+// vide jedan pored drugog (npr. u istom sortimentu) uvijek dobiju najudaljenije,
+// najkontrastnije boje iz palete.
 const KUPAC_COLORS = [
   { bg: '#e4edf5', text: '#1a3d5c' }, // plava
   { bg: '#fdf0e0', text: '#b5620a' }, // amber
@@ -5308,12 +5310,6 @@ const KUPAC_COLORS = [
   { bg: '#efebe9', text: '#5d4037' }, // smeđa
   { bg: '#e8f5e9', text: '#33691e' }, // maslinasta
 ];
-function kupacColor(name) {
-  const s = name || '';
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
-  return KUPAC_COLORS[Math.abs(hash) % KUPAC_COLORS.length];
-}
 
 function Zadnjih10DanaPanel({ otpreme, ready }) {
   const anchor = today();
@@ -5519,7 +5515,7 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                     </thead>
                     <tbody>
                       {attendanceKupci.map((k, i) => {
-                        const kc = kupacColor(k.kupac);
+                        const kc = KUPAC_COLORS[i % KUPAC_COLORS.length];
                         return (
                         <tr key={k.kupac} style={{ background: i % 2 ? '#fafaf6' : 'transparent' }}>
                           <td style={{ ...tdBase, fontWeight: 600, position: 'sticky', left: 0, background: i % 2 ? '#fafaf6' : 'var(--surface)', zIndex: 1, whiteSpace: 'nowrap' }}>
@@ -5560,6 +5556,18 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
               {activeSortiments.map(f => {
                 const totalM3 = bySortimentDay[f].reduce((s, d) => s + d.kupci.reduce((ss, k) => ss + k.m3, 0), 0);
                 const totalOtp = bySortimentDay[f].reduce((s, d) => s + d.kupci.length, 0);
+                // Boje se dodjeljuju po redoslijedu pojavljivanja unutar OVOG sortimenta
+                // (ne globalno po kupcu) — tako susjedni kupci u istoj kartici uvijek
+                // dobiju maksimalno različite boje iz palete, bez obzira šta se desi
+                // u drugim sortimentima.
+                const sortimentKupacColors = {};
+                let colorIdx = 0;
+                bySortimentDay[f].forEach(d => d.kupci.forEach(k => {
+                  if (!(k.kupac in sortimentKupacColors)) {
+                    sortimentKupacColors[k.kupac] = KUPAC_COLORS[colorIdx % KUPAC_COLORS.length];
+                    colorIdx++;
+                  }
+                }));
                 return (
                 <div className="card" key={f}>
                   <div className="card-header" style={{ background: 'var(--green-pale)' }}>
@@ -5580,7 +5588,7 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                               {d.kupci.map((k, i) => {
-                                const c = kupacColor(k.kupac);
+                                const c = sortimentKupacColors[k.kupac];
                                 return (
                                   <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.35rem', background: c.bg, border: `1px solid ${c.text}66`, borderRadius: 20, padding: '0.15rem 0.65rem', fontSize: '0.8rem' }}>
                                     <strong style={{ color: c.text }}>{k.kupac}</strong>

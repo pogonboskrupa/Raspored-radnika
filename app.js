@@ -10660,8 +10660,10 @@ function lastWorkingDays(n, endStr) {
 }
 const recTotalM3 = o => SORTIMENT_FIELDS.reduce((s, f) => s + (o[f] || 0), 0);
 
-// Dosljedna boja po kupcu (isto ime = ista boja svugdje na stranici) — lakše
-// prepoznavanje kupca na prvi pogled kroz listu bez čitanja svakog imena.
+// Paleta boja za razlikovanje kupaca — dodjeljuje se po redoslijedu pojavljivanja
+// (unutar tabele/sortimenta), NE globalno po imenu kupca, tako da dva kupca koja se
+// vide jedan pored drugog (npr. u istom sortimentu) uvijek dobiju najudaljenije,
+// najkontrastnije boje iz palete.
 const KUPAC_COLORS = [{
   bg: '#e4edf5',
   text: '#1a3d5c'
@@ -10722,12 +10724,6 @@ const KUPAC_COLORS = [{
   text: '#33691e'
 } // maslinasta
 ];
-function kupacColor(name) {
-  const s = name || '';
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = hash * 31 + s.charCodeAt(i) | 0;
-  return KUPAC_COLORS[Math.abs(hash) % KUPAC_COLORS.length];
-}
 function Zadnjih10DanaPanel(_ref48) {
   let {
     otpreme,
@@ -11034,7 +11030,7 @@ function Zadnjih10DanaPanel(_ref48) {
       }
     }, DAY_ABBR[dow], /*#__PURE__*/React.createElement("br", null), dt.slice(5).split('-').reverse().join('.'));
   }))), /*#__PURE__*/React.createElement("tbody", null, attendanceKupci.map((k, i) => {
-    const kc = kupacColor(k.kupac);
+    const kc = KUPAC_COLORS[i % KUPAC_COLORS.length];
     return /*#__PURE__*/React.createElement("tr", {
       key: k.kupac,
       style: {
@@ -11112,6 +11108,18 @@ function Zadnjih10DanaPanel(_ref48) {
   }, recentPeriodLabel)), activeSortiments.map(f => {
     const totalM3 = bySortimentDay[f].reduce((s, d) => s + d.kupci.reduce((ss, k) => ss + k.m3, 0), 0);
     const totalOtp = bySortimentDay[f].reduce((s, d) => s + d.kupci.length, 0);
+    // Boje se dodjeljuju po redoslijedu pojavljivanja unutar OVOG sortimenta
+    // (ne globalno po kupcu) — tako susjedni kupci u istoj kartici uvijek
+    // dobiju maksimalno različite boje iz palete, bez obzira šta se desi
+    // u drugim sortimentima.
+    const sortimentKupacColors = {};
+    let colorIdx = 0;
+    bySortimentDay[f].forEach(d => d.kupci.forEach(k => {
+      if (!(k.kupac in sortimentKupacColors)) {
+        sortimentKupacColors[k.kupac] = KUPAC_COLORS[colorIdx % KUPAC_COLORS.length];
+        colorIdx++;
+      }
+    }));
     return /*#__PURE__*/React.createElement("div", {
       className: "card",
       key: f
@@ -11175,7 +11183,7 @@ function Zadnjih10DanaPanel(_ref48) {
           gap: '0.35rem'
         }
       }, d.kupci.map((k, i) => {
-        const c = kupacColor(k.kupac);
+        const c = sortimentKupacColors[k.kupac];
         return /*#__PURE__*/React.createElement("span", {
           key: i,
           style: {
