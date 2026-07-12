@@ -5292,6 +5292,29 @@ function lastWorkingDays(n, endStr) {
 
 const recTotalM3 = o => SORTIMENT_FIELDS.reduce((s, f) => s + (o[f] || 0), 0);
 
+// Dosljedna boja po kupcu (isto ime = ista boja svugdje na stranici) — lakše
+// prepoznavanje kupca na prvi pogled kroz listu bez čitanja svakog imena.
+const KUPAC_COLORS = [
+  { bg: '#e4edf5', text: '#1a3d5c' }, // plava
+  { bg: '#fdf0e0', text: '#b5620a' }, // amber
+  { bg: '#f0e8f5', text: '#6b3080' }, // ljubičasta
+  { bg: '#e6f5ea', text: '#1a5a2d' }, // tamnozelena
+  { bg: '#e8eaf6', text: '#3949ab' }, // indigo
+  { bg: '#e0ecf5', text: '#1565c0' }, // nebo plava
+  { bg: '#fff3e0', text: '#c05e00' }, // narandžasta
+  { bg: '#fce4ec', text: '#ad1457' }, // roze
+  { bg: '#e0f2f1', text: '#00695c' }, // tirkiz
+  { bg: '#f3e5f5', text: '#7b1fa2' }, // violet
+  { bg: '#efebe9', text: '#5d4037' }, // smeđa
+  { bg: '#e8f5e9', text: '#33691e' }, // maslinasta
+];
+function kupacColor(name) {
+  const s = name || '';
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+  return KUPAC_COLORS[Math.abs(hash) % KUPAC_COLORS.length];
+}
+
 function Zadnjih10DanaPanel({ otpreme, ready }) {
   const anchor = today();
   const days = useMemo(() => lastWorkingDays(10, anchor), [anchor]); // najnoviji prvi
@@ -5495,9 +5518,16 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {attendanceKupci.map((k, i) => (
+                      {attendanceKupci.map((k, i) => {
+                        const kc = kupacColor(k.kupac);
+                        return (
                         <tr key={k.kupac} style={{ background: i % 2 ? '#fafaf6' : 'transparent' }}>
-                          <td style={{ ...tdBase, fontWeight: 600, position: 'sticky', left: 0, background: i % 2 ? '#fafaf6' : 'var(--surface)', zIndex: 1, whiteSpace: 'nowrap' }}>{k.kupac}</td>
+                          <td style={{ ...tdBase, fontWeight: 600, position: 'sticky', left: 0, background: i % 2 ? '#fafaf6' : 'var(--surface)', zIndex: 1, whiteSpace: 'nowrap' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: kc.text, flexShrink: 0 }} />
+                              {k.kupac}
+                            </span>
+                          </td>
                           {recentDaysChrono.map(dt => {
                             const cell = attendance[k.kupac]?.[dt];
                             return (
@@ -5512,7 +5542,8 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                             );
                           })}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -5548,12 +5579,15 @@ function Zadnjih10DanaPanel({ otpreme, ready }) {
                               {d.date.slice(5).split('-').reverse().join('.')}
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                              {d.kupci.map((k, i) => (
-                                <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.3rem', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 20, padding: '0.15rem 0.6rem', fontSize: '0.8rem' }}>
-                                  <strong>{k.kupac}</strong>
-                                  <span style={{ color: 'var(--green)', fontWeight: 700, fontFamily: 'var(--mono)', fontSize: '0.75rem' }}>{k.m3.toFixed(0)}m³</span>
-                                </span>
-                              ))}
+                              {d.kupci.map((k, i) => {
+                                const c = kupacColor(k.kupac);
+                                return (
+                                  <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.35rem', background: c.bg, border: `1px solid ${c.text}66`, borderRadius: 20, padding: '0.15rem 0.65rem', fontSize: '0.8rem' }}>
+                                    <strong style={{ color: c.text }}>{k.kupac}</strong>
+                                    <span style={{ color: c.text, fontWeight: 700, fontFamily: 'var(--mono)', fontSize: '0.75rem', opacity: 0.85 }}>{k.m3.toFixed(0)}m³</span>
+                                  </span>
+                                );
+                              })}
                             </div>
                           </div>
                         );
