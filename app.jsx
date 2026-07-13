@@ -5195,7 +5195,7 @@ const escHtml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/
 
 // Prijedlog kupca za red: rangirana lista + dropdown svih kupaca, ili ručni unos
 // za kupca koji još ne postoji u DISPOZICIJE sistemu (dispozicija stiže naknadno).
-function PrijedlogCell({ row, suggestions, kupci, onSetKupac }) {
+function PrijedlogCell({ row, suggestions, suggestions2, kupci, onSetKupac }) {
   const [manualMode, setManualMode] = useState(false);
   const [manualText, setManualText] = useState('');
 
@@ -5235,21 +5235,52 @@ function PrijedlogCell({ row, suggestions, kupci, onSetKupac }) {
   return (
     <div>
       {suggestions.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', maxHeight: 170, overflowY: 'auto', marginBottom: '0.35rem' }}>
-          {suggestions.map((s, idx) => (
-            <button key={s.disp.id || s.disp.kupac} type="button"
-              onClick={() => onSetKupac(s.disp.kupac)}
-              className="btn btn-ghost btn-sm no-print"
-              title="Klikni da odabereš ovog kupca"
-              style={{
-                justifyContent: 'flex-start', textAlign: 'left', padding: '0.15rem 0.4rem',
-                fontWeight: 500, background: 'transparent', color: 'var(--text)',
-                fontSize: '0.74rem', lineHeight: 1.35, whiteSpace: 'normal', height: 'auto',
-              }}>
-              <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-light)', marginRight: 4 }}>{idx + 1}.</span>
-              <strong>{s.disp.kupac}</strong> — <span style={{ color: balanceColor(s.bal), fontWeight: 700 }}>{s.bal.toFixed(2)} m³</span> <span style={{ color: 'var(--text-muted)' }}>({fmtDate(s.disp.datum)})</span>
-            </button>
-          ))}
+        <div style={{ marginBottom: '0.35rem' }}>
+          <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-light)', letterSpacing: '0.03em', marginBottom: '0.1rem' }}>
+            PRIJEDLOG · najstarija dispozicija
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', maxHeight: 170, overflowY: 'auto' }}>
+            {suggestions.map((s, idx) => (
+              <button key={s.disp.id || s.disp.kupac} type="button"
+                onClick={() => onSetKupac(s.disp.kupac)}
+                className="btn btn-ghost btn-sm no-print"
+                title="Klikni da odabereš ovog kupca"
+                style={{
+                  justifyContent: 'flex-start', textAlign: 'left', padding: '0.15rem 0.4rem',
+                  fontWeight: 500, background: 'transparent', color: 'var(--text)',
+                  fontSize: '0.74rem', lineHeight: 1.35, whiteSpace: 'normal', height: 'auto',
+                }}>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-light)', marginRight: 4 }}>{idx + 1}.</span>
+                <strong>{s.disp.kupac}</strong> — <span style={{ color: balanceColor(s.bal), fontWeight: 700 }}>{s.bal.toFixed(2)} m³</span> <span style={{ color: 'var(--text-muted)' }}>({fmtDate(s.disp.datum)})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {suggestions2 && suggestions2.length > 0 && (
+        <div style={{ marginBottom: '0.35rem' }}>
+          <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-light)', letterSpacing: '0.03em', marginBottom: '0.1rem' }}>
+            PRIJEDLOG 2 · najduže nije bio na otpremi
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', maxHeight: 170, overflowY: 'auto' }}>
+            {suggestions2.map((s, idx) => (
+              <button key={'p2-' + (s.disp.id || s.disp.kupac)} type="button"
+                onClick={() => onSetKupac(s.disp.kupac)}
+                className="btn btn-ghost btn-sm no-print"
+                title="Klikni da odabereš ovog kupca"
+                style={{
+                  justifyContent: 'flex-start', textAlign: 'left', padding: '0.15rem 0.4rem',
+                  fontWeight: 500, background: 'transparent', color: 'var(--text)',
+                  fontSize: '0.74rem', lineHeight: 1.35, whiteSpace: 'normal', height: 'auto',
+                }}>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-light)', marginRight: 4 }}>{idx + 1}.</span>
+                <strong>{s.disp.kupac}</strong> — <span style={{ color: balanceColor(s.bal), fontWeight: 700 }}>{s.bal.toFixed(2)} m³</span>{' '}
+                <span style={{ color: 'var(--text-muted)' }}>
+                  ({s.lastOtprema ? `zadnja otprema ${fmtDate(s.lastOtprema)}` : 'nikad na otpremi'})
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <select className="form-select no-print" value=""
@@ -5813,6 +5844,39 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
     return result;
   };
 
+  // Auto-prijedlog 2: isti kandidati (stanje >= 20m³ za odabrani sortiment), ali poredani po
+  // tome koliko dugo kupac STVARNO nije bio na otpremi (bilo koji sortiment) — kupci koji
+  // nikad nisu evidentirani na otpremi imaju najveći prioritet, zatim najstarija zadnja otprema.
+  // Ovo je drugačiji signal od prve liste (koja gleda samo starost dispozicije): kupac može
+  // imati staru dispoziciju, a ipak biti nedavno na otpremi (druga dispozicija/kamion), i obrnuto.
+  const findSuggestions2 = (sortiment) => {
+    if (!sortiment) return [];
+    const lastOtpremaByKupac = {};
+    (otpreme || []).forEach(o => {
+      if (!o.kupac || !o.datum) return;
+      const nk = normKupac(o.kupac);
+      if (!lastOtpremaByKupac[nk] || o.datum > lastOtpremaByKupac[nk]) lastOtpremaByKupac[nk] = o.datum;
+    });
+    const candidates = dispozicije
+      .map(d => ({ disp: d, bal: getDispBalance(d, otpreme)[sortiment] }))
+      .filter(x => x.bal >= 20)
+      .sort((a, b) => (a.disp.datum || '').localeCompare(b.disp.datum || ''));
+    const seen = new Set();
+    const result = [];
+    for (const c of candidates) {
+      if (seen.has(c.disp.kupac)) continue;
+      seen.add(c.disp.kupac);
+      result.push({ ...c, lastOtprema: lastOtpremaByKupac[normKupac(c.disp.kupac)] || null });
+    }
+    result.sort((a, b) => {
+      if (!a.lastOtprema && !b.lastOtprema) return 0;
+      if (!a.lastOtprema) return -1;
+      if (!b.lastOtprema) return 1;
+      return a.lastOtprema.localeCompare(b.lastOtprema);
+    });
+    return result.slice(0, 10);
+  };
+
   // Vizuelno grupiši redove trenutnog dana po odjelu (isti obrazac kao ScheduleView)
   const groupedDayRows = useMemo(() => {
     const order = [];
@@ -6116,6 +6180,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
                 {g.rows.map(r => {
                   const found = findDispForKupac(r.kupac, r.sortiment);
                   const suggestions = findSuggestions(r.sortiment);
+                  const suggestions2 = findSuggestions2(r.sortiment);
                   return (
                     <tr key={r.id}>
                       <td data-label="Odjel">
@@ -6128,7 +6193,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
                         </select>
                       </td>
                       <td data-label="Prijedlog">
-                        <PrijedlogCell row={r} suggestions={suggestions} kupci={kupci}
+                        <PrijedlogCell row={r} suggestions={suggestions} suggestions2={suggestions2} kupci={kupci}
                           onSetKupac={k => updateRow(r.id, { kupac: k })} />
                       </td>
                       <td data-label="Dispozicija">
