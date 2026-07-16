@@ -152,6 +152,155 @@ function balanceColor(bal) {
   return 'var(--amber)';
 }
 const balanceCssClass = bal => (bal < 25 ? 'low' : bal > 100 ? 'ok' : 'mid');
+// Iste boje kao balanceColor(), ali kao konkretni hex — canvas ne razumije var(--x).
+const balanceColorHex = bal => (bal < 25 ? '#ff0000' : bal > 100 ? '#2d5a27' : '#b5620a');
+
+// Fiksna boja po sortimentu (isti sortiment = ista boja svugdje) — koristi se u slici
+// rasporeda da se sortimenti razlikuju na prvi pogled.
+const SORTIMENT_COLORS = {
+  tc:  { bg: '#dcefdd', text: '#1b5e20' },
+  rud: { bg: '#e6ddd6', text: '#4e342e' },
+  cd:  { bg: '#dbe9fb', text: '#0d47a1' },
+  cc:  { bg: '#d6eef5', text: '#01579b' },
+  tl:  { bg: '#ffe7c2', text: '#e65100' },
+  fl:  { bg: '#fbdad0', text: '#bf360c' },
+  oc:  { bg: '#ecdcf3', text: '#4a148c' },
+  od:  { bg: '#fbd6e3', text: '#880e4f' },
+};
+
+// Skrati tekst sa "…" ako ne staje u dati max. razmak (canvas ne prelama tekst sam).
+function fitText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) t = t.slice(0, -1);
+  return t + '…';
+}
+
+function canvasRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Nacrta cijeli raspored dana kao obojenu, preglednu tabelu na canvasu — za slanje
+// poslovođama kao SLIKU (umjesto teksta) na Viber/WhatsApp, gdje se boje i lakše čitaju.
+function buildScheduleCanvas({ selectedDate, groups, findDispForKupac, dispUsageMap }) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const padX = 20, padY = 20;
+  const tableW = 660;
+  const width = tableW + padX * 2;
+
+  const rowH = 46, groupHeaderH = 34, tableHeadH = 26, titleH = 42, groupGap = 14, footerH = 26;
+
+  let contentH = titleH;
+  groups.forEach(g => { contentH += groupHeaderH + tableHeadH + g.rows.length * rowH + groupGap; });
+  contentH += footerH;
+  const height = contentH + padY * 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.textBaseline = 'top';
+
+  ctx.fillStyle = '#f5f2ec';
+  ctx.fillRect(0, 0, width, height);
+
+  let y = padY;
+  ctx.fillStyle = '#2d5a27';
+  ctx.font = '700 19px Arial, sans-serif';
+  ctx.fillText(`🚚 Raspored kamiona — ${fmtDate(selectedDate)}`, padX, y);
+  y += titleH;
+
+  const colX = { sortiment: padX, kupac: padX + 110, disp: padX + 110 + 210, stanje: padX + 110 + 210 + 180 };
+  const colW = { sortiment: 110, kupac: 210, disp: 180, stanje: tableW - (110 + 210 + 180) };
+
+  groups.forEach(g => {
+    ctx.fillStyle = '#2d5a27';
+    canvasRoundRect(ctx, padX, y, tableW, groupHeaderH, 6);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 13px Arial, sans-serif';
+    const groupLabel = `📍 ${g.label}` + (g.otpremaci.length ? `   👷 ${g.otpremaci.join(', ')}` : '');
+    ctx.fillText(fitText(ctx, groupLabel, tableW - 20), padX + 10, y + 10);
+    y += groupHeaderH;
+
+    ctx.fillStyle = '#e8e4da';
+    ctx.fillRect(padX, y, tableW, tableHeadH);
+    ctx.fillStyle = '#6b6459';
+    ctx.font = '700 10px Arial, sans-serif';
+    ctx.fillText('SORTIMENT', colX.sortiment + 8, y + 8);
+    ctx.fillText('KUPAC', colX.kupac + 8, y + 8);
+    ctx.fillText('DISPOZICIJA', colX.disp + 8, y + 8);
+    ctx.fillText('STANJE', colX.stanje + 8, y + 8);
+    y += tableHeadH;
+
+    g.rows.forEach((r, i) => {
+      const found = findDispForKupac(r.kupac, r.sortiment);
+      ctx.fillStyle = i % 2 ? '#fbfaf7' : '#ffffff';
+      ctx.fillRect(padX, y, tableW, rowH);
+
+      if (r.sortiment) {
+        const sc = SORTIMENT_COLORS[r.sortiment] || { bg: '#eee', text: '#333' };
+        ctx.fillStyle = sc.bg;
+        canvasRoundRect(ctx, colX.sortiment + 6, y + 8, colW.sortiment - 16, rowH - 16, 10);
+        ctx.fill();
+        ctx.fillStyle = sc.text;
+        ctx.font = '700 11px Arial, sans-serif';
+        ctx.fillText(fitText(ctx, SORTIMENT_LABELS[r.sortiment] || '', colW.sortiment - 28), colX.sortiment + 14, y + rowH / 2 - 6);
+      }
+
+      ctx.fillStyle = r.kupac ? '#1a1714' : '#9e9589';
+      ctx.font = r.kupac ? '700 13px Arial, sans-serif' : 'italic 12px Arial, sans-serif';
+      ctx.fillText(fitText(ctx, r.kupac || 'nije dodijeljen', colW.kupac - 16), colX.kupac + 8, y + rowH / 2 - 7);
+
+      ctx.font = '400 11px Arial, sans-serif';
+      if (found) {
+        ctx.fillStyle = '#1a1714';
+        ctx.fillText(fitText(ctx, found.disp.broj || '—', colW.disp - 16), colX.disp + 8, y + 7);
+        ctx.fillStyle = '#6b6459';
+        ctx.fillText(fitText(ctx, `${found.disp.ugovor || '—'} · ${fmtDate(found.disp.datum)}`, colW.disp - 16), colX.disp + 8, y + 23);
+      } else if (r.kupac) {
+        ctx.fillStyle = '#b5620a';
+        ctx.font = 'italic 11px Arial, sans-serif';
+        ctx.fillText('u obradi', colX.disp + 8, y + 15);
+      } else {
+        ctx.fillStyle = '#9e9589';
+        ctx.fillText('—', colX.disp + 8, y + 15);
+      }
+
+      if (found) {
+        ctx.fillStyle = balanceColorHex(found.bal);
+        ctx.font = '700 14px Arial, sans-serif';
+        ctx.fillText(`${found.bal.toFixed(2)} m³`, colX.stanje + 8, y + 7);
+        if (dispUsageMap[found.disp.id] > 1) {
+          ctx.fillStyle = '#b5620a';
+          ctx.font = '600 9px Arial, sans-serif';
+          ctx.fillText(fitText(ctx, `⚠ dijeli ${dispUsageMap[found.disp.id]}×`, colW.stanje - 16), colX.stanje + 8, y + 25);
+        }
+      } else {
+        ctx.fillStyle = '#9e9589';
+        ctx.font = '400 12px Arial, sans-serif';
+        ctx.fillText('—', colX.stanje + 8, y + 15);
+      }
+
+      y += rowH;
+    });
+
+    y += groupGap;
+  });
+
+  ctx.fillStyle = '#9e9589';
+  ctx.font = '400 10px Arial, sans-serif';
+  ctx.fillText('Raspored Pogon Bos.Krupa', padX, y);
+
+  return canvas;
+}
 
 // ─── PREGLED ZADNJIH 10 RADNIH DANA (admin) ───────────────────────────────────
 const DAY_ABBR = ['NED', 'PON', 'UTO', 'SRI', 'ČET', 'PET', 'SUB'];
@@ -906,6 +1055,37 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
     }
   };
 
+  // Umjesto teksta — generiši obojenu, preglednu SLIKU rasporeda i podijeli je kao
+  // fajl (Web Share API); ako uređaj/preglednik ne podržava dijeljenje fajlova,
+  // slika se preuzme na uređaj pa je poslovođa ručno prikači u poruku.
+  const handleShareImage = () => {
+    const groups = groupByOdjel(dayRows);
+    if (groups.length === 0) {
+      showToast('Nema kamiona za ovaj dan.', 'error');
+      return;
+    }
+    const canvas = buildScheduleCanvas({ selectedDate, groups, findDispForKupac, dispUsageMap });
+    canvas.toBlob(async (blob) => {
+      if (!blob) { showToast('Greška pri generisanju slike.', 'error'); return; }
+      const file = new File([blob], `raspored-kamiona-${selectedDate}.png`, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Raspored kamiona', text: `Raspored kamiona — ${fmtDate(selectedDate)}` });
+        } catch (e) { /* korisnik otkazao dijeljenje */ }
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Slika je preuzeta na uređaj — pošaljite je ručno.', 'success');
+      }
+    }, 'image/png');
+  };
+
   return (
     <div>
       {subTab !== 'pregled10' && (
@@ -919,6 +1099,7 @@ function RasporedKamionaView({ truckRows, setTruckRows, workers, truckGroupOtpre
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary btn-sm no-print" onClick={handleCopyMessage}>📋 Kopiraj za poruku</button>
               <button className="btn btn-secondary btn-sm no-print" onClick={handleShare}>📤 Pošalji (Viber/WhatsApp/Messenger)</button>
+              <button className="btn btn-secondary btn-sm no-print" onClick={handleShareImage}>🖼️ Pošalji sliku poslovođama</button>
               <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>🖨️ Štampaj za poslovođe</button>
               {!isPoslovodja && (
                 <button className="btn btn-primary btn-sm no-print" onClick={addRow}>+ Dodaj kamion</button>
