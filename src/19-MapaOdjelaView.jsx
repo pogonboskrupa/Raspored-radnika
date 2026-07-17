@@ -146,6 +146,9 @@ function MapaOdjelaView({ active, truckRows }) {
             <button type="button" onClick={handleClearRute}
               style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer' }}>✕ Očisti rute</button>
           )}
+          <button type="button" title="Izračunate rute (Šumarija→odjel) se pamte lokalno da se ne pogađa OSRM server svaki put — ovo briše taj keš, npr. ako se promijeni putna mreža."
+            onClick={() => { if (window.clearMapaRutaCache) window.clearMapaRutaCache(); }}
+            style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer', color: '#6b7280', marginLeft: 'auto' }}>🗑️ Obriši keš ruta</button>
           {vozilaResult && !vozilaResult.error && vozilaResult.matched.length === 0 && vozilaResult.unmatched.length === 0 && (
             <span style={{ fontSize: 12, color: '#9a3412' }}>Nema zakazanih kamiona za {vozilaDate.split('-').reverse().join('.')}.</span>
           )}
@@ -164,6 +167,10 @@ function MapaOdjelaView({ active, truckRows }) {
                     const total = vozilaResult.matched.reduce((s, m) => s + (m.distKm || 0), 0);
                     return total > 0 ? ` — ukupno ${total.toFixed(1)} km (jednosmjerno, po odjelu)` : '';
                   })()}
+                  {(() => {
+                    const cachedCount = vozilaResult.matched.filter(m => m.cached).length;
+                    return cachedCount > 0 ? ` · ${cachedCount} iz keša` : '';
+                  })()}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {vozilaResult.matched.map((m, i) => (
@@ -174,7 +181,10 @@ function MapaOdjelaView({ active, truckRows }) {
                         {m.kamioni.length} {m.kamioni.length === 1 ? 'kamion' : 'kamiona'} — {m.kamioni.map(k => `${k.kupac || '—'}${k.sortiment ? ` (${SORTIMENT_LABELS[k.sortiment] || k.sortiment})` : ''}`).join(', ')}
                       </span>
                       {m.distKm != null
-                        ? <span style={{ fontWeight: 700, color: '#9a3412', marginLeft: 'auto' }}>{m.distKm.toFixed(1)} km · ~{m.durMin} min</span>
+                        ? <span style={{ fontWeight: 700, color: '#9a3412', marginLeft: 'auto' }}>
+                            {m.distKm.toFixed(1)} km · ~{m.durMin} min
+                            {m.cached && <span style={{ fontWeight: 500, color: '#9ca3af', marginLeft: 4 }}>(keš)</span>}
+                          </span>
                         : <span style={{ color: '#dc2626', marginLeft: 'auto' }}>Ruta nije uspjela{m.error ? ` (${m.error})` : ''}</span>}
                     </div>
                   ))}

@@ -11,6 +11,21 @@
   const ROUTE_COLORS = ['#ea580c', '#0891b2', '#7c3aed', '#be123c', '#059669', '#ca8a04', '#4338ca', '#c2410c'];
   const HIGHLIGHT_COLOR = '#ea580c';
 
+  // Udaljenost Šumarija→odjel se praktično ne mijenja (putna mreža je stabilna) — keširaj
+  // izračunatu OSRM rutu po odjelu u localStorage da se ne pogađa javni OSRM demo server
+  // (spor, rate-limituje) svaki put iznova. Ključ je labelKey(gj+odjel) poligona sa kojim je
+  // odjel matchovan (stabilan identitet), ne slobodni tekst iz Raspored kamiona (koji varira).
+  const ROUTE_CACHE_KEY = 'mapa_ruta_cache_v1';
+  function _loadRouteCache() {
+    try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function _saveRouteCache(cache) {
+    try { localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+  }
+  window.clearMapaRutaCache = function () {
+    try { localStorage.removeItem(ROUTE_CACHE_KEY); } catch (e) {}
+  };
+
   let _routeLayerGroup = null;
   let _highlightedLayers = [];
 
@@ -98,6 +113,7 @@
     const unmatched = [];
     let colorIdx = 0;
     const boundsAcc = [];
+    const routeCache = _loadRouteCache();
 
     for (const [, g] of groups) {
       const lyrs = _findFeaturesForOdjel(g.odjelRaw, features, internal);
@@ -112,18 +128,28 @@
         _highlightedLayers.push(lyr);
       });
 
+      const p0 = lyrs[0]._kartaProps || {};
+      const cacheKey = internal.labelKey((p0.gj || '') + ' ' + (p0.odjel || p0.name || g.odjelRaw));
+      let route = routeCache[cacheKey];
+      const fromCache = !!route;
+
       try {
-        const route = await _fetchRoute(internal.SUMARIJA_LATLNG, centroid, internal);
+        if (!route) {
+          route = await _fetchRoute(internal.SUMARIJA_LATLNG, centroid, internal);
+          routeCache[cacheKey] = route;
+          _saveRouteCache(routeCache);
+        }
         L.polyline(route.coords, { color, weight: 4, opacity: 0.85, dashArray: '8 4' })
-          .bindTooltip(`${g.odjelRaw}: ${route.distKm.toFixed(1)} km · ~${route.durMin} min`, { permanent: false, direction: 'center', className: 'karta-tooltip' })
+          .bindTooltip(`${g.odjelRaw}: ${route.distKm.toFixed(1)} km · ~${route.durMin} min${fromCache ? ' · keš' : ''}`, { permanent: false, direction: 'center', className: 'karta-tooltip' })
           .addTo(_routeLayerGroup);
         route.coords.forEach(c => boundsAcc.push(c));
-        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: route.distKm, durMin: route.durMin, color });
+        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: route.distKm, durMin: route.durMin, color, cached: fromCache });
       } catch (e) {
         matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: null, durMin: null, color, error: e.message });
       }
       // Blaga pauza između poziva — javni OSRM demo server zna throttle-ovati brze uzastopne pozive.
-      await _sleep(300);
+      // Preskoči je za keš-pogotke (nema mrežnog poziva, nema šta throttle-ovati).
+      if (!fromCache) await _sleep(300);
     }
 
     if (boundsAcc.length) {

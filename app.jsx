@@ -8603,6 +8603,9 @@ function MapaOdjelaView({ active, truckRows }) {
             <button type="button" onClick={handleClearRute}
               style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer' }}>✕ Očisti rute</button>
           )}
+          <button type="button" title="Izračunate rute (Šumarija→odjel) se pamte lokalno da se ne pogađa OSRM server svaki put — ovo briše taj keš, npr. ako se promijeni putna mreža."
+            onClick={() => { if (window.clearMapaRutaCache) window.clearMapaRutaCache(); }}
+            style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer', color: '#6b7280', marginLeft: 'auto' }}>🗑️ Obriši keš ruta</button>
           {vozilaResult && !vozilaResult.error && vozilaResult.matched.length === 0 && vozilaResult.unmatched.length === 0 && (
             <span style={{ fontSize: 12, color: '#9a3412' }}>Nema zakazanih kamiona za {vozilaDate.split('-').reverse().join('.')}.</span>
           )}
@@ -8621,6 +8624,10 @@ function MapaOdjelaView({ active, truckRows }) {
                     const total = vozilaResult.matched.reduce((s, m) => s + (m.distKm || 0), 0);
                     return total > 0 ? ` — ukupno ${total.toFixed(1)} km (jednosmjerno, po odjelu)` : '';
                   })()}
+                  {(() => {
+                    const cachedCount = vozilaResult.matched.filter(m => m.cached).length;
+                    return cachedCount > 0 ? ` · ${cachedCount} iz keša` : '';
+                  })()}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {vozilaResult.matched.map((m, i) => (
@@ -8631,7 +8638,10 @@ function MapaOdjelaView({ active, truckRows }) {
                         {m.kamioni.length} {m.kamioni.length === 1 ? 'kamion' : 'kamiona'} — {m.kamioni.map(k => `${k.kupac || '—'}${k.sortiment ? ` (${SORTIMENT_LABELS[k.sortiment] || k.sortiment})` : ''}`).join(', ')}
                       </span>
                       {m.distKm != null
-                        ? <span style={{ fontWeight: 700, color: '#9a3412', marginLeft: 'auto' }}>{m.distKm.toFixed(1)} km · ~{m.durMin} min</span>
+                        ? <span style={{ fontWeight: 700, color: '#9a3412', marginLeft: 'auto' }}>
+                            {m.distKm.toFixed(1)} km · ~{m.durMin} min
+                            {m.cached && <span style={{ fontWeight: 500, color: '#9ca3af', marginLeft: 4 }}>(keš)</span>}
+                          </span>
                         : <span style={{ color: '#dc2626', marginLeft: 'auto' }}>Ruta nije uspjela{m.error ? ` (${m.error})` : ''}</span>}
                     </div>
                   ))}
@@ -8689,6 +8699,21 @@ const PLAN_YEAR_LABEL = 2026;
 
   const ROUTE_COLORS = ['#ea580c', '#0891b2', '#7c3aed', '#be123c', '#059669', '#ca8a04', '#4338ca', '#c2410c'];
   const HIGHLIGHT_COLOR = '#ea580c';
+
+  // Udaljenost Šumarija→odjel se praktično ne mijenja (putna mreža je stabilna) — keširaj
+  // izračunatu OSRM rutu po odjelu u localStorage da se ne pogađa javni OSRM demo server
+  // (spor, rate-limituje) svaki put iznova. Ključ je labelKey(gj+odjel) poligona sa kojim je
+  // odjel matchovan (stabilan identitet), ne slobodni tekst iz Raspored kamiona (koji varira).
+  const ROUTE_CACHE_KEY = 'mapa_ruta_cache_v1';
+  function _loadRouteCache() {
+    try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function _saveRouteCache(cache) {
+    try { localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+  }
+  window.clearMapaRutaCache = function () {
+    try { localStorage.removeItem(ROUTE_CACHE_KEY); } catch (e) {}
+  };
 
   let _routeLayerGroup = null;
   let _highlightedLayers = [];
@@ -8777,6 +8802,7 @@ const PLAN_YEAR_LABEL = 2026;
     const unmatched = [];
     let colorIdx = 0;
     const boundsAcc = [];
+    const routeCache = _loadRouteCache();
 
     for (const [, g] of groups) {
       const lyrs = _findFeaturesForOdjel(g.odjelRaw, features, internal);
@@ -8791,18 +8817,28 @@ const PLAN_YEAR_LABEL = 2026;
         _highlightedLayers.push(lyr);
       });
 
+      const p0 = lyrs[0]._kartaProps || {};
+      const cacheKey = internal.labelKey((p0.gj || '') + ' ' + (p0.odjel || p0.name || g.odjelRaw));
+      let route = routeCache[cacheKey];
+      const fromCache = !!route;
+
       try {
-        const route = await _fetchRoute(internal.SUMARIJA_LATLNG, centroid, internal);
+        if (!route) {
+          route = await _fetchRoute(internal.SUMARIJA_LATLNG, centroid, internal);
+          routeCache[cacheKey] = route;
+          _saveRouteCache(routeCache);
+        }
         L.polyline(route.coords, { color, weight: 4, opacity: 0.85, dashArray: '8 4' })
-          .bindTooltip(`${g.odjelRaw}: ${route.distKm.toFixed(1)} km · ~${route.durMin} min`, { permanent: false, direction: 'center', className: 'karta-tooltip' })
+          .bindTooltip(`${g.odjelRaw}: ${route.distKm.toFixed(1)} km · ~${route.durMin} min${fromCache ? ' · keš' : ''}`, { permanent: false, direction: 'center', className: 'karta-tooltip' })
           .addTo(_routeLayerGroup);
         route.coords.forEach(c => boundsAcc.push(c));
-        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: route.distKm, durMin: route.durMin, color });
+        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: route.distKm, durMin: route.durMin, color, cached: fromCache });
       } catch (e) {
         matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: null, durMin: null, color, error: e.message });
       }
       // Blaga pauza između poziva — javni OSRM demo server zna throttle-ovati brze uzastopne pozive.
-      await _sleep(300);
+      // Preskoči je za keš-pogotke (nema mrežnog poziva, nema šta throttle-ovati).
+      if (!fromCache) await _sleep(300);
     }
 
     if (boundsAcc.length) {
