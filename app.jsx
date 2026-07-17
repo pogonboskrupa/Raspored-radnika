@@ -7012,7 +7012,7 @@ function AppMain({ onLogout, currentUser }) {
           )}
           {mapaLoaded && (
             <div style={{ display: activeTab === 'mapa' ? 'block' : 'none' }}>
-              <MapaOdjelaView active={activeTab === 'mapa'} />
+              <MapaOdjelaView active={activeTab === 'mapa'} truckRows={truckRows} />
             </div>
           )}
         </main>
@@ -8438,6 +8438,22 @@ window.fetchWithCache = fetchWithCache;
     ];
   }
 
+  // ---- EXPORT (dodano za integraciju sa "Raspored vozila", 20-mapaVozilaOverlay.jsx) ----
+  // Čisto ADITIVNO — ne mijenja nijednu postojeću funkciju/ponašanje iznad. Izlaže samo
+  // reference potrebne da se raspored kamiona (Raspored-radnika truckRows) poveže sa istim
+  // geojson poligonima/key-matching logikom koju karta već koristi za primke/otpreme.
+  window.__mapaOdjelaInternal = {
+    normKey: _normKey,
+    labelKey: _labelKey,
+    baseKey: _baseKey,
+    getMap: () => _map,
+    getLayerGroup: () => _layer,
+    getAllFeatures: () => _allFeatures,
+    getCentroid: (lyr) => _centroid(lyr),
+    SUMARIJA_LATLNG: SUMARIJA_LATLNG,
+    OSRM_URL: OSRM_URL,
+  };
+
 })();
 // ─── MAPA ODJELA — React wrapper ────────────────────────────────────────────
 // Kontejneri i modal ovdje SAMO drže DOM čvorove sa istim id-jevima koje
@@ -8445,12 +8461,37 @@ window.fetchWithCache = fetchWithCache;
 // očekuje i puni imperativno (getElementById + innerHTML/style). Zato JSX ovih čvorova
 // namjerno nema dinamičkog React sadržaja/state-a — spriječava da React na sljedećem
 // re-renderu "vrati" ono što je vanilla skripta upisala (Leaflet panes, modal HTML...).
-function MapaOdjelaView({ active }) {
+function MapaOdjelaView({ active, truckRows }) {
   useEffect(() => {
     if (active && typeof window.initKartaOdjela === 'function') {
       window.initKartaOdjela(false);
     }
   }, [active]);
+
+  // ── Raspored vozila (integracija sa "Raspored kamiona") ──
+  // Rute/highlight ostaju imperativni (Leaflet, u 20-mapaVozilaOverlay.jsx) — samo
+  // rezultat (lista za prikaz) se drži u React state-u da se lijepo renderuje.
+  const [vozilaDate, setVozilaDate] = useState(today());
+  const [vozilaResult, setVozilaResult] = useState(null);
+  const [vozilaLoading, setVozilaLoading] = useState(false);
+
+  const handlePrikaziRute = async () => {
+    if (typeof window.showMapaVozilaRute !== 'function') return;
+    setVozilaLoading(true);
+    setVozilaResult(null);
+    try {
+      const res = await window.showMapaVozilaRute(vozilaDate, truckRows);
+      setVozilaResult(res);
+    } catch (e) {
+      setVozilaResult({ matched: [], unmatched: [], error: e.message });
+    } finally {
+      setVozilaLoading(false);
+    }
+  };
+  const handleClearRute = () => {
+    if (typeof window.clearMapaVozilaRute === 'function') window.clearMapaVozilaRute();
+    setVozilaResult(null);
+  };
 
   return (
     <div id="karta-odjela-content">
@@ -8548,6 +8589,62 @@ function MapaOdjelaView({ active }) {
 
         {/* Hint za ruta-mode */}
         <div id="mapa-ruta-hint" style={{ display: 'none', padding: '8px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626', fontWeight: 600, marginBottom: 8 }}></div>
+
+        {/* Raspored vozila — integracija sa "Raspored kamiona" */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#9a3412' }}>🚚 Raspored vozila:</span>
+          <input type="date" value={vozilaDate} onChange={e => setVozilaDate(e.target.value)}
+            style={{ fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6 }} />
+          <button type="button" onClick={handlePrikaziRute} disabled={vozilaLoading}
+            style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #ea580c', borderRadius: 6, background: vozilaLoading ? '#fed7aa' : '#ea580c', color: 'white', cursor: vozilaLoading ? 'default' : 'pointer', fontWeight: 600 }}>
+            {vozilaLoading ? '⏳ Računam rute...' : '🛣️ Prikaži rute za dan'}
+          </button>
+          {vozilaResult && (
+            <button type="button" onClick={handleClearRute}
+              style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer' }}>✕ Očisti rute</button>
+          )}
+          {vozilaResult && !vozilaResult.error && vozilaResult.matched.length === 0 && vozilaResult.unmatched.length === 0 && (
+            <span style={{ fontSize: 12, color: '#9a3412' }}>Nema zakazanih kamiona za {vozilaDate.split('-').reverse().join('.')}.</span>
+          )}
+          {vozilaResult && vozilaResult.error && (
+            <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>{vozilaResult.error}</span>
+          )}
+        </div>
+
+        {vozilaResult && (vozilaResult.matched.length > 0 || vozilaResult.unmatched.length > 0) && (
+          <div style={{ marginBottom: 10, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px' }}>
+            {vozilaResult.matched.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
+                  {vozilaResult.matched.length} {vozilaResult.matched.length === 1 ? 'odjel' : 'odjela'} sa otpremom
+                  {(() => {
+                    const total = vozilaResult.matched.reduce((s, m) => s + (m.distKm || 0), 0);
+                    return total > 0 ? ` — ukupno ${total.toFixed(1)} km (jednosmjerno, po odjelu)` : '';
+                  })()}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {vozilaResult.matched.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12.5, flexWrap: 'wrap' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: m.color, flexShrink: 0, display: 'inline-block' }} />
+                      <strong>{m.odjel}</strong>
+                      <span style={{ color: '#6b7280' }}>
+                        {m.kamioni.length} {m.kamioni.length === 1 ? 'kamion' : 'kamiona'} — {m.kamioni.map(k => `${k.kupac || '—'}${k.sortiment ? ` (${SORTIMENT_LABELS[k.sortiment] || k.sortiment})` : ''}`).join(', ')}
+                      </span>
+                      {m.distKm != null
+                        ? <span style={{ fontWeight: 700, color: '#9a3412', marginLeft: 'auto' }}>{m.distKm.toFixed(1)} km · ~{m.durMin} min</span>
+                        : <span style={{ color: '#dc2626', marginLeft: 'auto' }}>Ruta nije uspjela{m.error ? ` (${m.error})` : ''}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {vozilaResult.unmatched.length > 0 && (
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: vozilaResult.matched.length > 0 ? 8 : 0 }}>
+                ⚠️ Nije pronađeno na mapi (provjeriti naziv odjela u Rasporedu kamiona): {vozilaResult.unmatched.join(', ')}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Leaflet mapa */}
@@ -8580,6 +8677,142 @@ function MapaOdjelaView({ active }) {
 }
 
 const PLAN_YEAR_LABEL = 2026;
+// ─── MAPA ODJELA — RASPORED VOZILA (integracija sa "Raspored kamiona") ─────────
+// Novo, samostalno od 18-karta-odjela.jsx (koji ostaje neizmijenjen) — čita
+// window.__mapaOdjelaInternal (aditivni export iz karta-odjela.jsx) da poveže
+// truckRows (Raspored kamiona, ovaj repo) sa istim geojson poligonima/key-matching
+// logikom koju karta već koristi za primke/otpreme. Za svaki odjel koji ima
+// zakazan kamion na odabrani dan: nacrta OSRM rutu Šumarija→odjel (udaljenost +
+// vrijeme) i istakne poligon odjela na mapi.
+(function () {
+  'use strict';
+
+  const ROUTE_COLORS = ['#ea580c', '#0891b2', '#7c3aed', '#be123c', '#059669', '#ca8a04', '#4338ca', '#c2410c'];
+  const HIGHLIGHT_COLOR = '#ea580c';
+
+  let _routeLayerGroup = null;
+  let _highlightedLayers = [];
+
+  function _clearHighlights() {
+    const internal = window.__mapaOdjelaInternal;
+    const layerGroup = internal && internal.getLayerGroup();
+    _highlightedLayers.forEach(lyr => { if (layerGroup) layerGroup.resetStyle(lyr); });
+    _highlightedLayers = [];
+  }
+
+  window.clearMapaVozilaRute = function () {
+    const internal = window.__mapaOdjelaInternal;
+    const map = internal && internal.getMap();
+    if (_routeLayerGroup && map) map.removeLayer(_routeLayerGroup);
+    _routeLayerGroup = null;
+    _clearHighlights();
+  };
+
+  // Svi geojson poligoni (mogu biti više dijelova za isti odjel) koji odgovaraju
+  // slobodnom tekstu odjela iz Raspored kamiona (npr. "RISOVAC KRUPA 54") — ISTA
+  // normalizacija (labelKey precizno → normKey fallback) kao karta-odjela.js.
+  function _findFeaturesForOdjel(rawOdjel, features, internal) {
+    const label = internal.labelKey(rawOdjel);
+    let matches = features.filter(lyr => {
+      const p = lyr._kartaProps || {};
+      return internal.labelKey((p.gj || '') + ' ' + (p.odjel || p.name || '')) === label;
+    });
+    if (matches.length) return matches;
+    const norm = internal.normKey(rawOdjel);
+    return features.filter(lyr => {
+      const p = lyr._kartaProps || {};
+      return internal.normKey((p.gj || '') + ' ' + (p.odjel || p.name || '')) === norm;
+    });
+  }
+
+  function _combinedCentroid(layers) {
+    try {
+      const bounds = L.latLngBounds([]);
+      layers.forEach(l => bounds.extend(l.getBounds()));
+      return bounds.isValid() ? bounds.getCenter() : null;
+    } catch (e) { return null; }
+  }
+
+  async function _fetchRoute(fromLatLng, toLatLng, internal) {
+    const url = `${internal.OSRM_URL}/${fromLatLng[1]},${fromLatLng[0]};${toLatLng.lng},${toLatLng.lat}?overview=full&geometries=geojson`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.code !== 'Ok' || !data.routes.length) throw new Error('Nema rute');
+    const route = data.routes[0];
+    return {
+      coords: route.geometry.coordinates.map(c => [c[1], c[0]]),
+      distKm: route.distance / 1000,
+      durMin: Math.round(route.duration / 60),
+    };
+  }
+
+  const _sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // Grupiši truckRows za dati datum po normalizovanom odjelu, spoji sa geojson
+  // poligonom (ako postoji), nacrtaj OSRM rutu Šumarija→odjel + istakni poligon.
+  // Vraća { matched:[{odjel,kamioni,distKm,durMin,color,error?}], unmatched:[odjel,...] }
+  // za React prikaz liste (rute/highlight ostaju u Leafletu, van React-a).
+  window.showMapaVozilaRute = async function (dateStr, truckRows) {
+    const internal = window.__mapaOdjelaInternal;
+    if (!internal) return { matched: [], unmatched: [], error: 'Karta nije inicijalizovana.' };
+    const map = internal.getMap();
+    const features = internal.getAllFeatures();
+    if (!map || !features || !features.length) return { matched: [], unmatched: [], error: 'Poligoni odjela još nisu učitani — sačekajte da se karta učita.' };
+
+    window.clearMapaVozilaRute();
+
+    const dayRows = (truckRows || []).filter(r => r.date === dateStr && (r.odjel || '').trim());
+    if (!dayRows.length) return { matched: [], unmatched: [] };
+
+    const groups = new Map(); // normKey → { odjelRaw, kamioni:[] }
+    dayRows.forEach(r => {
+      const k = internal.normKey(r.odjel);
+      if (!groups.has(k)) groups.set(k, { odjelRaw: r.odjel.trim(), kamioni: [] });
+      groups.get(k).kamioni.push({ sortiment: r.sortiment, kupac: r.kupac });
+    });
+
+    _routeLayerGroup = L.layerGroup().addTo(map);
+    const matched = [];
+    const unmatched = [];
+    let colorIdx = 0;
+    const boundsAcc = [];
+
+    for (const [, g] of groups) {
+      const lyrs = _findFeaturesForOdjel(g.odjelRaw, features, internal);
+      const centroid = lyrs.length ? _combinedCentroid(lyrs) : null;
+      if (!lyrs.length || !centroid) { unmatched.push(g.odjelRaw); continue; }
+
+      const color = ROUTE_COLORS[colorIdx % ROUTE_COLORS.length];
+      colorIdx++;
+
+      lyrs.forEach(lyr => {
+        lyr.setStyle({ color: HIGHLIGHT_COLOR, weight: 5, opacity: 1, dashArray: null });
+        _highlightedLayers.push(lyr);
+      });
+
+      try {
+        const route = await _fetchRoute(internal.SUMARIJA_LATLNG, centroid, internal);
+        L.polyline(route.coords, { color, weight: 4, opacity: 0.85, dashArray: '8 4' })
+          .bindTooltip(`${g.odjelRaw}: ${route.distKm.toFixed(1)} km · ~${route.durMin} min`, { permanent: false, direction: 'center', className: 'karta-tooltip' })
+          .addTo(_routeLayerGroup);
+        route.coords.forEach(c => boundsAcc.push(c));
+        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: route.distKm, durMin: route.durMin, color });
+      } catch (e) {
+        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: null, durMin: null, color, error: e.message });
+      }
+      // Blaga pauza između poziva — javni OSRM demo server zna throttle-ovati brze uzastopne pozive.
+      await _sleep(300);
+    }
+
+    if (boundsAcc.length) {
+      try { map.fitBounds(boundsAcc, { padding: [40, 40] }); } catch (e) {}
+    }
+
+    return { matched, unmatched };
+  };
+
+})();
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 ReactDOM.createRoot(document.getElementById('root')).render(

@@ -597,7 +597,7 @@ function AppMain({ onLogout, currentUser }) {
           )}
           {mapaLoaded && (
             <div style={{ display: activeTab === 'mapa' ? 'block' : 'none' }}>
-              <MapaOdjelaView active={activeTab === 'mapa'} />
+              <MapaOdjelaView active={activeTab === 'mapa'} truckRows={truckRows} />
             </div>
           )}
         </main>

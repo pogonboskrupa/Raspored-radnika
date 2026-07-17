@@ -1292,4 +1292,20 @@
     ];
   }
 
+  // ---- EXPORT (dodano za integraciju sa "Raspored vozila", 20-mapaVozilaOverlay.jsx) ----
+  // Čisto ADITIVNO — ne mijenja nijednu postojeću funkciju/ponašanje iznad. Izlaže samo
+  // reference potrebne da se raspored kamiona (Raspored-radnika truckRows) poveže sa istim
+  // geojson poligonima/key-matching logikom koju karta već koristi za primke/otpreme.
+  window.__mapaOdjelaInternal = {
+    normKey: _normKey,
+    labelKey: _labelKey,
+    baseKey: _baseKey,
+    getMap: () => _map,
+    getLayerGroup: () => _layer,
+    getAllFeatures: () => _allFeatures,
+    getCentroid: (lyr) => _centroid(lyr),
+    SUMARIJA_LATLNG: SUMARIJA_LATLNG,
+    OSRM_URL: OSRM_URL,
+  };
+
 })();
