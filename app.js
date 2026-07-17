@@ -12386,6 +12386,13 @@ function AppMain(_ref53) {
     setInstallPromptEvent(null);
   };
   const [activeTab, setActiveTab] = useState('raspored');
+  // Mapa odjela je teška (Leaflet + 4MB geojson) — mount-uje se tek pri prvoj posjeti
+  // tom tabu, a nakon toga ostaje mount-ovana (samo se sakriva/prikazuje preko CSS-a)
+  // da se Leaflet instanca ne uništi/ponovo inicijalizira pri svakom prebacivanju taba.
+  const [mapaLoaded, setMapaLoaded] = useState(false);
+  useEffect(() => {
+    if (activeTab === 'mapa') setMapaLoaded(true);
+  }, [activeTab]);
   const [selectedDate, setSelectedDate] = useState(today());
   const [sidebarFilter, setSidebarFilter] = useState(null);
   const [modal, setModal] = useState(null);
@@ -12795,7 +12802,7 @@ function AppMain(_ref53) {
     }
   }, "\uD83D\uDCBE lokalno")), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs"
-  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref58 => {
+  }, [['raspored', '📋 Raspored'], ['kamioni', '🚚 Raspored kamiona'], ['mapa', '🗺️ Mapa odjela'], ['spisak', '📊 Spisak'], ['vozila', '🚗 Vozila'], ['radnici', '👷 Radnici'], ['sihtarica', '📄 Šihtarica'], ['odjeli', '🏕️ Odjeli'], ['pregled', '🔍 Pregled'], ['historija', '📜 Historija']].filter(_ref58 => {
     let [k] = _ref58;
     return !(isPoslovodja && (k === 'radnici' || k === 'odjeli'));
   }).map(_ref59 => {
@@ -13071,7 +13078,13 @@ function AppMain(_ref53) {
     setTruckGroupOtpremaci: setTruckGroupOtpremaci,
     isPoslovodja: isPoslovodja,
     currentUser: currentUser
-  })), activeTab === 'raspored' && /*#__PURE__*/React.createElement("div", {
+  }), mapaLoaded && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: activeTab === 'mapa' ? 'block' : 'none'
+    }
+  }, /*#__PURE__*/React.createElement(MapaOdjelaView, {
+    active: activeTab === 'mapa'
+  }))), activeTab === 'raspored' && /*#__PURE__*/React.createElement("div", {
     ref: readOnlyRef,
     style: isPoslovodja ? readOnlyStyle : undefined
   }, /*#__PURE__*/React.createElement(RightPanel, {
@@ -13156,6 +13169,2275 @@ function AppMain(_ref53) {
     onClose: () => setHistoryModal(null)
   }));
 }
+
+// ─── MAPA ODJELA — API SLOJ ─────────────────────────────────────────────────
+// Tab "Mapa odjela" (18-karta-odjela.jsx / 19-MapaOdjelaView.jsx) je prenesen iz
+// pogonboskrupa/sumarija i spaja se na ISTI Google Apps Script backend (primke/otpreme
+// za status sječe/otpreme po odjelu, Šumarija Bosanska Krupa) — LIVE podaci, ne statična
+// kopija. Taj backend traži username/password na svakom pozivu (Apps Script verifyUser),
+// a Raspored-radnika ima potpuno drugačiji login (lokalni PIN po korisniku). Dogovoreno
+// rješenje: dedicated nalog, ugrađen ovdje, koji svi korisnici ovog appa dijele isključivo
+// za čitanje podataka za mapu — ne predstavlja login trenutno prijavljenog korisnika appa.
+const MAPA_API_URL = 'https://script.google.com/macros/s/AKfycbz__4umdSqKd0o81TnDgdtHufd0FcaT-1E2oLq9pcHqfWPjVgIA9WZDz6-O4ta_fiUR/exec';
+const MAPA_API_USER = 'NedimCehic';
+const MAPA_API_PASS = '2501';
+function buildApiUrl(path, additionalParams) {
+  const params = new URLSearchParams();
+  params.append('path', path);
+  params.append('username', MAPA_API_USER);
+  params.append('password', MAPA_API_PASS);
+  if (additionalParams) {
+    for (const [key, value] of Object.entries(additionalParams)) {
+      if (value !== null && value !== undefined) params.append(key, value);
+    }
+  }
+  return `${MAPA_API_URL}?${params.toString()}`;
+}
+window.buildApiUrl = buildApiUrl;
+
+// Raspored-radnika nema poseban cache sloj (za razliku od sumarija appa) — obični
+// fetch+JSON, uz upis posljednjeg uspješnog odgovora u localStorage pod cacheKey.
+// karta-odjela.js sam čita taj localStorage zapis kao fallback ako ovaj fetch baci
+// grešku (offline/timeout), pa ga ovdje samo popunjavamo u istom obliku ({data, ts}).
+async function fetchWithCache(url, cacheKey, forceRefresh, timeout) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout || 60000);
+  try {
+    const resp = await fetch(url, {
+      signal: controller.signal
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data,
+        ts: Date.now()
+      }));
+    } catch (e) {}
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+window.fetchWithCache = fetchWithCache;
+// ========================================
+// js/karta-odjela.js — Mapa odjela 2026
+// Preneseno iz pogonboskrupa/sumarija (branch main, js/karta-odjela.js) — samodovoljan
+// vanilla JS modul, namjerno NEIZMIJENJEN (osim GEOJSON_URL niže) da se ne pokvari
+// key-matching logika (_normKey/_labelKey/_baseKey — nedavno ispravljeni bugovi za
+// "Prikaz otpreme" i /N pod-odsjek koliziju). Oslanja se na window.buildApiUrl /
+// window.fetchWithCache (17-mapaOdjelaApi.jsx) i globalni Leaflet (L) sa CDN-a.
+// ========================================
+(function () {
+  'use strict';
+
+  const GEOJSON_VERSION = '20260603a';
+  const GEOJSON_URL = 'https://raw.githubusercontent.com/pogonboskrupa/sumarija/main/data/odjeli.geojson';
+  // ISTI ključevi kao kanonski preload primke/otpreme fetch — dijeli cache umjesto
+  // da duplicira cijeli payload pod treći zaseban ključ (cache_otpreme_karta)
+  const CACHE_SJECA = 'cache_primke_sjeca';
+  const CACHE_OTPR = 'cache_otpreme_tab';
+
+  // Lokacija Šumarije Bosanska Krupa — Trg Alije Izetbegovića 1
+  const SUMARIJA_LATLNG = [44.883425, 16.154427];
+  const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving';
+  let _map = null;
+  let _osmLayer = null;
+  let _satLayer = null;
+  let _isSat = false;
+  let _layer = null;
+  let _geojson = null;
+  let _statusMap = new Map();
+  let _slucajniSet = new Set(); // normKeys s "SLUCAJNI" u nazivu
+  let _prelazniSetGlobal = new Set(); // normKeys bez plana, bez "SLUCAJNI" — prelazni
+  let _allFeatures = [];
+  let _mapBounds = null;
+  let _routeLine = null;
+  let _routeLine2 = null; // ruta odjel→odjel
+  let _sumarijaMark = null;
+  let _currentLatlng = null;
+  let _currentOdjelLabel = null;
+  let _stanjeMap = null; // normKey → { projekat:[], sortimentiNazivi:[] }
+  let _odjelRutaMode = false; // da li je aktivan režim rute između odjela
+  let _odjelRutaFrom = null; // { latlng, label }
+  let _odjelRutaFromMark = null;
+
+  // ---- BOJE ----
+  function _getColor(status) {
+    switch (status) {
+      case 'posjeceno':
+        return '#16a34a';
+      case 'u-sjeci':
+        return '#dc2626';
+      case 'planirano':
+        return '#eab308';
+      case 'plan-2027':
+        return '#2563eb';
+      // plava — plan za narednu godinu
+      case 'slucajni':
+        return '#7c3aed';
+      case 'prelazni':
+        return '#0891b2';
+      default:
+        return '#6366f1';
+    }
+  }
+  function _getStyle(status) {
+    const c = _getColor(status);
+    const noPlan = status === 'bez-plana';
+    return {
+      fillColor: c,
+      fillOpacity: noPlan ? 0.20 : 0.55,
+      color: '#1a1a1a',
+      weight: noPlan ? 1.5 : 4,
+      opacity: noPlan ? 1 : 0.85,
+      dashArray: noPlan ? '4 4' : null
+    };
+  }
+  function _getHoverStyle(status) {
+    const c = _getColor(status);
+    const noPlan = status === 'bez-plana';
+    return {
+      fillColor: c,
+      fillOpacity: noPlan ? 0.30 : 0.8,
+      color: '#000',
+      weight: noPlan ? 2 : 5,
+      opacity: 1
+    };
+  }
+  // Stil u "Prikaz otpreme" režimu — zadržava boju statusa (zeleno posječeno,
+  // crveno u sječi, itd.) ali dodaje bold narandžasti obrub da odjeli s otpremom
+  // jasno iskaču, uključujući "bez-plana" odjele koji su inače blijedi/isprekidani.
+  function _getOtpremaStyle(status) {
+    const c = _getColor(status);
+    return {
+      fillColor: c,
+      fillOpacity: 0.6,
+      color: '#b45309',
+      weight: 4,
+      opacity: 1,
+      dashArray: null
+    };
+  }
+
+  // ---- NORMALIZACIJA ----
+  function _normKey(s) {
+    return String(s || '').trim().toUpperCase().replace(/Č/g, 'C').replace(/Ć/g, 'C').replace(/Š/g, 'S').replace(/Ž/g, 'Z').replace(/Đ/g, 'DJ').replace(/P\s*$/, '') // strip trailing P before stripping /N
+    .replace(/\/\d+\s*$/, '') // then strip /N suffix
+    .trim();
+  }
+
+  // Ključ za prikaz labela — ne strippe /N sufiks, čuva 64/1 vs 64/2
+  function _labelKey(s) {
+    return String(s || '').trim().toUpperCase().replace(/Č/g, 'C').replace(/Ć/g, 'C').replace(/Š/g, 'S').replace(/Ž/g, 'Z').replace(/Đ/g, 'DJ').replace(/P\s*$/, '').trim();
+  }
+  function _fmt(n) {
+    if (n == null || isNaN(n)) return '—';
+    const v = Math.round(n);
+    return v === 0 ? '—' : v.toLocaleString('de-DE') + ' m³';
+  }
+  const PLAN_YEAR = 2026;
+  const MJESECI_NAZIVI = ['Januar', 'Februar', 'Mart', 'April', 'Maj', 'Juni', 'Juli', 'August', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
+  let _otpremaMode = false; // "Prikaz otpreme" checkbox — prikaži samo odjele s otpremom u tekućem mjesecu
+
+  function _getYear(p) {
+    const parts = (p.datum || '').split('.');
+    return parts.length >= 3 ? parseInt(parts[2]) : null;
+  }
+  function _getMonth(p) {
+    const parts = (p.datum || '').split('.');
+    return parts.length >= 2 ? parseInt(parts[1]) : null; // 1-12
+  }
+
+  // ---- STATUS MAP + SLUČAJNI ----
+  // Stripa SLUCAJNI sufiks u svim formatima: "104 SLUCAJNI", "104 SLUCAJNI UZICI", "104 (SLUCAJNI 2025)"
+  const _baseKey = k => k.replace(/[\s(]+SLUCAJNI.*/, '').replace(/[\s(]+SLUCAJAN.*/, '').trim();
+  function _buildStatusMap(primke, otpreme) {
+    const planEntries = _planEntries();
+    const planKeys = new Set(planEntries.map(e => _normKey(e.gj + ' ' + e.odjel)));
+    const map = new Map();
+    _slucajniSet = new Set();
+    const primkeTekuce = (primke || []).filter(p => _getYear(p) === PLAN_YEAR);
+    const primkeOstale = (primke || []).filter(p => _getYear(p) !== PLAN_YEAR);
+    const otpremeTekuce = (otpreme || []).filter(p => _getYear(p) === PLAN_YEAR);
+    const otremeOstale = (otpreme || []).filter(p => _getYear(p) !== PLAN_YEAR);
+    _slucajniSet = new Set(); // ima "SLUCAJNI" u nazivu odjela
+    let _prelazniSet = new Set(); // nije u planu 2026, ali nema "SLUCAJNI" — prelazni iz prethodne godine
+
+    primkeTekuce.forEach(p => {
+      const k = _normKey(p.odjel);
+      const bk = _baseKey(k); // stripa SLUCAJNI sufiks da matchuje GeoJSON polygon key
+      if (!planKeys.has(k)) {
+        if (k.includes('SLUCAJNI') || k.includes('SLUCAJAN')) {
+          _slucajniSet.add(bk); // čuvamo baseKey, ne puni normKey
+        } else {
+          _prelazniSet.add(bk); // isto za prelazne
+        }
+      }
+    });
+    _prelazniSetGlobal = _prelazniSet;
+    planEntries.forEach(entry => {
+      const key = _normKey(entry.gj + ' ' + entry.odjel); // matches normKey(p.odjel)
+      const sjeca = _emptySort();
+      const otpr = _emptySort();
+      const sjecaOst = _emptySort();
+      const otprOst = _emptySort();
+      primkeTekuce.filter(p => _normKey(p.odjel) === key).forEach(p => _addSort(sjeca, p.sortiment, p.kolicina));
+      otpremeTekuce.filter(p => _normKey(p.odjel) === key).forEach(p => _addSort(otpr, p.sortiment, p.kolicina));
+      primkeOstale.filter(p => _normKey(p.odjel) === key).forEach(p => _addSort(sjecaOst, p.sortiment, p.kolicina));
+      otremeOstale.filter(p => _normKey(p.odjel) === key).forEach(p => _addSort(otprOst, p.sortiment, p.kolicina));
+
+      // Radilište, izvođač, poslovođa — iz tekućih primki za ovaj odjel
+      const odjelPrimke = primkeTekuce.filter(p => _normKey(p.odjel) === key);
+      const uniq = (arr, fn) => [...new Set(arr.map(fn).filter(Boolean))].join(', ') || '—';
+      const radiliste = uniq(odjelPrimke, p => p.radiliste);
+      const izvodjac = uniq(odjelPrimke, p => p.izvodjac);
+      const poslovodja = uniq(odjelPrimke, p => p.poslovodja);
+      sjeca.ukupno = _sumSort(sjeca);
+      otpr.ukupno = _sumSort(otpr);
+      sjecaOst.ukupno = _sumSort(sjecaOst);
+      otprOst.ukupno = _sumSort(otprOst);
+      const pct = entry.neto > 0 ? sjeca.ukupno / entry.neto * 100 : 0;
+      const status = pct >= 95 ? 'posjeceno' : pct > 5 ? 'u-sjeci' : 'planirano';
+      const entryData = {
+        gj: entry.gj,
+        odjel: entry.odjel,
+        status,
+        pct,
+        sjeca,
+        otpr,
+        sjecaOst,
+        otprOst,
+        neto: entry.neto,
+        bruto: entry.bruto,
+        radiliste,
+        izvodjac,
+        poslovodja
+      };
+      map.set(key, entryData);
+      // Alias bez /N stripa — sprječava 64/1 da matchuje plan od 64/2P
+      const strictKey = _labelKey(entry.gj + ' ' + entry.odjel);
+      if (strictKey !== key) map.set(strictKey, entryData);
+    });
+
+    // Plan 2027 — odjeli planirani za narednu godinu, još nisu u planu 2026
+    // Guard za "već u planu 2026" se gradi ISKLJUČIVO iz planEntries (2026), a ne iz
+    // map-e koju ova ista petlja puni — inače susjedni /N odjeli (npr. 5/1 i 5/2) imaju
+    // identičan normKey ("GRMEC JASENICA 5" bez /N sufiksa), pa bi upis 5/1 pogrešno
+    // "zauzeo" normKey i naveo guard da tiho preskoči 5/2 kao da je već obrađen.
+    const plan2026NormKeys = new Set(planEntries.map(e => _normKey(e.gj + ' ' + e.odjel)));
+    const plan2026LabelKeys = new Set(planEntries.map(e => _labelKey(e.gj + ' ' + e.odjel)));
+    _plan2027Entries().forEach(entry => {
+      const normK = _normKey(entry.gj + ' ' + entry.odjel);
+      const labelK = _labelKey(entry.gj + ' ' + entry.odjel);
+      if (plan2026NormKeys.has(normK) || plan2026LabelKeys.has(labelK)) return; // već u planu 2026
+      const d = {
+        gj: entry.gj,
+        odjel: entry.odjel,
+        status: 'plan-2027',
+        pct: 0,
+        sjeca: _emptySort(),
+        otpr: _emptySort(),
+        sjecaOst: _emptySort(),
+        otprOst: _emptySort(),
+        neto: 0,
+        bruto: 0,
+        radiliste: '—',
+        izvodjac: '—',
+        poslovodja: '—'
+      };
+      // labelK je specifičan za OVAJ /N odjel — uvijek ga upiši (to je ključ po kojem
+      // se GeoJSON poligon pronalazi pri renderu). normK je dijeljeni fallback pa ga
+      // upisuje samo prvi /N odjel koji ga zatraži, da ne prepiše sestrinski unos.
+      if (!map.has(labelK)) map.set(labelK, d);
+      if (normK !== labelK && !map.has(normK)) map.set(normK, d);
+    });
+
+    // Extra map za non-plan odjele (slučajni + prelazni)
+    const extraMap = new Map();
+    const nonPlanPrimke = [...primkeTekuce, ...primkeOstale].filter(p => !planKeys.has(_normKey(p.odjel)));
+    const nonPlanOtpr = [...otpremeTekuce, ...otremeOstale].filter(p => !planKeys.has(_normKey(p.odjel)));
+    const nonPlanKeys = new Set([...nonPlanPrimke.map(p => _baseKey(_normKey(p.odjel))), ...nonPlanOtpr.map(p => _baseKey(_normKey(p.odjel)))]);
+    nonPlanKeys.forEach(bk => {
+      const sj = _emptySort();
+      const ot = _emptySort();
+      const sjO = _emptySort();
+      const otO = _emptySort();
+      // Match primke čiji base key odgovara (pokriva i "104 SLUCAJNI" i "104")
+      const matchP = p => _baseKey(_normKey(p.odjel)) === bk;
+      primkeTekuce.filter(matchP).forEach(p => _addSort(sj, p.sortiment, p.kolicina));
+      otpremeTekuce.filter(matchP).forEach(p => _addSort(ot, p.sortiment, p.kolicina));
+      primkeOstale.filter(matchP).forEach(p => _addSort(sjO, p.sortiment, p.kolicina));
+      otremeOstale.filter(matchP).forEach(p => _addSort(otO, p.sortiment, p.kolicina));
+      sj.ukupno = _sumSort(sj);
+      ot.ukupno = _sumSort(ot);
+      sjO.ukupno = _sumSort(sjO);
+      otO.ukupno = _sumSort(otO);
+      const srcPrimke = primkeTekuce.filter(matchP);
+      const uniq = (arr, fn) => [...new Set(arr.map(fn).filter(Boolean))].join(', ') || '—';
+      extraMap.set(bk, {
+        sjeca: sj,
+        otpr: ot,
+        sjecaOst: sjO,
+        otprOst: otO,
+        radiliste: uniq(srcPrimke, p => p.radiliste),
+        izvodjac: uniq(srcPrimke, p => p.izvodjac),
+        poslovodja: uniq(srcPrimke, p => p.poslovodja)
+      });
+    });
+    map._extra = extraMap;
+
+    // ---- OTPREMA TEKUĆEG MJESECA ----
+    // Za "Prikaz otpreme" checkbox: skup odjela koji su imali otpremu u tekućem
+    // kalendarskom mjesecu/godini, sa ukupnom količinom (m³).
+    //
+    // BUGFIX: _normKey BRIŠE /N sufiks (64/1 i 64/2 → isti ključ "64"). Kad se
+    // taj spljošteni ključ koristio za SVE zapise, otprema evidentirana za
+    // POJEDINAČAN pododsjek (npr. "Risovac Krupa 59/1") je lažno "prelijevala"
+    // highlight i na susjedni pododsjek (59/2) koji te otpreme uopšte nije imao
+    // — na mapi se to vidjelo kao highlight "pored" pravog odjela / naizgled
+    // nasumični odsjeci. Rješenje: DVA nivoa preciznosti —
+    //  1. precise: labelKey (ČUVA /N) — kad zapis već navodi tačan pododsjek
+    //  2. fallback: normKey (briše /N) — SAMO za zapise koji nemaju /N u nazivu
+    //     (agregatni/roditeljski unos bez preciznog pododsjeka) — primjenjuje
+    //     se širom svih pododsjeka jer se iz podatka ne može znati tačno koji.
+    const now = new Date();
+    const curMonth = now.getMonth() + 1; // 1-12
+    const curYear = now.getFullYear();
+    const otpremaPreciseMap = new Map(); // baseKey(labelKey) → m³ (čuva /N)
+    const otpremaFallbackMap = new Map(); // baseKey(normKey)  → m³ (bez /N)
+    (otpreme || []).forEach(p => {
+      if (_getYear(p) === curYear && _getMonth(p) === curMonth) {
+        const raw = String(p.odjel || '');
+        const amt = parseFloat(p.kolicina) || 0;
+        if (/\/\d+/.test(raw)) {
+          const pk = _baseKey(_labelKey(raw));
+          otpremaPreciseMap.set(pk, (otpremaPreciseMap.get(pk) || 0) + amt);
+        } else {
+          const fk = _baseKey(_normKey(raw));
+          otpremaFallbackMap.set(fk, (otpremaFallbackMap.get(fk) || 0) + amt);
+        }
+      }
+    });
+    map._otpremaPrecise = otpremaPreciseMap;
+    map._otpremaFallback = otpremaFallbackMap;
+    map._otpremaMjesecNaziv = MJESECI_NAZIVI[curMonth - 1] + ' ' + curYear;
+    return map;
+  }
+  function _emptySort() {
+    return {
+      cTrupci: 0,
+      celDuga: 0,
+      celCijepana: 0,
+      skart: 0,
+      lTrupci: 0,
+      ogrDugi: 0,
+      ogrCijepani: 0,
+      gule: 0,
+      ukupno: 0
+    };
+  }
+  function _sumSort(s) {
+    return s.cTrupci + s.celDuga + s.celCijepana + s.skart + s.lTrupci + s.ogrDugi + s.ogrCijepani + s.gule;
+  }
+  function _addSort(obj, sortiment, kolicina) {
+    const k = parseFloat(kolicina) || 0;
+    switch (sortiment) {
+      case 'TRUPCI Č':
+        obj.cTrupci += k;
+        break;
+      case 'CEL.DUGA':
+        obj.celDuga += k;
+        break;
+      case 'CEL.CIJEPANA':
+        obj.celCijepana += k;
+        break;
+      case 'ŠKART':
+        obj.skart += k;
+        break;
+      case 'TRUPCI L':
+        obj.lTrupci += k;
+        break;
+      case 'OGR.DUGI':
+        obj.ogrDugi += k;
+        break;
+      case 'OGR.CIJEPANI':
+        obj.ogrCijepani += k;
+        break;
+      case 'GULE':
+        obj.gule += k;
+        break;
+    }
+  }
+
+  // ---- CENTROID ----
+  function _centroid(layer) {
+    try {
+      const b = layer.getBounds();
+      return b.getCenter();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ---- OSRM RUTA ----
+  async function _drawRoute(destLatLng) {
+    if (_routeLine) {
+      _map.removeLayer(_routeLine);
+      _routeLine = null;
+    }
+    const [lat1, lng1] = SUMARIJA_LATLNG;
+    const url = `${OSRM_URL}/${lng1},${lat1};${destLatLng.lng},${destLatLng.lat}?overview=full&geometries=geojson`;
+    try {
+      // Timeout — javni OSRM demo server zna visiti; bez ovoga UI čeka zauvijek
+      const resp = await fetch(url, {
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!resp.ok) throw new Error('Server rute nedostupan (HTTP ' + resp.status + ')');
+      const data = await resp.json();
+      if (data.code !== 'Ok' || !data.routes.length) throw new Error('Nema rute');
+      const route = data.routes[0];
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      const distKm = (route.distance / 1000).toFixed(1);
+      const durMin = Math.round(route.duration / 60);
+      _routeLine = L.polyline(coords, {
+        color: '#2563eb',
+        weight: 4,
+        opacity: 0.85,
+        dashArray: '8 4'
+      }).bindTooltip(`${distKm} km · ~${durMin} min`, {
+        permanent: true,
+        direction: 'center',
+        className: 'karta-tooltip'
+      }).addTo(_map);
+      const infoDiv = document.getElementById('mapa-ruta-info');
+      if (infoDiv) {
+        infoDiv.innerHTML = `🛣️ <b>${distKm} km</b> &nbsp;·&nbsp; ⏱️ ~<b>${durMin} min</b> &nbsp;
+          <button onclick="clearMapaRuta()" style="margin-left:8px;font-size:11px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:white;">✕ Ukloni</button>`;
+        infoDiv.style.display = 'inline-flex';
+      }
+
+      // Zoom na rutu + šumariju
+      _map.fitBounds(_routeLine.getBounds(), {
+        padding: [30, 30]
+      });
+    } catch (e) {
+      alert('Greška pri učitavanju rute: ' + e.message);
+    }
+  }
+  window.clearMapaRuta = function () {
+    if (_routeLine) {
+      _map.removeLayer(_routeLine);
+      _routeLine = null;
+    }
+    const infoDiv = document.getElementById('mapa-ruta-info');
+    if (infoDiv) infoDiv.style.display = 'none';
+  };
+  window.routeToOdjel = function () {
+    closeMapaModal();
+    if (_currentLatlng) _drawRoute(_currentLatlng);
+  };
+  window.routeOdjelToOdjel = function () {
+    if (!_currentLatlng) return;
+    closeMapaModal();
+    // Postavi polazište na trenutni odjel i čekaj klik na odredište
+    if (_routeLine2) {
+      _map.removeLayer(_routeLine2);
+      _routeLine2 = null;
+    }
+    const infoDiv = document.getElementById('mapa-ruta-info');
+    if (infoDiv) infoDiv.style.display = 'none';
+    _odjelRutaMode = true;
+    _odjelRutaFrom = {
+      latlng: _currentLatlng,
+      label: _currentOdjelLabel
+    };
+    _odjelRutaFromMark = L.circleMarker(_currentLatlng, {
+      radius: 10,
+      color: '#dc2626',
+      fillColor: '#fca5a5',
+      fillOpacity: 0.9,
+      weight: 3
+    }).bindTooltip(`Polazište: Odjel ${_currentOdjelLabel}`, {
+      permanent: true,
+      direction: 'top',
+      offset: [0, -8]
+    }).addTo(_map);
+    const btn = document.getElementById('karta-odjel-ruta-btn');
+    if (btn) {
+      btn.style.background = '#2563eb';
+      btn.style.color = 'white';
+    }
+    const hint = document.getElementById('mapa-ruta-hint');
+    if (hint) {
+      hint.textContent = `🎯 Polazište: Odjel ${_currentOdjelLabel} — kliknite na odredišni odjel`;
+      hint.style.display = 'block';
+    }
+  };
+
+  // ---- RUTA IZMEĐU DVA ODJELA ----
+  async function _drawOdjelRuta(from, to, fromLabel, toLabel) {
+    if (_routeLine2) {
+      _map.removeLayer(_routeLine2);
+      _routeLine2 = null;
+    }
+    const url = `${OSRM_URL}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+    try {
+      // Timeout — javni OSRM demo server zna visiti; bez ovoga UI čeka zauvijek
+      const resp = await fetch(url, {
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!resp.ok) throw new Error('Server rute nedostupan (HTTP ' + resp.status + ')');
+      const data = await resp.json();
+      if (data.code !== 'Ok' || !data.routes.length) throw new Error('Nema rute');
+      const route = data.routes[0];
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      const distKm = (route.distance / 1000).toFixed(1);
+      const durMin = Math.round(route.duration / 60);
+      _routeLine2 = L.polyline(coords, {
+        color: '#dc2626',
+        weight: 4,
+        opacity: 0.85,
+        dashArray: '8 4'
+      }).bindTooltip(`${distKm} km · ~${durMin} min`, {
+        permanent: true,
+        direction: 'center',
+        className: 'karta-tooltip'
+      }).addTo(_map);
+      const infoDiv = document.getElementById('mapa-ruta-info');
+      if (infoDiv) {
+        infoDiv.innerHTML = `🔀 <b>Odjel ${fromLabel} → Odjel ${toLabel}</b>: <b>${distKm} km</b> · ⏱️ ~<b>${durMin} min</b>
+          <button onclick="clearOdjelRuta()" style="margin-left:8px;font-size:11px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:white;">✕ Ukloni</button>`;
+        infoDiv.style.display = 'inline-flex';
+      }
+      _map.fitBounds(_routeLine2.getBounds(), {
+        padding: [30, 30]
+      });
+    } catch (e) {
+      alert('Greška pri učitavanju rute: ' + e.message);
+    }
+  }
+  function _clearOdjelRutaState() {
+    _odjelRutaMode = false;
+    _odjelRutaFrom = null;
+    if (_odjelRutaFromMark) {
+      _map.removeLayer(_odjelRutaFromMark);
+      _odjelRutaFromMark = null;
+    }
+    const btn = document.getElementById('karta-odjel-ruta-btn');
+    if (btn) {
+      btn.style.background = 'white';
+      btn.style.color = '#374151';
+    }
+    const hint = document.getElementById('mapa-ruta-hint');
+    if (hint) hint.style.display = 'none';
+  }
+  window.clearOdjelRuta = function () {
+    if (_routeLine2) {
+      _map.removeLayer(_routeLine2);
+      _routeLine2 = null;
+    }
+    const infoDiv = document.getElementById('mapa-ruta-info');
+    if (infoDiv) infoDiv.style.display = 'none';
+    _clearOdjelRutaState();
+  };
+  window.toggleOdjelRutaMode = function () {
+    if (_odjelRutaMode) {
+      _clearOdjelRutaState();
+      return;
+    }
+    // Ukloni stare rute
+    if (_routeLine) {
+      _map.removeLayer(_routeLine);
+      _routeLine = null;
+    }
+    if (_routeLine2) {
+      _map.removeLayer(_routeLine2);
+      _routeLine2 = null;
+    }
+    const infoDiv = document.getElementById('mapa-ruta-info');
+    if (infoDiv) infoDiv.style.display = 'none';
+    _odjelRutaMode = true;
+    _odjelRutaFrom = null;
+    const btn = document.getElementById('karta-odjel-ruta-btn');
+    if (btn) {
+      btn.style.background = '#2563eb';
+      btn.style.color = 'white';
+    }
+    const hint = document.getElementById('mapa-ruta-hint');
+    if (hint) {
+      hint.textContent = '📍 Kliknite na prvi odjel (polazište)';
+      hint.style.display = 'block';
+    }
+  };
+
+  // ---- STANJE ODJELA (projekat) ----
+  function _getStanjeMap() {
+    if (_stanjeMap) return _stanjeMap;
+    try {
+      // Čitaj iz cache_stanje_zaliha (projekat/sječa/zaliha po sortimentima)
+      let raw = localStorage.getItem('cache_stanje_zaliha');
+      // Ako nema, probaj poslovođa varijantu (cache_stanje_zaliha_Ime_Prezime)
+      if (!raw) {
+        const key = Object.keys(localStorage).find(k => k.startsWith('cache_stanje_zaliha_'));
+        if (key) raw = localStorage.getItem(key);
+      }
+      if (!raw) return null;
+      const wrapper = JSON.parse(raw);
+      const payload = wrapper && wrapper.data;
+      if (!payload) return null;
+
+      // stanje-zaliha vraća { odjeli: [...], sortimentiHeader: [...] }
+      // stanje-odjela vraća { data: [...], sortimentiNazivi: [...] }
+      const odjeli = payload.odjeli || payload.data || [];
+      const sortN = payload.sortimentiHeader || payload.sortimentiNazivi || [];
+      if (!Array.isArray(odjeli) || !odjeli.length) return null;
+      _stanjeMap = new Map();
+      odjeli.forEach(od => {
+        const naziv = od.odjelNaziv || od.odjel || '';
+        if (!naziv) return;
+        const k = _normKey(naziv);
+        _stanjeMap.set(k, {
+          projekat: od.redovi && od.redovi.projekat || [],
+          sjeca: od.redovi && od.redovi.sjeca || [],
+          otprema: od.redovi && od.redovi.otprema || [],
+          sumaLager: od.redovi && od.redovi.sumaLager || [],
+          sortimentiNazivi: sortN
+        });
+      });
+    } catch (_) {}
+    return _stanjeMap || null;
+  }
+
+  // ---- DETALJI MODAL ----
+  function _openDetaljiModal(props, info, latlng, extra) {
+    _currentLatlng = latlng;
+    // Uvijek koristi GeoJSON props.odjel za prikaz — ne info.odjel koji može biti od drugog poligona
+    _currentOdjelLabel = String(props.odjel || props.name || info && info.odjel || '?');
+    const odjel = _currentOdjelLabel;
+    const gj = props.gj || '—';
+    const odsjek = props.odsjek || '—';
+    const gjBg = {
+      'Risovac Krupa': 'rgba(147,197,253,.25)',
+      'Grmeč Jasenica': 'rgba(134,239,172,.25)',
+      'Vojskova': 'rgba(252,211,77,.25)'
+    }[gj] || 'rgba(255,255,255,.15)';
+    document.getElementById('mapa-modal-title').textContent = 'Odjel ' + odjel;
+    const gjEl = document.getElementById('mapa-modal-gj');
+    gjEl.textContent = gj;
+    gjEl.style.cssText = `color:white;font-weight:600;background:${gjBg};display:inline-block;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.4);`;
+    const metaDiv = document.getElementById('mapa-modal-meta');
+    if (metaDiv) {
+      const src = info || extra;
+      const metaItem = (icon, label, val) => val && val !== '—' ? `<div style="display:flex;align-items:center;gap:4px;font-size:11px;opacity:.9;"><span>${icon}</span><span><b>${label}:</b> ${val}</span></div>` : '';
+      metaDiv.innerHTML = src ? metaItem('📍', 'Radilište', src.radiliste) + metaItem('👷', 'Izvođač', src.izvodjac) + metaItem('👤', 'Poslovođa', src.poslovodja) : '';
+      metaDiv.style.display = metaDiv.innerHTML ? 'flex' : 'none';
+    }
+    const statusLabel = {
+      posjeceno: 'Posječeno',
+      'u-sjeci': 'U sječi',
+      planirano: 'Planirano',
+      slucajni: 'Slučajni užitak',
+      prelazni: 'Nekategorisan odjel',
+      'plan-2027': 'Plan sječa 2027'
+    };
+    const statusColor = {
+      posjeceno: '#166534',
+      'u-sjeci': '#dc2626',
+      planirano: '#6b7280',
+      slucajni: '#7c3aed',
+      prelazni: '#0e7490',
+      'plan-2027': '#1e40af'
+    };
+    const statusBg = {
+      posjeceno: '#dcfce7',
+      'u-sjeci': '#fee2e2',
+      planirano: '#f3f4f6',
+      slucajni: '#f5f3ff',
+      prelazni: '#ecfeff',
+      'plan-2027': '#dbeafe'
+    };
+    const routeBtn = `
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="routeToOdjel()" style="flex:1;display:flex;align-items:center;gap:6px;background:#2563eb;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;justify-content:center;">🏢 Ruta od Šumarije</button>
+        <button onclick="routeOdjelToOdjel()" style="flex:1;display:flex;align-items:center;gap:6px;background:#dc2626;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;justify-content:center;">🔀 Ruta do odjela…</button>
+      </div>`;
+    const normKey2 = _labelKey((props.gj || '') + ' ' + (props.odjel || props.name || ''));
+    const isSlucajni = !info && _slucajniSet.has(normKey2);
+    const isPrelazni = !info && !isSlucajni && _prelazniSetGlobal.has(normKey2);
+    let body;
+    if (!info) {
+      const label = isSlucajni ? 'Slučajni užitak' : isPrelazni ? 'Nekategorisan odjel' : 'Bez plana';
+      const bg = isSlucajni ? '#f5f3ff' : isPrelazni ? '#ecfeff' : '#f3f4f6';
+      const col = isSlucajni ? '#7c3aed' : isPrelazni ? '#0e7490' : '#6b7280';
+      const note = isSlucajni ? `${gj} — sječa evidentirana kao slučajni užitak` : isPrelazni ? `${gj} — nije u planu 2026, vjerovatno prelazni odjel iz prethodne godine` : `${gj} — nema podataka za ovaj odjel`;
+      let extraTable = '';
+      if (extra) {
+        const sj = extra.sjeca || _emptySort();
+        const ot = extra.otpr || _emptySort();
+        const sjO = extra.sjecaOst || _emptySort();
+        const otO = extra.otprOst || _emptySort();
+        const prevYear = PLAN_YEAR - 1;
+        const hasTek = sj.ukupno > 0 || ot.ukupno > 0;
+        const hasOst = sjO.ukupno > 0 || otO.ukupno > 0;
+        if (hasTek || hasOst) {
+          const cell = (v, color, bold) => `<td style="padding:7px 10px;font-size:13px;text-align:right;border-bottom:1px solid #f1f5f9;color:${color};${bold ? 'font-weight:700;' : ''}">${_fmt(v)}</td>`;
+          const row = (lbl, sv, ov, svO, ovO, bold) => {
+            const bS = bold ? 'font-weight:700;font-size:13px;' : 'font-size:13px;';
+            return `<tr${bold ? ' style="background:#f8fafc;"' : ''}>
+              <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;${bS}">${lbl}</td>
+              ${cell(sv, '#15803d', bold)}
+              ${cell(ov, '#92400e', bold)}
+              ${cell(svO, '#6b7280', bold)}
+              ${cell(ovO, '#9ca3af', bold)}
+            </tr>`;
+          };
+          const sjCijC = sj.celDuga + sj.celCijepana + sj.skart;
+          const sjCijL = sj.ogrDugi + sj.ogrCijepani + sj.gule;
+          const otCijC = ot.celDuga + ot.celCijepana + ot.skart;
+          const otCijL = ot.ogrDugi + ot.ogrCijepani + ot.gule;
+          const sjOCijC = sjO.celDuga + sjO.celCijepana + sjO.skart;
+          const sjOCijL = sjO.ogrDugi + sjO.ogrCijepani + sjO.gule;
+          const otOCijC = otO.celDuga + otO.celCijepana + otO.skart;
+          const otOCijL = otO.ogrDugi + otO.ogrCijepani + otO.gule;
+          extraTable = `
+            <div style="margin-top:16px;background:#f8fafc;border-radius:12px;overflow:hidden;">
+              <div style="padding:10px 14px 4px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">Evidencija sječe</div>
+              <div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#e2e8f0;">
+                    <th style="padding:7px 10px;font-size:12px;text-align:left;color:#475569;font-weight:600;">Sortiment</th>
+                    <th style="padding:7px 10px;font-size:12px;text-align:right;color:#15803d;font-weight:600;">Sječa<br><span style="font-size:10px;">${PLAN_YEAR}</span></th>
+                    <th style="padding:7px 10px;font-size:12px;text-align:right;color:#92400e;font-weight:600;">Otpr.<br><span style="font-size:10px;">${PLAN_YEAR}</span></th>
+                    <th style="padding:7px 10px;font-size:12px;text-align:right;color:#6b7280;font-weight:600;">Sječa<br><span style="font-size:10px;">${prevYear}</span></th>
+                    <th style="padding:7px 10px;font-size:12px;text-align:right;color:#9ca3af;font-weight:600;">Otpr.<br><span style="font-size:10px;">${prevYear}</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${row('TRUPCI Č', sj.cTrupci, ot.cTrupci, sjO.cTrupci, otO.cTrupci, false)}
+                  ${row('CIJEPANO Č', sjCijC, otCijC, sjOCijC, otOCijC, false)}
+                  ${row('TRUPCI L', sj.lTrupci, ot.lTrupci, sjO.lTrupci, otO.lTrupci, false)}
+                  ${row('CIJEPANO L', sjCijL, otCijL, sjOCijL, otOCijL, false)}
+                  ${row('UKUPNO', sj.ukupno, ot.ukupno, sjO.ukupno, otO.ukupno, true)}
+                </tbody>
+              </table>
+              </div>
+            </div>`;
+        }
+      }
+      body = `
+        <div style="text-align:center;padding:20px 0 0;">
+          <span style="background:${bg};color:${col};padding:4px 12px;border-radius:99px;font-size:12px;font-weight:700;">${label}</span>
+          <div style="font-size:13px;color:#6b7280;margin-top:8px;">${note}</div>
+        </div>
+        ${extraTable}
+        ${routeBtn}`;
+    } else if (info.status === 'plan-2027') {
+      body = `
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:110px;">
+            <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;">Gospodarska jedinica</div>
+            <div style="font-weight:700;font-size:13px;">${gj}</div>
+          </div>
+          <div style="flex:0;min-width:50px;">
+            <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;">Odsjek</div>
+            <div style="font-weight:600;font-size:13px;">${odsjek}</div>
+          </div>
+          <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;align-self:flex-start;">Plan sječa 2027</span>
+        </div>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:4px;">📅</div>
+          <div style="font-size:13px;font-weight:700;color:#1e40af;">Planiran za sječu u 2027. godini</div>
+          <div style="font-size:12px;color:#9ca3af;margin-top:4px;">Odjel nije u planu sječe za ${PLAN_YEAR}. godinu.</div>
+        </div>
+        ${routeBtn}`;
+    } else {
+      const s = info.status;
+      const pct = (info.pct || 0).toFixed(1);
+      const barW = Math.min(100, Math.round(info.pct || 0));
+      const barCol = (info.pct || 0) > 100 ? '#dc2626' : _getColor(s);
+      const sj = info.sjeca;
+      const ot = info.otpr;
+      const hasOtpr = ot && ot.ukupno > 0;
+      const zaliha = sj.ukupno - (hasOtpr ? ot.ukupno : 0);
+      const e = _planEntries().find(x => _normKey(x.gj + ' ' + x.odjel) === _normKey(info.gj + ' ' + info.odjel)) || {};
+
+      // Grupisani sortimenti
+      const sjCijC = sj.celDuga + sj.celCijepana + sj.skart;
+      const sjCijL = sj.ogrDugi + sj.ogrCijepani + sj.gule;
+      const otCijC = ot.celDuga + ot.celCijepana + ot.skart;
+      const otCijL = ot.ogrDugi + ot.ogrCijepani + ot.gule;
+
+      // Sječa i otprema iz netekuće godine
+      const so = info.sjecaOst || _emptySort();
+      const oo = info.otprOst || _emptySort();
+      const hasOst = so.ukupno > 0 || oo.ukupno > 0;
+      const td = (v, col, bold) => `<td style="padding:7px 10px;font-size:13px;text-align:right;border-bottom:1px solid #f1f5f9;color:${col};${bold ? 'font-weight:700;' : ''}">${_fmt(v)}</td>`;
+      const tdL = v => `<td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f1f5f9;color:#374151;">${v}</td>`;
+      const grpRow = (label, sv, ov, pv) => {
+        const z = sv - (ov || 0);
+        const zC = z < 0 ? '#dc2626' : z === 0 ? '#6b7280' : '#059669';
+        return `<tr>${tdL(label)}${td(sv, '#15803d', true)}${hasOtpr ? td(ov, '#92400e', false) + td(z, zC, true) : ''}${td(pv, '#9ca3af', false)}</tr>`;
+      };
+      const subRow = (label, sv, ov) => {
+        return `<tr style="background:#fafafa;">${tdL('<span style="font-size:12px;color:#9ca3af;padding-left:10px;">↳ ' + label + '</span>')}${td(sv, '#6b7280', false)}${hasOtpr ? td(ov, '#9ca3af', false) + '<td style="border-bottom:1px solid #f1f5f9;"></td>' : ''}<td style="border-bottom:1px solid #f1f5f9;"></td></tr>`;
+      };
+
+      // Projekat + realizacija iz stanje-odjela cache
+      const _sm = _getStanjeMap();
+      const _stanjeKey = _normKey((info.gj || '') + ' ' + info.odjel);
+      const _stanjeOd = _sm && _sm.get(_stanjeKey);
+      let projekatSection = '';
+      if (_stanjeOd && _stanjeOd.projekat && _stanjeOd.projekat.length) {
+        const sortN = _stanjeOd.sortimentiNazivi;
+        const proj = _stanjeOd.projekat;
+        const sj = _stanjeOd.sjeca || [];
+        const lager = _stanjeOd.sumaLager || [];
+        const fmtP = v => v === 0 || v == null ? '—' : Number(v).toFixed(2);
+        const getV = (arr, name) => {
+          const i = sortN.findIndex(s => s === name);
+          return i >= 0 ? arr[i] ?? null : null;
+        };
+        const pC = getV(proj, 'ČETINARI'),
+          pL = getV(proj, 'LIŠĆARI'),
+          pSveu = getV(proj, 'SVEUKUPNO');
+        const sC = getV(sj, 'ČETINARI'),
+          sL = getV(sj, 'LIŠĆARI'),
+          sSveu = getV(sj, 'SVEUKUPNO');
+        const zC = getV(lager, 'ČETINARI'),
+          zL = getV(lager, 'LIŠĆARI'),
+          zSveu = getV(lager, 'SVEUKUPNO');
+        const pctC = pC && pC > 0 && sC != null ? Math.min(999, sC / pC * 100).toFixed(1) : null;
+        const pctL = pL && pL > 0 && sL != null ? Math.min(999, sL / pL * 100).toFixed(1) : null;
+        const pctSveu = pSveu && pSveu > 0 && sSveu != null ? Math.min(999, sSveu / pSveu * 100).toFixed(1) : null;
+        const col3 = (label, pV, sV, zV, pct, accentC, accentL) => {
+          const zCol = zV != null && zV < 0 ? '#dc2626' : '#059669';
+          return `
+          <div style="background:white;border-radius:8px;padding:8px 10px;flex:1;min-width:90px;border:1px solid #fde68a;">
+            <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">${label}</div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+              <span style="font-size:10px;color:#9ca3af;">Proj.</span>
+              <span style="font-size:13px;font-weight:700;color:${accentC};">${fmtP(pV)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+              <span style="font-size:10px;color:#9ca3af;">Sječa</span>
+              <span style="font-size:13px;font-weight:700;color:#15803d;">${fmtP(sV)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <span style="font-size:10px;color:#9ca3af;">Zaliha</span>
+              <span style="font-size:13px;font-weight:700;color:${zCol};">${fmtP(zV)}</span>
+            </div>
+            ${pct != null ? `<div style="margin-top:5px;height:4px;background:#f3f4f6;border-radius:2px;overflow:hidden;">
+              <div style="height:100%;width:${Math.min(100, parseFloat(pct))}%;background:${parseFloat(pct) >= 100 ? '#dc2626' : '#15803d'};border-radius:2px;"></div>
+            </div>
+            <div style="text-align:right;font-size:10px;font-weight:700;color:${parseFloat(pct) >= 100 ? '#dc2626' : '#6b7280'};margin-top:1px;">${pct}%</div>` : ''}
+          </div>`;
+        };
+        projekatSection = `
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📋 Realizacija projekta (stanje zaliha)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              ${pC != null ? col3('Četinari', pC, sC, zC, pctC, '#1e40af', '') : ''}
+              ${pL != null ? col3('Lišćari', pL, sL, zL, pctL, '#92400e', '') : ''}
+              ${pSveu != null ? col3('Ukupno', pSveu, sSveu, zSveu, pctSveu, '#5b21b6', '') : ''}
+            </div>
+          </div>`;
+      }
+
+      // Kompaktna sekcija godišnjeg plana (ide na dno)
+      const godisnjiPlanSection = `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 12px;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 Godišnji plan ${PLAN_YEAR}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <div style="background:white;border-radius:6px;padding:4px 8px;text-align:center;flex:1;min-width:60px;border:1px solid #bbf7d0;">
+              <div style="font-size:10px;color:#9ca3af;">Bruto</div>
+              <div style="font-weight:700;font-size:12px;color:#374151;">${_fmt(e.bruto || 0)}</div>
+            </div>
+            <div style="background:white;border-radius:6px;padding:4px 8px;text-align:center;flex:1;min-width:60px;border:1px solid #bbf7d0;">
+              <div style="font-size:10px;color:#9ca3af;">Neto</div>
+              <div style="font-weight:700;font-size:12px;color:#166534;">${_fmt(e.neto || 0)}</div>
+            </div>
+            ${(e.cTrupci || 0) > 0 ? `<div style="background:white;border-radius:6px;padding:4px 8px;text-align:center;flex:1;min-width:60px;border:1px solid #bbf7d0;"><div style="font-size:10px;color:#9ca3af;">Trp.Č</div><div style="font-weight:700;font-size:12px;color:#1e40af;">${_fmt(e.cTrupci)}</div></div>` : ''}
+            ${(e.cijepanoC || 0) > 0 ? `<div style="background:white;border-radius:6px;padding:4px 8px;text-align:center;flex:1;min-width:60px;border:1px solid #bbf7d0;"><div style="font-size:10px;color:#9ca3af;">Cij.Č</div><div style="font-weight:700;font-size:12px;color:#1e40af;">${_fmt(e.cijepanoC)}</div></div>` : ''}
+            ${(e.lTrupci || 0) > 0 ? `<div style="background:white;border-radius:6px;padding:4px 8px;text-align:center;flex:1;min-width:60px;border:1px solid #bbf7d0;"><div style="font-size:10px;color:#9ca3af;">Trp.L</div><div style="font-weight:700;font-size:12px;color:#92400e;">${_fmt(e.lTrupci)}</div></div>` : ''}
+            ${(e.cijepanoL || 0) > 0 ? `<div style="background:white;border-radius:6px;padding:4px 8px;text-align:center;flex:1;min-width:60px;border:1px solid #bbf7d0;"><div style="font-size:10px;color:#9ca3af;">Cij.L</div><div style="font-weight:700;font-size:12px;color:#92400e;">${_fmt(e.cijepanoL)}</div></div>` : ''}
+          </div>
+        </div>`;
+      body = `
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:110px;">
+            <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;">Gospodarska jedinica</div>
+            <div style="font-weight:700;font-size:13px;">${gj}</div>
+          </div>
+          <div style="flex:0;min-width:50px;">
+            <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;">Odsjek</div>
+            <div style="font-weight:600;font-size:13px;">${odsjek}</div>
+          </div>
+          <span style="background:${statusBg[s]};color:${statusColor[s]};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;align-self:flex-start;">${statusLabel[s] || s}</span>
+        </div>
+
+        ${projekatSection}
+
+        <div style="background:#f8fafc;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:600;color:#374151;">Realizacija plana ${PLAN_YEAR}</span>
+            <span style="font-size:16px;font-weight:800;color:${statusColor[s]};">${pct}%</span>
+          </div>
+          <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-bottom:8px;">
+            <div style="height:100%;width:${barW}%;background:${barCol};border-radius:3px;"></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <div style="background:white;border-radius:7px;padding:4px 8px;text-align:center;flex:1;min-width:60px;">
+              <div style="font-size:10px;color:#9ca3af;">Sječa ${PLAN_YEAR}</div>
+              <div style="font-weight:800;font-size:13px;color:#15803d;">${_fmt(sj.ukupno)}</div>
+            </div>
+            ${hasOtpr ? `
+            <div style="background:white;border-radius:7px;padding:4px 8px;text-align:center;flex:1;min-width:60px;">
+              <div style="font-size:10px;color:#9ca3af;">Otprema</div>
+              <div style="font-weight:800;font-size:13px;color:#b45309;">${_fmt(ot.ukupno)}</div>
+            </div>
+            <div style="background:white;border-radius:7px;padding:4px 8px;text-align:center;flex:1;min-width:60px;">
+              <div style="font-size:10px;color:#9ca3af;">Zaliha</div>
+              <div style="font-weight:800;font-size:13px;color:${zaliha < 0 ? '#dc2626' : '#1d4ed8'};">${_fmt(zaliha)}</div>
+            </div>` : ''}
+            <div style="background:white;border-radius:7px;padding:4px 8px;text-align:center;flex:1;min-width:60px;">
+              <div style="font-size:10px;color:#9ca3af;">Plan neto</div>
+              <div style="font-weight:800;font-size:13px;color:#6b7280;">${_fmt(info.neto)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Sortimenti — ${PLAN_YEAR}</div>
+        <div style="border-radius:10px;overflow:hidden;border:1px solid #f1f5f9;margin-bottom:10px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#e2e8f0;">
+            <th style="padding:5px 8px;font-size:11px;text-align:left;color:#475569;font-weight:600;">Sortiment</th>
+            <th style="padding:5px 8px;font-size:11px;text-align:right;color:#15803d;font-weight:600;">Sječa</th>
+            ${hasOtpr ? '<th style="padding:5px 8px;font-size:11px;text-align:right;color:#b45309;font-weight:600;">Otpr.</th><th style="padding:5px 8px;font-size:11px;text-align:right;color:#1d4ed8;font-weight:600;">Zal.</th>' : ''}
+            <th style="padding:5px 8px;font-size:11px;text-align:right;color:#9ca3af;font-weight:600;">Plan</th>
+          </tr></thead>
+          <tbody>
+            ${grpRow('TRUPCI Č', sj.cTrupci, ot.cTrupci, e.cTrupci || 0)}
+            ${grpRow('CIJEPANO Č', sjCijC, otCijC, e.cijepanoC || 0)}
+            ${subRow('Cel.duga', sj.celDuga, ot.celDuga)}
+            ${subRow('Cel.cijepana', sj.celCijepana, ot.celCijepana)}
+            ${subRow('Škart', sj.skart, ot.skart)}
+            ${grpRow('TRUPCI L', sj.lTrupci, ot.lTrupci, e.lTrupci || 0)}
+            ${grpRow('CIJEPANO L', sjCijL, otCijL, e.cijepanoL || 0)}
+            ${subRow('Ogr.dugi', sj.ogrDugi, ot.ogrDugi)}
+            ${subRow('Ogr.cijepani', sj.ogrCijepani, ot.ogrCijepani)}
+            ${subRow('Gule', sj.gule, ot.gule)}
+            <tr style="background:#e2e8f0;font-weight:800;border-top:2px solid #cbd5e1;">
+              <td style="padding:6px 8px;font-size:12px;">UKUPNO</td>
+              <td style="padding:6px 8px;font-size:12px;text-align:right;color:#15803d;">${_fmt(sj.ukupno)}</td>
+              ${hasOtpr ? `<td style="padding:6px 8px;font-size:12px;text-align:right;color:#b45309;">${_fmt(ot.ukupno)}</td>
+              <td style="padding:6px 8px;font-size:12px;text-align:right;color:${zaliha < 0 ? '#dc2626' : '#1d4ed8'};">${_fmt(zaliha)}</td>` : ''}
+              <td style="padding:6px 8px;font-size:11px;text-align:right;color:#9ca3af;">${_fmt(info.neto)}</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+
+        ${hasOst ? (() => {
+        const prevYear = PLAN_YEAR - 1;
+        const soCijC = so.celDuga + so.celCijepana + so.skart;
+        const soCijL = so.ogrDugi + so.ogrCijepani + so.gule;
+        const ooCijC = oo.celDuga + oo.celCijepana + oo.skart;
+        const ooCijL = oo.ogrDugi + oo.ogrCijepani + oo.gule;
+        const rowO = (lbl, sv, ov, bold) => {
+          const bS = bold ? 'font-weight:700;font-size:13px;' : 'font-size:13px;';
+          return `<tr${bold ? ' style="background:#f8fafc;"' : ''}>
+              <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;${bS}">${lbl}</td>
+              <td style="padding:7px 10px;font-size:13px;text-align:right;border-bottom:1px solid #f1f5f9;color:#15803d;${bold ? 'font-weight:700;' : ''}">${_fmt(sv)}</td>
+              <td style="padding:7px 10px;font-size:13px;text-align:right;border-bottom:1px solid #f1f5f9;color:#92400e;${bold ? 'font-weight:700;' : ''}">${_fmt(ov)}</td>
+            </tr>`;
+        };
+        return `<div style="margin-bottom:12px;border-radius:12px;overflow:hidden;border:1px solid #fde68a;">
+            <div style="background:#fffbeb;padding:8px 14px 4px;font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">⚠️ Sječa ${prevYear} (prethodna godina)</div>
+            <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:#fef9c3;">
+                <th style="padding:6px 10px;font-size:12px;text-align:left;color:#78350f;font-weight:600;">Sortiment</th>
+                <th style="padding:6px 10px;font-size:12px;text-align:right;color:#15803d;font-weight:600;">Sječa</th>
+                <th style="padding:6px 10px;font-size:12px;text-align:right;color:#92400e;font-weight:600;">Otprema</th>
+              </tr></thead>
+              <tbody>
+                ${rowO('TRUPCI Č', so.cTrupci, oo.cTrupci, false)}
+                ${rowO('CIJEPANO Č', soCijC, ooCijC, false)}
+                ${rowO('TRUPCI L', so.lTrupci, oo.lTrupci, false)}
+                ${rowO('CIJEPANO L', soCijL, ooCijL, false)}
+                ${rowO('UKUPNO', so.ukupno, oo.ukupno, true)}
+              </tbody>
+            </table>
+            </div>
+          </div>`;
+      })() : ''}
+        ${godisnjiPlanSection}
+        ${routeBtn}`;
+    }
+    document.getElementById('mapa-modal-body').innerHTML = body;
+    document.getElementById('mapa-modal').style.display = 'flex';
+  }
+  window.closeMapaModal = function () {
+    document.getElementById('mapa-modal').style.display = 'none';
+  };
+
+  // ---- FOKUS MODE ----
+  window.toggleMapaFokus = function () {
+    document.body.classList.toggle('mapa-fokus');
+    const active = document.body.classList.contains('mapa-fokus');
+    const btn = document.getElementById('karta-fokus-btn');
+    if (btn) {
+      btn.textContent = active ? '✕ Fokus' : '⛶ Fokus';
+      btn.classList.toggle('active', active);
+    }
+    if (_map) setTimeout(() => _map.invalidateSize(), 50);
+  };
+
+  // ---- SATELITSKI SLOJ ----
+  window.toggleMapaSat = function () {
+    _isSat = !_isSat;
+    if (_isSat) {
+      if (_osmLayer) _map.removeLayer(_osmLayer);
+      if (!_satLayer) {
+        _satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: '© Esri',
+          maxZoom: 19
+        });
+      }
+      _satLayer.addTo(_map);
+    } else {
+      if (_satLayer) _map.removeLayer(_satLayer);
+      if (_osmLayer) _osmLayer.addTo(_map);
+    }
+    const btn = document.getElementById('karta-sat-btn');
+    if (btn) btn.textContent = _isSat ? '🗺️ OSM' : '🛰️ Satelit';
+  };
+
+  // ---- PRETRAGA ----
+  window.searchKartaOdjel = function () {
+    const term = (document.getElementById('karta-search') || {}).value || '';
+    const q = term.trim().toUpperCase();
+    if (!q) {
+      _allFeatures.forEach(l => {
+        if (!_map.hasLayer(l)) l.addTo(_map);
+      });
+      return;
+    }
+    let found = null;
+    _allFeatures.forEach(lyr => {
+      const p = lyr._kartaProps || {};
+      const o = String(p.odjel || p.name || '').trim().toUpperCase();
+      const g = String(p.gj || '').trim().toUpperCase();
+      if (o === q || o.startsWith(q) || g.includes(q)) {
+        if (!_map.hasLayer(lyr)) lyr.addTo(_map);
+        if (!found) found = lyr;
+      } else {
+        if (_map.hasLayer(lyr)) _map.removeLayer(lyr);
+      }
+    });
+    if (found) {
+      const b = found.getBounds ? found.getBounds() : null;
+      if (b && b.isValid()) _map.fitBounds(b, {
+        padding: [60, 60],
+        maxZoom: 14
+      });
+      found.setStyle(_getHoverStyle(found._kartaStatus));
+      setTimeout(() => {
+        if (_layer) _layer.resetStyle(found);
+      }, 2000);
+    }
+  };
+  window.clearKartaSearch = function () {
+    const inp = document.getElementById('karta-search');
+    if (inp) inp.value = '';
+    applyKartaFilter();
+  };
+
+  // ---- FILTER ----
+  window.applyKartaFilter = function () {
+    const gjF = (document.getElementById('karta-filter-gj') || {}).value || 'sve';
+    const stF = (document.getElementById('karta-filter-status') || {}).value || 'sve';
+    const q = ((document.getElementById('karta-search') || {}).value || '').trim().toUpperCase();
+    _otpremaMode = (document.getElementById('karta-otprema-toggle') || {}).checked || false;
+    let otpremaBroj = 0;
+    _allFeatures.forEach(lyr => {
+      const p = lyr._kartaProps || {};
+      const o = String(p.odjel || p.name || '').trim().toUpperCase();
+      const gjM = gjF === 'sve' || lyr._kartaGj === gjF;
+      const stM = stF === 'sve' || lyr._kartaStatus === stF;
+      const qM = !q || o.startsWith(q) || String(p.gj || '').toUpperCase().includes(q);
+      // U režimu otpreme prikaži SAMO odjele s otpremom u tekućem mjesecu
+      // (uključujući bez-plana/slučajne/prelazne) — ostali se sakriju.
+      const otM = !_otpremaMode || lyr._kartaOtpremaMjesec > 0;
+      if (gjM && stM && qM && otM) {
+        if (!_map.hasLayer(lyr)) lyr.addTo(_map);
+        if (_otpremaMode) {
+          lyr.setStyle(_getOtpremaStyle(lyr._kartaStatus));
+          otpremaBroj++;
+        } else if (_layer) {
+          _layer.resetStyle(lyr);
+        }
+      } else {
+        if (_map.hasLayer(lyr)) _map.removeLayer(lyr);
+      }
+    });
+
+    // Info traka pored checkboxa — koliko odjela ima otpremu i za koji mjesec
+    const info = document.getElementById('karta-otprema-info');
+    if (info) {
+      if (_otpremaMode) {
+        const naziv = _statusMap && _statusMap._otpremaMjesecNaziv || 'tekući mjesec';
+        info.textContent = `${otpremaBroj} odjela s otpremom — ${naziv}`;
+        info.style.display = 'inline';
+      } else {
+        info.style.display = 'none';
+      }
+    }
+  };
+  window.resetKartaView = function () {
+    const s = document.getElementById('karta-search');
+    if (s) s.value = '';
+    document.getElementById('karta-filter-gj').value = 'sve';
+    document.getElementById('karta-filter-status').value = 'sve';
+    const ot = document.getElementById('karta-otprema-toggle');
+    if (ot) ot.checked = false;
+    applyKartaFilter();
+    if (_mapBounds && _mapBounds.isValid()) _map.fitBounds(_mapBounds, {
+      padding: [20, 20]
+    });
+  };
+  let _labelMarkers = []; // permanentni labeli po odjelu
+
+  // ---- ZOOM-RESPONSIVE LABELI ----
+  let _labelStyleEl = null;
+  function _updateLabelSizes() {
+    const z = _map ? _map.getZoom() : 12;
+    // font-size po zoom nivou; ispod 11 sakrij labele
+    const size = z >= 16 ? 15 : z >= 15 ? 13 : z >= 14 ? 11 : z >= 13 ? 9 : z >= 12 ? 7 : z >= 11 ? 5 : 0;
+    const vis = size > 0 ? 'visible' : 'hidden';
+    if (!_labelStyleEl) {
+      _labelStyleEl = document.createElement('style');
+      _labelStyleEl.id = 'karta-label-zoom-style';
+      document.head.appendChild(_labelStyleEl);
+    }
+    _labelStyleEl.textContent = `.karta-tooltip { font-size:${size}px !important; visibility:${vis}; padding:${size > 0 ? '2px 6px' : '0'} !important; }`;
+  }
+
+  // ---- RENDEROVANJE ----
+  function _renderLayer(geojson, statusMap) {
+    if (_layer) {
+      _map.removeLayer(_layer);
+      _layer = null;
+    }
+    _labelMarkers.forEach(m => _map.removeLayer(m));
+    _labelMarkers = [];
+    _allFeatures = [];
+    if (!geojson || !geojson.features || !geojson.features.length) {
+      const ld = document.getElementById('karta-loading');
+      if (ld) {
+        ld.style.display = 'flex';
+        ld.textContent = '📭 Nema podataka o poligonima.';
+      }
+      return;
+    }
+    const ld = document.getElementById('karta-loading');
+    if (ld) ld.style.display = 'none';
+    _layer = L.geoJSON(geojson, {
+      style: feature => {
+        const p = feature.properties || {};
+        const key = _labelKey((p.gj || '') + ' ' + (p.odjel || p.name || ''));
+        const info = statusMap.get(key);
+        const isSluc = !info && _slucajniSet.has(key);
+        const isPrelazni = !info && !isSluc && _prelazniSetGlobal.has(key);
+        return _getStyle(info ? info.status : isSluc ? 'slucajni' : isPrelazni ? 'prelazni' : 'bez-plana');
+      },
+      onEachFeature: (feature, lyr) => {
+        const props = feature.properties || {};
+        const odjel = String(props.odjel || props.name || '').trim();
+        const gj = String(props.gj || '').trim();
+        const key = _labelKey(gj + ' ' + odjel); // bez /N stripa — 64/1 ≠ 64/2
+        const info = statusMap.get(key);
+        const isSluc = !info && _slucajniSet.has(key);
+        const isPrelazni = !info && !isSluc && _prelazniSetGlobal.has(key);
+        const status = info ? info.status : isSluc ? 'slucajni' : isPrelazni ? 'prelazni' : 'bez-plana';
+        lyr._kartaStatus = status;
+        lyr._kartaGj = gj;
+        lyr._kartaInfo = info;
+        lyr._kartaProps = props;
+        lyr._kartaExtra = !info ? statusMap._extra && statusMap._extra.get(key) || null : null;
+        // Otprema tekućeg mjeseca za ovaj odjel (m³) — za "Prikaz otpreme" filter.
+        // Precizan match (čuva /N) + fallback (bez /N, samo za agregatne unose
+        // bez preciznog pododsjeka) — vidi komentar u _buildStatusMap.
+        const otPreciseKey = _baseKey(_labelKey(gj + ' ' + odjel));
+        const otFallbackKey = _baseKey(_normKey(gj + ' ' + odjel));
+        const otPrecise = statusMap._otpremaPrecise ? statusMap._otpremaPrecise.get(otPreciseKey) || 0 : 0;
+        const otFallback = statusMap._otpremaFallback ? statusMap._otpremaFallback.get(otFallbackKey) || 0 : 0;
+        lyr._kartaOtpremaMjesec = otPrecise + otFallback;
+        _allFeatures.push(lyr);
+
+        // Hover tooltip za odjele bez permanentnog labela
+        if (status === 'bez-plana' || status === 'prelazni') {
+          lyr.bindTooltip(odjel || '?', {
+            permanent: false,
+            direction: 'center',
+            className: 'karta-tooltip'
+          });
+        }
+        lyr.on('mouseover', function () {
+          this.setStyle(_getHoverStyle(this._kartaStatus));
+        });
+        lyr.on('mouseout', function () {
+          // U režimu otpreme zadrži otprema-highlight umjesto default stila
+          if (_otpremaMode && this._kartaOtpremaMjesec > 0) this.setStyle(_getOtpremaStyle(this._kartaStatus));else if (_layer) _layer.resetStyle(this);
+        });
+        lyr.on('click', function (e) {
+          const center = _centroid(this) || e.latlng;
+          const label = String(this._kartaProps.odjel || this._kartaProps.name || '?');
+          if (_odjelRutaMode) {
+            if (!_odjelRutaFrom) {
+              // Odabir polazišta
+              _odjelRutaFrom = {
+                latlng: center,
+                label
+              };
+              _odjelRutaFromMark = L.circleMarker(center, {
+                radius: 10,
+                color: '#dc2626',
+                fillColor: '#fca5a5',
+                fillOpacity: 0.9,
+                weight: 3
+              }).bindTooltip(`Polazište: Odjel ${label}`, {
+                permanent: true,
+                direction: 'top',
+                offset: [0, -8]
+              }).addTo(_map);
+              const hint = document.getElementById('mapa-ruta-hint');
+              if (hint) hint.textContent = `🎯 Polazište: Odjel ${label} — kliknite na odredišni odjel`;
+            } else {
+              // Odabir odredišta — crtaj rutu
+              const from = _odjelRutaFrom;
+              _clearOdjelRutaState();
+              _drawOdjelRuta(from.latlng, center, from.label, label);
+            }
+            return;
+          }
+          _openDetaljiModal(this._kartaProps, this._kartaInfo, center, this._kartaExtra);
+        });
+      }
+    });
+    _layer.addTo(_map);
+
+    // ---- JEDAN LABEL PO ODJELU ----
+    // Grupisati poligone po odjelu, naći zajednički centar, dodati jedan label
+    const odjelGroups = new Map(); // _labelKey(gj+odjel) → { lyrs, odjel, isSluc }
+    _allFeatures.forEach(lyr => {
+      const p = lyr._kartaProps || {};
+      const odjel = String(p.odjel || p.name || '').trim();
+      const gj = String(p.gj || '').trim();
+      const key = _labelKey(gj + ' ' + odjel); // preservira /N razlike
+      const status = lyr._kartaStatus;
+      const showLabel = status !== 'bez-plana' && status !== 'prelazni';
+      if (!showLabel) return;
+      if (!odjelGroups.has(key)) {
+        odjelGroups.set(key, {
+          lyrs: [],
+          odjel,
+          isSluc: status === 'slucajni'
+        });
+      }
+      const grp = odjelGroups.get(key);
+      grp.lyrs.push(lyr);
+    });
+    odjelGroups.forEach(grp => {
+      // Centar najvećeg odsjeka u grupi (najveći bounding box po površini)
+      let bestLyr = null,
+        bestArea = -1;
+      grp.lyrs.forEach(lyr => {
+        try {
+          const b = lyr.getBounds();
+          const area = (b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest());
+          if (area > bestArea) {
+            bestArea = area;
+            bestLyr = lyr;
+          }
+        } catch (_) {}
+      });
+      if (!bestLyr) return;
+      let center;
+      try {
+        center = bestLyr.getBounds().getCenter();
+      } catch (_) {
+        return;
+      }
+      const cls = grp.isSluc ? 'karta-tooltip karta-tooltip-slucajni' : 'karta-tooltip';
+      const tip = L.tooltip({
+        permanent: true,
+        direction: 'center',
+        className: cls,
+        interactive: false,
+        opacity: 1
+      }).setContent(grp.odjel).setLatLng(center).addTo(_map);
+      _labelMarkers.push(tip);
+    });
+
+    // Sačuvaj bounds za Reset dugme, ali ne fituj automatski
+    try {
+      _mapBounds = _layer.getBounds();
+    } catch (e) {}
+
+    // Marker šumarije
+    if (!_sumarijaMark) {
+      _sumarijaMark = L.marker(SUMARIJA_LATLNG, {
+        icon: L.divIcon({
+          html: '<div style="background:#166534;color:white;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);transform:translateX(-50%);">🏢 Šumarija Bosanska Krupa</div>',
+          className: '',
+          iconAnchor: [0, 0]
+        })
+      }).addTo(_map);
+      _sumarijaMark.bindTooltip('Šumarija Bosanska Krupa — Trg Alije Izetbegovića 1');
+    }
+  }
+
+  // ---- UČITAVANJE ----
+  async function _loadArr(endpoint, cacheKey, dataKey, force) {
+    try {
+      const url = typeof buildApiUrl === 'function' ? buildApiUrl(endpoint) : null;
+      if (!url) return [];
+      const data = await fetchWithCache(url, cacheKey, force || false, 150000);
+      return data && data[dataKey] ? data[dataKey] : [];
+    } catch (e) {
+      console.warn('[Mapa]', endpoint, 'failed:', e.message);
+      try {
+        // Veliki ključevi (primke/otpreme) žive u IndexedDB, ne localStorage
+        if ((cacheKey === 'cache_primke_sjeca' || cacheKey === 'cache_otpreme_tab') && window.IDBHelper) {
+          const entry = await window.IDBHelper.getMeta('blob_' + cacheKey);
+          if (entry && entry.data) return entry.data[dataKey] || [];
+        } else {
+          const raw = typeof _resolveCacheRaw === 'function' ? _resolveCacheRaw(cacheKey) : localStorage.getItem(cacheKey);
+          if (raw) {
+            const obj = JSON.parse(raw);
+            return obj && obj.data && obj.data[dataKey] || [];
+          }
+        }
+      } catch (_) {}
+      return [];
+    }
+  }
+  async function _loadGeojson() {
+    if (_geojson) return _geojson;
+    const ld = document.getElementById('karta-loading');
+
+    // VAŽNO: GeoJSON (7.5MB!) se VIŠE NE ČUVA u localStorage — mobilni browseri
+    // imaju kvotu od svega 5-10MB, pa je sam GeoJSON gutao gotovo cijelu kvotu.
+    // Posljedica: preload podataka za tabove (cache_*) je pucao na QuotaExceeded
+    // i tabovi su offline bili prazni. Offline poligone sada služi ISKLJUČIVO
+    // Service Worker keš (fetch handler za .geojson je cache-first).
+    const VER_KEY = 'geojson_version';
+    const GEO_KEY = 'geojson_data';
+    // Jednokratno čišćenje legacy zapisa — odmah oslobodi ~7.5MB za podatke tabova
+    try {
+      localStorage.removeItem(GEO_KEY);
+      localStorage.removeItem(VER_KEY);
+    } catch (_) {}
+    try {
+      if (ld) {
+        ld.style.display = 'flex';
+        ld.textContent = '⏳ Učitavam poligone (može potrajati)...';
+      }
+      // Bez cache:'reload' — pusti SW cache-first handler da posluži keširanu
+      // kopiju (i offline i online); SW u pozadini sam osvježava svoju kopiju
+      const r = await fetch(GEOJSON_URL);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const text = await r.text();
+      if (ld) ld.textContent = '⏳ Parsiram ' + Math.round(text.length / 1024) + ' KB...';
+      _geojson = JSON.parse(text);
+      return _geojson;
+    } catch (e) {
+      console.error('[Mapa] GeoJSON fetch failed:', e);
+      if (ld) {
+        ld.style.display = 'flex';
+        ld.textContent = '❌ Greška pri učitavanju poligona: ' + e.message;
+      }
+      return {
+        type: 'FeatureCollection',
+        features: []
+      };
+    }
+  }
+
+  // ---- INICIJALIZACIJA ----
+  window.initKartaOdjela = async function (force) {
+    const mapDiv = document.getElementById('karta-odjela-map');
+    if (!mapDiv) return;
+    const content = document.getElementById('karta-odjela-content');
+    if (content) content.classList.remove('hidden');
+    if (!_map) {
+      const ld = document.getElementById('karta-loading');
+      if (ld) ld.style.display = 'none';
+
+      // Backdrop click zatvara modal
+      const modal = document.getElementById('mapa-modal');
+      if (modal) modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeMapaModal();
+      });
+      _map = L.map('karta-odjela-map', {
+        center: SUMARIJA_LATLNG,
+        zoom: 12,
+        zoomControl: true
+      });
+      _osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18
+      });
+      _osmLayer.addTo(_map);
+
+      // Zoom-responsive labeli
+      _map.on('zoomend', _updateLabelSizes);
+      _updateLabelSizes();
+    } else if (!force) {
+      _map.invalidateSize();
+      return;
+    }
+    setTimeout(() => {
+      if (_map) _map.invalidateSize();
+    }, 100);
+    const ld = document.getElementById('karta-loading');
+    if (ld) {
+      ld.style.display = 'flex';
+      ld.textContent = navigator.onLine ? '⏳ Učitavam podatke...' : '📦 Učitavam keširano stanje...';
+    }
+    const [geojson, primke, otpreme] = await Promise.all([_loadGeojson(), _loadArr('primke', CACHE_SJECA, 'primke', force), _loadArr('otpreme', CACHE_OTPR, 'otpreme', force)]);
+    _statusMap = _buildStatusMap(primke, otpreme);
+    _renderLayer(geojson, _statusMap);
+    if (typeof markTabRendered === 'function') markTabRendered('karta-odjela');
+    setTimeout(() => {
+      if (_map) _map.invalidateSize();
+    }, 200);
+  };
+
+  // ---- PLAN ENTRIES ----
+  // cTrupci=TRUPCI Č, cijepanoC=CEL.DUGA+CEL.CIJEPANA+ŠKART, lTrupci=TRUPCI L, cijepanoL=OGR.DUGI+OGR.CIJEPANI+GULE
+  function _planEntries() {
+    return [{
+      gj: 'Risovac Krupa',
+      odjel: '13',
+      bruto: 3244,
+      neto: 2768,
+      cTrupci: 3,
+      cijepanoC: 2,
+      lTrupci: 875,
+      cijepanoL: 1888
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '35',
+      bruto: 5417,
+      neto: 4648,
+      cTrupci: 122,
+      cijepanoC: 44,
+      lTrupci: 1813,
+      cijepanoL: 2670
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '50',
+      bruto: 5161,
+      neto: 4329,
+      cTrupci: 1824,
+      cijepanoC: 227,
+      lTrupci: 971,
+      cijepanoL: 1307
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '54P',
+      bruto: 1511,
+      neto: 1276,
+      cTrupci: 639,
+      cijepanoC: 109,
+      lTrupci: 208,
+      cijepanoL: 320
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '55',
+      bruto: 5195,
+      neto: 4258,
+      cTrupci: 2193,
+      cijepanoC: 328,
+      lTrupci: 789,
+      cijepanoL: 948
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '56',
+      bruto: 3877,
+      neto: 3206,
+      cTrupci: 1779,
+      cijepanoC: 263,
+      lTrupci: 439,
+      cijepanoL: 725
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '59/1',
+      bruto: 3724,
+      neto: 3087,
+      cTrupci: 1545,
+      cijepanoC: 208,
+      lTrupci: 658,
+      cijepanoL: 676
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '63',
+      bruto: 4033,
+      neto: 3339,
+      cTrupci: 1309,
+      cijepanoC: 236,
+      lTrupci: 796,
+      cijepanoL: 998
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '66',
+      bruto: 2645,
+      neto: 2307,
+      cTrupci: 0,
+      cijepanoC: 52,
+      lTrupci: 949,
+      cijepanoL: 1307
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '68/2',
+      bruto: 2605,
+      neto: 2287,
+      cTrupci: 35,
+      cijepanoC: 6,
+      lTrupci: 1012,
+      cijepanoL: 1234
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '71P',
+      bruto: 1957,
+      neto: 1655,
+      cTrupci: 664,
+      cijepanoC: 114,
+      lTrupci: 401,
+      cijepanoL: 476
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '97',
+      bruto: 4889,
+      neto: 4058,
+      cTrupci: 1253,
+      cijepanoC: 236,
+      lTrupci: 901,
+      cijepanoL: 1668
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '113P',
+      bruto: 5177,
+      neto: 4300,
+      cTrupci: 225,
+      cijepanoC: 74,
+      lTrupci: 1278,
+      cijepanoL: 2723
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '4/1',
+      bruto: 2490,
+      neto: 2117,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 303,
+      cijepanoL: 1814
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '11P',
+      bruto: 208,
+      neto: 179,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 73,
+      cijepanoL: 106
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '43P',
+      bruto: 1099,
+      neto: 740,
+      cTrupci: 40,
+      cijepanoC: 100,
+      lTrupci: 160,
+      cijepanoL: 440
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '60',
+      bruto: 3551,
+      neto: 3061,
+      cTrupci: 295,
+      cijepanoC: 65,
+      lTrupci: 1050,
+      cijepanoL: 1651
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '61',
+      bruto: 4774,
+      neto: 4105,
+      cTrupci: 454,
+      cijepanoC: 102,
+      lTrupci: 1393,
+      cijepanoL: 2156
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '64/2P',
+      bruto: 996,
+      neto: 608,
+      cTrupci: 13,
+      cijepanoC: 23,
+      lTrupci: 211,
+      cijepanoL: 361
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '66',
+      bruto: 5339,
+      neto: 4493,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 1025,
+      cijepanoL: 3468
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '67',
+      bruto: 4853,
+      neto: 4199,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 1530,
+      cijepanoL: 2669
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '69P',
+      bruto: 1309,
+      neto: 1204,
+      cTrupci: 82,
+      cijepanoC: 32,
+      lTrupci: 390,
+      cijepanoL: 700
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '85P',
+      bruto: 678,
+      neto: 418,
+      cTrupci: 0,
+      cijepanoC: 73,
+      lTrupci: 25,
+      cijepanoL: 320
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '88P',
+      bruto: 1805,
+      neto: 1200,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 20,
+      cijepanoL: 1180
+    }, {
+      gj: 'Vojskova',
+      odjel: '15',
+      bruto: 450,
+      neto: 383,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 0,
+      cijepanoL: 383
+    }, {
+      gj: 'Vojskova',
+      odjel: '21P',
+      bruto: 787,
+      neto: 624,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 202,
+      cijepanoL: 422
+    }, {
+      gj: 'Vojskova',
+      odjel: '25',
+      bruto: 750,
+      neto: 637,
+      cTrupci: 0,
+      cijepanoC: 0,
+      lTrupci: 0,
+      cijepanoL: 637
+    }];
+  }
+
+  // ---- PLAN 2027 ----
+  function _plan2027Entries() {
+    return [{
+      gj: 'Grmeč Jasenica',
+      odjel: '5/1'
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '5/2'
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '68'
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '8'
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '80'
+    }, {
+      gj: 'Grmeč Jasenica',
+      odjel: '81'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '112'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '120'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '14'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '34'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '4'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '44/1P'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '5'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '6'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '60'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '7'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '78'
+    }, {
+      gj: 'Risovac Krupa',
+      odjel: '81'
+    }, {
+      gj: 'Vojskova',
+      odjel: '15'
+    }, {
+      gj: 'Vojskova',
+      odjel: '22'
+    }, {
+      gj: 'Vojskova',
+      odjel: '23/2'
+    }, {
+      gj: 'Vojskova',
+      odjel: '25'
+    }];
+  }
+})();
+// ─── MAPA ODJELA — React wrapper ────────────────────────────────────────────
+// Kontejneri i modal ovdje SAMO drže DOM čvorove sa istim id-jevima koje
+// 18-karta-odjela.jsx (neizmijenjen vanilla modul, preuzet iz pogonboskrupa/sumarija)
+// očekuje i puni imperativno (getElementById + innerHTML/style). Zato JSX ovih čvorova
+// namjerno nema dinamičkog React sadržaja/state-a — spriječava da React na sljedećem
+// re-renderu "vrati" ono što je vanilla skripta upisala (Leaflet panes, modal HTML...).
+function MapaOdjelaView(_ref60) {
+  let {
+    active
+  } = _ref60;
+  useEffect(() => {
+    if (active && typeof window.initKartaOdjela === 'function') {
+      window.initKartaOdjela(false);
+    }
+  }, [active]);
+  return /*#__PURE__*/React.createElement("div", {
+    id: "karta-odjela-content"
+  }, /*#__PURE__*/React.createElement("style", null, `
+        #karta-odjela-map { width:100%; height:calc(100vh - 260px); min-height:400px; background:#f1f5f9; }
+        @media (max-width:1024px) { #karta-odjela-map { height:calc(100vh - 240px); min-height:320px; } }
+        @media (max-width:640px)  { #karta-odjela-map { height:calc(100vh - 270px); min-height:260px; } }
+
+        body.mapa-fokus .app-header { padding:4px 16px !important; min-height:0 !important; }
+        body.mapa-fokus .app-header .app-title { display:none !important; }
+        body.mapa-fokus .nav-tabs { display:none !important; }
+        body.mapa-fokus #karta-odjela-map { height:calc(100vh - 60px) !important; }
+        body.mapa-fokus #mapa-modal { top:6px !important; }
+        @media (max-width:640px) {
+          body.mapa-fokus #karta-odjela-map { height:calc(100vh - 70px) !important; }
+        }
+        #karta-fokus-btn.active { background:#1e40af !important; color:white !important; border-color:#1e40af !important; }
+        @media (min-width:1024px) {
+          #mapa-modal { justify-content:flex-start; align-items:stretch; }
+          #mapa-modal-panel { width:400px; max-width:400px; min-height:unset; max-height:calc(100vh - 44px); border-radius:0 0 12px 0; }
+        }
+        @media (min-width:1440px) {
+          #mapa-modal-panel { width:460px; max-width:460px; }
+        }
+
+        .karta-tooltip { background:white; border:1px solid #d1d5db; border-radius:5px; padding:2px 6px; font-weight:800; color:#1e293b; box-shadow:0 2px 6px rgba(0,0,0,.2); white-space:nowrap; transition:font-size .15s; }
+        .karta-tooltip::before { display:none; }
+        .karta-tooltip-slucajni { background:#7c3aed; border-color:#6d28d9; color:white; }
+        .leaflet-marker-icon.karta-tooltip { background:white; border:1px solid #d1d5db; }
+        .leaflet-marker-icon.karta-tooltip-slucajni { background:#7c3aed; border-color:#6d28d9; color:white; }
+      `), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '1rem 1rem 0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-header",
+    style: {
+      marginBottom: '0.75rem'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "\uD83D\uDDFA\uFE0F Mapa odjela ", PLAN_YEAR_LABEL), /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, "Prostorni prikaz odjela po statusu realizacije plana sje\u010De"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm no-print",
+    style: {
+      marginLeft: 'auto'
+    },
+    onClick: () => window.initKartaOdjela && window.initKartaOdjela(true)
+  }, "\uD83D\uDD04 Osvje\u017Ei")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 8,
+      alignItems: 'center',
+      marginBottom: 10,
+      background: '#f8fafc',
+      border: '1px solid #e2e8f0',
+      borderRadius: 10,
+      padding: '10px 14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#374151'
+    }
+  }, "GJ:"), /*#__PURE__*/React.createElement("select", {
+    id: "karta-filter-gj",
+    onChange: () => window.applyKartaFilter && window.applyKartaFilter(),
+    style: {
+      fontSize: 12,
+      padding: '4px 8px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "sve"
+  }, "Sve GJ"), /*#__PURE__*/React.createElement("option", {
+    value: "Risovac Krupa"
+  }, "Risovac Krupa"), /*#__PURE__*/React.createElement("option", {
+    value: "Grme\u010D Jasenica"
+  }, "Grme\u010D Jasenica"), /*#__PURE__*/React.createElement("option", {
+    value: "Vojskova"
+  }, "Vojskova"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#374151'
+    }
+  }, "Status:"), /*#__PURE__*/React.createElement("select", {
+    id: "karta-filter-status",
+    onChange: () => window.applyKartaFilter && window.applyKartaFilter(),
+    style: {
+      fontSize: 12,
+      padding: '4px 8px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "sve"
+  }, "Svi statusi"), /*#__PURE__*/React.createElement("option", {
+    value: "plan-2027"
+  }, "Plan 2027"), /*#__PURE__*/React.createElement("option", {
+    value: "planirano"
+  }, "Planirano"), /*#__PURE__*/React.createElement("option", {
+    value: "u-sjeci"
+  }, "U sje\u010Di"), /*#__PURE__*/React.createElement("option", {
+    value: "posjeceno"
+  }, "Posje\u010Deno"), /*#__PURE__*/React.createElement("option", {
+    value: "bez-plana"
+  }, "Bez plana"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "karta-search",
+    type: "text",
+    placeholder: "Broj odjela...",
+    onInput: () => window.searchKartaOdjel && window.searchKartaOdjel(),
+    style: {
+      fontSize: 12,
+      padding: '4px 8px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      width: 110
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => window.searchKartaOdjel && window.searchKartaOdjel(),
+    style: {
+      fontSize: 12,
+      padding: '4px 8px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white',
+      cursor: 'pointer'
+    }
+  }, "\uD83D\uDD0D"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => window.clearKartaSearch && window.clearKartaSearch(),
+    style: {
+      fontSize: 12,
+      padding: '4px 8px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white',
+      cursor: 'pointer'
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 5,
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#374151',
+      cursor: 'pointer',
+      background: 'white',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      padding: '4px 10px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "karta-otprema-toggle",
+    type: "checkbox",
+    onChange: () => window.applyKartaFilter && window.applyKartaFilter(),
+    style: {
+      cursor: 'pointer',
+      margin: 0
+    }
+  }), "\uD83D\uDE9B Prikaz otpreme"), /*#__PURE__*/React.createElement("span", {
+    id: "karta-otprema-info",
+    style: {
+      fontSize: 11,
+      color: '#b45309',
+      fontWeight: 700,
+      display: 'none'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    id: "karta-sat-btn",
+    type: "button",
+    onClick: () => window.toggleMapaSat && window.toggleMapaSat(),
+    style: {
+      fontSize: 12,
+      padding: '4px 10px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white',
+      cursor: 'pointer'
+    }
+  }, "\uD83D\uDEF0\uFE0F Satelit"), /*#__PURE__*/React.createElement("button", {
+    id: "karta-odjel-ruta-btn",
+    type: "button",
+    onClick: () => window.toggleOdjelRutaMode && window.toggleOdjelRutaMode(),
+    style: {
+      fontSize: 12,
+      padding: '4px 10px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white',
+      cursor: 'pointer'
+    }
+  }, "\uD83D\uDD00 Ruta odjel\u2192odjel"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => window.resetKartaView && window.resetKartaView(),
+    style: {
+      fontSize: 12,
+      padding: '4px 10px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white',
+      cursor: 'pointer'
+    }
+  }, "\u21BA Reset"), /*#__PURE__*/React.createElement("button", {
+    id: "karta-fokus-btn",
+    type: "button",
+    title: "Mapa u prvom planu",
+    onClick: () => window.toggleMapaFokus && window.toggleMapaFokus(),
+    style: {
+      fontSize: 12,
+      padding: '4px 10px',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
+      background: 'white',
+      cursor: 'pointer'
+    }
+  }, "\u26F6 Fokus"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginLeft: 'auto',
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      width: 12,
+      height: 12,
+      background: '#2563eb',
+      borderRadius: 2
+    }
+  }), "Plan sje\u010Da 2027"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      width: 12,
+      height: 12,
+      background: '#eab308',
+      borderRadius: 2
+    }
+  }), "Planirano"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      width: 12,
+      height: 12,
+      background: '#dc2626',
+      borderRadius: 2
+    }
+  }), "U sje\u010Di"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      width: 12,
+      height: 12,
+      background: '#16a34a',
+      borderRadius: 2
+    }
+  }), "Posje\u010Deno"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      width: 12,
+      height: 12,
+      background: '#7c3aed',
+      borderRadius: 2
+    }
+  }), "Slu\u010Dajni"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      width: 12,
+      height: 12,
+      background: '#0891b2',
+      borderRadius: 2
+    }
+  }), "Nekategorisan"))), /*#__PURE__*/React.createElement("div", {
+    id: "mapa-ruta-hint",
+    style: {
+      display: 'none',
+      padding: '8px 14px',
+      background: '#fef2f2',
+      border: '1px solid #fca5a5',
+      borderRadius: 8,
+      fontSize: 13,
+      color: '#dc2626',
+      fontWeight: 600,
+      marginBottom: 8
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    id: "karta-odjela-map"
+  }, /*#__PURE__*/React.createElement("div", {
+    id: "karta-loading",
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      color: '#6b7280',
+      fontSize: 14
+    }
+  }, "\u23F3 U\u010Ditavam kartu...")), /*#__PURE__*/React.createElement("div", {
+    id: "mapa-ruta-info",
+    style: {
+      display: 'none',
+      margin: '8px 20px',
+      padding: '10px 16px',
+      background: '#eff6ff',
+      border: '1px solid #bfdbfe',
+      borderRadius: 8,
+      fontSize: 13,
+      color: '#1e40af'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    id: "mapa-modal",
+    style: {
+      display: 'none',
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9999,
+      background: 'rgba(0,0,0,.5)',
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    id: "mapa-modal-panel",
+    style: {
+      background: 'white',
+      borderRadius: '0 0 18px 18px',
+      width: '100%',
+      maxWidth: 640,
+      minHeight: '40vh',
+      maxHeight: 'calc(100vh - 44px)',
+      display: 'flex',
+      flexDirection: 'column',
+      boxShadow: '0 8px 40px rgba(0,0,0,.25)',
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'linear-gradient(135deg,#14532d 0%,#166534 100%)',
+      color: 'white',
+      padding: '8px 14px 10px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    id: "mapa-modal-title",
+    style: {
+      fontSize: 17,
+      fontWeight: 800
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    id: "mapa-modal-gj",
+    style: {
+      fontSize: 12,
+      opacity: 0.85,
+      marginTop: 2
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    id: "mapa-modal-meta",
+    style: {
+      display: 'none',
+      flexDirection: 'column',
+      gap: 3,
+      marginTop: 6,
+      paddingTop: 6,
+      borderTop: '1px solid rgba(255,255,255,.25)'
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => window.closeMapaModal && window.closeMapaModal(),
+    style: {
+      background: 'rgba(255,255,255,.2)',
+      border: 'none',
+      color: 'white',
+      width: 28,
+      height: 28,
+      borderRadius: 7,
+      cursor: 'pointer',
+      fontSize: 16,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      marginLeft: 8
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    id: "mapa-modal-body",
+    style: {
+      padding: '12px 14px 16px',
+      overflowY: 'auto',
+      flex: 1,
+      WebkitOverflowScrolling: 'touch'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flexShrink: 0,
+      display: 'flex',
+      justifyContent: 'center',
+      padding: '8px 0',
+      cursor: 'pointer'
+    },
+    onClick: () => window.closeMapaModal && window.closeMapaModal()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 4,
+      background: '#d1d5db',
+      borderRadius: 2
+    }
+  })))));
+}
+const PLAN_YEAR_LABEL = 2026;
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null), /*#__PURE__*/React.createElement(ToastContainer, null)));

@@ -41,8 +41,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
-  // Firebase — uvijek network (real-time sync)
-  if (url.includes('firebaseio.com') || url.includes('firebase') || url.includes('googleapis.com/identitytoolkit')) {
+  // Firebase / sumarija backend (mapa odjela) — uvijek network (real-time sync)
+  if (url.includes('firebaseio.com') || url.includes('firebase') || url.includes('googleapis.com/identitytoolkit') || url.includes('script.google.com')) {
     return; // default browser fetch
   }
 

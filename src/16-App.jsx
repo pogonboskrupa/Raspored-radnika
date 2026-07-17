@@ -92,6 +92,11 @@ function AppMain({ onLogout, currentUser }) {
   };
 
   const [activeTab, setActiveTab] = useState('raspored');
+  // Mapa odjela je teška (Leaflet + 4MB geojson) — mount-uje se tek pri prvoj posjeti
+  // tom tabu, a nakon toga ostaje mount-ovana (samo se sakriva/prikazuje preko CSS-a)
+  // da se Leaflet instanca ne uništi/ponovo inicijalizira pri svakom prebacivanju taba.
+  const [mapaLoaded, setMapaLoaded] = useState(false);
+  useEffect(() => { if (activeTab === 'mapa') setMapaLoaded(true); }, [activeTab]);
   const [selectedDate, setSelectedDate] = useState(today());
   const [sidebarFilter, setSidebarFilter] = useState(null);
   const [modal, setModal] = useState(null);
@@ -432,7 +437,7 @@ function AppMain({ onLogout, currentUser }) {
           }
         </div>
         <nav className="nav-tabs">
-          {[['raspored','📋 Raspored'],['kamioni','🚚 Raspored kamiona'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']]
+          {[['raspored','📋 Raspored'],['kamioni','🚚 Raspored kamiona'],['mapa','🗺️ Mapa odjela'],['spisak','📊 Spisak'],['vozila','🚗 Vozila'],['radnici','👷 Radnici'],['sihtarica','📄 Šihtarica'],['odjeli','🏕️ Odjeli'],['pregled','🔍 Pregled'],['historija','📜 Historija']]
             .filter(([k]) => !(isPoslovodja && (k === 'radnici' || k === 'odjeli')))
             .map(([k,l]) =>
             <button key={k} className={`nav-tab ${activeTab===k?'active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
@@ -589,6 +594,11 @@ function AppMain({ onLogout, currentUser }) {
               workers={workers}
               truckGroupOtpremaci={truckGroupOtpremaci} setTruckGroupOtpremaci={setTruckGroupOtpremaci}
               isPoslovodja={isPoslovodja} currentUser={currentUser} />
+          )}
+          {mapaLoaded && (
+            <div style={{ display: activeTab === 'mapa' ? 'block' : 'none' }}>
+              <MapaOdjelaView active={activeTab === 'mapa'} />
+            </div>
           )}
         </main>
 
