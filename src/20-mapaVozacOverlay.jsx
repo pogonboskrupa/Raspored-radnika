@@ -1,10 +1,15 @@
-// ─── MAPA ODJELA — RASPORED VOZILA (integracija sa "Raspored kamiona") ─────────
+// ─── MAPA ODJELA — RASPORED VOZAČA (integracija sa glavnim Rasporedom radnika) ─
 // Novo, samostalno od 18-karta-odjela.jsx (koji ostaje neizmijenjen) — čita
 // window.__mapaOdjelaInternal (aditivni export iz karta-odjela.jsx) da poveže
-// truckRows (Raspored kamiona, ovaj repo) sa istim geojson poligonima/key-matching
-// logikom koju karta već koristi za primke/otpreme. Za svaki odjel koji ima
-// zakazan kamion na odabrani dan: nacrta OSRM rutu Šumarija→odjel (udaljenost +
-// vrijeme) i istakne poligon odjela na mapi.
+// vozače (workers sa category:'vozac', zakazane na odjel u glavnom Rasporedu) sa
+// istim geojson poligonima/key-matching logikom koju karta već koristi za
+// primke/otpreme. Za svaki odjel koji ima zakazanog vozača tog dana: nacrta OSRM
+// rutu Šumarija→odjel (udaljenost + vrijeme) i istakne poligon odjela na mapi.
+//
+// NAMJERNO nije vezano za "Raspored kamiona" — ti kamioni su kupčevi, kreću sa
+// svoje lokacije, ne od Šumarije, pa im ruta Šumarija→odjel nije relevantna.
+// Ovdje su u pitanju VLASTITI vozači firme (radnici kategorije 'vozac' ili
+// row.otherDriverId) koji stvarno kreću iz Šumarije.
 (function () {
   'use strict';
 
@@ -14,7 +19,7 @@
   // Udaljenost Šumarija→odjel se praktično ne mijenja (putna mreža je stabilna) — keširaj
   // izračunatu OSRM rutu po odjelu u localStorage da se ne pogađa javni OSRM demo server
   // (spor, rate-limituje) svaki put iznova. Ključ je labelKey(gj+odjel) poligona sa kojim je
-  // odjel matchovan (stabilan identitet), ne slobodni tekst iz Raspored kamiona (koji varira).
+  // odjel matchovan (stabilan identitet), ne slobodni tekst koji korisnik unese.
   const ROUTE_CACHE_KEY = 'mapa_ruta_cache_v1';
   function _loadRouteCache() {
     try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY) || '{}'); } catch (e) { return {}; }
@@ -36,7 +41,7 @@
     _highlightedLayers = [];
   }
 
-  window.clearMapaVozilaRute = function () {
+  window.clearMapaVozacRute = function () {
     const internal = window.__mapaOdjelaInternal;
     const map = internal && internal.getMap();
     if (_routeLayerGroup && map) map.removeLayer(_routeLayerGroup);
@@ -45,16 +50,16 @@
   };
 
   // Svi geojson poligoni (mogu biti više dijelova za isti odjel) koji odgovaraju
-  // slobodnom tekstu odjela iz Raspored kamiona (npr. "RISOVAC KRUPA 54") — ISTA
-  // normalizacija (labelKey precizno → normKey fallback) kao karta-odjela.js.
-  function _findFeaturesForOdjel(rawOdjel, features, internal) {
-    const label = internal.labelKey(rawOdjel);
+  // datom "GJ ODJEL" labelu — ISTA normalizacija (labelKey precizno → normKey
+  // fallback) kao karta-odjela.js koristi za primke/otpreme.
+  function _findFeaturesForOdjel(rawLabel, features, internal) {
+    const label = internal.labelKey(rawLabel);
     let matches = features.filter(lyr => {
       const p = lyr._kartaProps || {};
       return internal.labelKey((p.gj || '') + ' ' + (p.odjel || p.name || '')) === label;
     });
     if (matches.length) return matches;
-    const norm = internal.normKey(rawOdjel);
+    const norm = internal.normKey(rawLabel);
     return features.filter(lyr => {
       const p = lyr._kartaProps || {};
       return internal.normKey((p.gj || '') + ' ' + (p.odjel || p.name || '')) === norm;
@@ -85,28 +90,22 @@
 
   const _sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  // Grupiši truckRows za dati datum po normalizovanom odjelu, spoji sa geojson
-  // poligonom (ako postoji), nacrtaj OSRM rutu Šumarija→odjel + istakni poligon.
-  // Vraća { matched:[{odjel,kamioni,distKm,durMin,color,error?}], unmatched:[odjel,...] }
-  // za React prikaz liste (rute/highlight ostaju u Leafletu, van React-a).
-  window.showMapaVozilaRute = async function (dateStr, truckRows) {
+  // groups: [{ key, label, drivers:[imena], jobTypes:[...] }] — pripremljeno u
+  // React sloju (19-MapaOdjelaView.jsx) iz schedules+departments+workers, jer taj
+  // sloj zna poslovnu logiku (ko je vozač, koji red ima dodijeljen odjel). Ovaj
+  // fajl je namjerno "glup" — samo matchuje label→poligon, crta rutu, highlightuje.
+  // Vraća { matched:[{odjel,drivers,jobTypes,distKm,durMin,color,cached,error?}],
+  // unmatched:[label,...] } za React prikaz liste.
+  window.showMapaVozacRute = async function (groups) {
     const internal = window.__mapaOdjelaInternal;
     if (!internal) return { matched: [], unmatched: [], error: 'Karta nije inicijalizovana.' };
     const map = internal.getMap();
     const features = internal.getAllFeatures();
     if (!map || !features || !features.length) return { matched: [], unmatched: [], error: 'Poligoni odjela još nisu učitani — sačekajte da se karta učita.' };
 
-    window.clearMapaVozilaRute();
+    window.clearMapaVozacRute();
 
-    const dayRows = (truckRows || []).filter(r => r.date === dateStr && (r.odjel || '').trim());
-    if (!dayRows.length) return { matched: [], unmatched: [] };
-
-    const groups = new Map(); // normKey → { odjelRaw, kamioni:[] }
-    dayRows.forEach(r => {
-      const k = internal.normKey(r.odjel);
-      if (!groups.has(k)) groups.set(k, { odjelRaw: r.odjel.trim(), kamioni: [] });
-      groups.get(k).kamioni.push({ sortiment: r.sortiment, kupac: r.kupac });
-    });
+    if (!groups || !groups.length) return { matched: [], unmatched: [] };
 
     _routeLayerGroup = L.layerGroup().addTo(map);
     const matched = [];
@@ -115,10 +114,10 @@
     const boundsAcc = [];
     const routeCache = _loadRouteCache();
 
-    for (const [, g] of groups) {
-      const lyrs = _findFeaturesForOdjel(g.odjelRaw, features, internal);
+    for (const g of groups) {
+      const lyrs = _findFeaturesForOdjel(g.label, features, internal);
       const centroid = lyrs.length ? _combinedCentroid(lyrs) : null;
-      if (!lyrs.length || !centroid) { unmatched.push(g.odjelRaw); continue; }
+      if (!lyrs.length || !centroid) { unmatched.push(g.label); continue; }
 
       const color = ROUTE_COLORS[colorIdx % ROUTE_COLORS.length];
       colorIdx++;
@@ -129,7 +128,7 @@
       });
 
       const p0 = lyrs[0]._kartaProps || {};
-      const cacheKey = internal.labelKey((p0.gj || '') + ' ' + (p0.odjel || p0.name || g.odjelRaw));
+      const cacheKey = internal.labelKey((p0.gj || '') + ' ' + (p0.odjel || p0.name || g.label));
       let route = routeCache[cacheKey];
       const fromCache = !!route;
 
@@ -140,12 +139,12 @@
           _saveRouteCache(routeCache);
         }
         L.polyline(route.coords, { color, weight: 4, opacity: 0.85, dashArray: '8 4' })
-          .bindTooltip(`${g.odjelRaw}: ${route.distKm.toFixed(1)} km · ~${route.durMin} min${fromCache ? ' · keš' : ''}`, { permanent: false, direction: 'center', className: 'karta-tooltip' })
+          .bindTooltip(`${g.label}: ${route.distKm.toFixed(1)} km · ~${route.durMin} min${fromCache ? ' · keš' : ''}`, { permanent: false, direction: 'center', className: 'karta-tooltip' })
           .addTo(_routeLayerGroup);
         route.coords.forEach(c => boundsAcc.push(c));
-        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: route.distKm, durMin: route.durMin, color, cached: fromCache });
+        matched.push({ odjel: g.label, drivers: g.drivers, jobTypes: g.jobTypes, distKm: route.distKm, durMin: route.durMin, color, cached: fromCache });
       } catch (e) {
-        matched.push({ odjel: g.odjelRaw, kamioni: g.kamioni, distKm: null, durMin: null, color, error: e.message });
+        matched.push({ odjel: g.label, drivers: g.drivers, jobTypes: g.jobTypes, distKm: null, durMin: null, color, error: e.message });
       }
       // Blaga pauza između poziva — javni OSRM demo server zna throttle-ovati brze uzastopne pozive.
       // Preskoči je za keš-pogotke (nema mrežnog poziva, nema šta throttle-ovati).

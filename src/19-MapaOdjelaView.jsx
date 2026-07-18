@@ -4,26 +4,60 @@
 // očekuje i puni imperativno (getElementById + innerHTML/style). Zato JSX ovih čvorova
 // namjerno nema dinamičkog React sadržaja/state-a — spriječava da React na sljedećem
 // re-renderu "vrati" ono što je vanilla skripta upisala (Leaflet panes, modal HTML...).
-function MapaOdjelaView({ active, truckRows }) {
+function MapaOdjelaView({ active, schedules, departments, workers }) {
   useEffect(() => {
     if (active && typeof window.initKartaOdjela === 'function') {
       window.initKartaOdjela(false);
     }
   }, [active]);
 
-  // ── Raspored vozila (integracija sa "Raspored kamiona") ──
-  // Rute/highlight ostaju imperativni (Leaflet, u 20-mapaVozilaOverlay.jsx) — samo
+  // ── Raspored vozača (integracija sa glavnim Rasporedom radnika) ──
+  // NIJE vezano za "Raspored kamiona" — ti kamioni su kupčevi i kreću sa svoje
+  // lokacije, ne od Šumarije. Ovdje se gleda ko od VLASTITIH vozača (radnik
+  // kategorije 'vozac', ili row.otherDriverId — pozajmljeni vozač na vozno
+  // vozilo) je raspoređen na koji odjel tog dana u glavnom Rasporedu.
+  // Rute/highlight ostaju imperativni (Leaflet, u 20-mapaVozacOverlay.jsx) — samo
   // rezultat (lista za prikaz) se drži u React state-u da se lijepo renderuje.
   const [vozilaDate, setVozilaDate] = useState(today());
   const [vozilaResult, setVozilaResult] = useState(null);
   const [vozilaLoading, setVozilaLoading] = useState(false);
 
+  // Grupiši schedules za dati dan po odjelu — samo redovi koji stvarno imaju
+  // vozača dodijeljenog (radnik category==='vozac' u allWorkers, ili otherDriverId).
+  const buildVozacGroups = (dateStr) => {
+    const dayRows = (schedules || []).filter(s => s.date === dateStr && s.deptId);
+    const groups = new Map(); // deptId → { label, drivers:Set, jobTypes:Set }
+    dayRows.forEach(s => {
+      const dept = (departments || []).find(d => d.id === s.deptId);
+      if (!dept) return;
+      const driverIds = (s.allWorkers || []).filter(wid => {
+        const w = (workers || []).find(x => x.id === wid);
+        return w && w.category === 'vozac';
+      });
+      if (s.otherDriverId) driverIds.push(s.otherDriverId);
+      if (!driverIds.length) return;
+      if (!groups.has(s.deptId)) {
+        groups.set(s.deptId, {
+          key: s.deptId,
+          label: `${dept.gospodarskaJedinica} ${dept.brojOdjela}`,
+          drivers: new Set(),
+          jobTypes: new Set(),
+        });
+      }
+      const grp = groups.get(s.deptId);
+      driverIds.forEach(id => { const w = (workers || []).find(x => x.id === id); grp.drivers.add(w ? w.name : id); });
+      grp.jobTypes.add(s.jobType);
+    });
+    return [...groups.values()].map(g => ({ key: g.key, label: g.label, drivers: [...g.drivers], jobTypes: [...g.jobTypes] }));
+  };
+
   const handlePrikaziRute = async () => {
-    if (typeof window.showMapaVozilaRute !== 'function') return;
+    if (typeof window.showMapaVozacRute !== 'function') return;
     setVozilaLoading(true);
     setVozilaResult(null);
     try {
-      const res = await window.showMapaVozilaRute(vozilaDate, truckRows);
+      const groups = buildVozacGroups(vozilaDate);
+      const res = await window.showMapaVozacRute(groups);
       setVozilaResult(res);
     } catch (e) {
       setVozilaResult({ matched: [], unmatched: [], error: e.message });
@@ -32,7 +66,7 @@ function MapaOdjelaView({ active, truckRows }) {
     }
   };
   const handleClearRute = () => {
-    if (typeof window.clearMapaVozilaRute === 'function') window.clearMapaVozilaRute();
+    if (typeof window.clearMapaVozacRute === 'function') window.clearMapaVozacRute();
     setVozilaResult(null);
   };
 
@@ -133,9 +167,9 @@ function MapaOdjelaView({ active, truckRows }) {
         {/* Hint za ruta-mode */}
         <div id="mapa-ruta-hint" style={{ display: 'none', padding: '8px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626', fontWeight: 600, marginBottom: 8 }}></div>
 
-        {/* Raspored vozila — integracija sa "Raspored kamiona" */}
+        {/* Raspored vozača — integracija sa glavnim Rasporedom radnika (ne "Raspored kamiona") */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#9a3412' }}>🚚 Raspored vozila:</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#9a3412' }}>🚗 Raspored vozača:</span>
           <input type="date" value={vozilaDate} onChange={e => setVozilaDate(e.target.value)}
             style={{ fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6 }} />
           <button type="button" onClick={handlePrikaziRute} disabled={vozilaLoading}
@@ -150,7 +184,7 @@ function MapaOdjelaView({ active, truckRows }) {
             onClick={() => { if (window.clearMapaRutaCache) window.clearMapaRutaCache(); }}
             style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer', color: '#6b7280', marginLeft: 'auto' }}>🗑️ Obriši keš ruta</button>
           {vozilaResult && !vozilaResult.error && vozilaResult.matched.length === 0 && vozilaResult.unmatched.length === 0 && (
-            <span style={{ fontSize: 12, color: '#9a3412' }}>Nema zakazanih kamiona za {vozilaDate.split('-').reverse().join('.')}.</span>
+            <span style={{ fontSize: 12, color: '#9a3412' }}>Nema zakazanih vozača za {vozilaDate.split('-').reverse().join('.')}.</span>
           )}
           {vozilaResult && vozilaResult.error && (
             <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>{vozilaResult.error}</span>
@@ -162,7 +196,7 @@ function MapaOdjelaView({ active, truckRows }) {
             {vozilaResult.matched.length > 0 && (
               <>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
-                  {vozilaResult.matched.length} {vozilaResult.matched.length === 1 ? 'odjel' : 'odjela'} sa otpremom
+                  {vozilaResult.matched.length} {vozilaResult.matched.length === 1 ? 'odjel' : 'odjela'} sa vozačem
                   {(() => {
                     const total = vozilaResult.matched.reduce((s, m) => s + (m.distKm || 0), 0);
                     return total > 0 ? ` — ukupno ${total.toFixed(1)} km (jednosmjerno, po odjelu)` : '';
@@ -178,7 +212,7 @@ function MapaOdjelaView({ active, truckRows }) {
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: m.color, flexShrink: 0, display: 'inline-block' }} />
                       <strong>{m.odjel}</strong>
                       <span style={{ color: '#6b7280' }}>
-                        {m.kamioni.length} {m.kamioni.length === 1 ? 'kamion' : 'kamiona'} — {m.kamioni.map(k => `${k.kupac || '—'}${k.sortiment ? ` (${SORTIMENT_LABELS[k.sortiment] || k.sortiment})` : ''}`).join(', ')}
+                        {m.drivers.join(', ')}{m.jobTypes && m.jobTypes.length ? ` (${m.jobTypes.join(', ')})` : ''}
                       </span>
                       {m.distKm != null
                         ? <span style={{ fontWeight: 700, color: '#9a3412', marginLeft: 'auto' }}>
@@ -193,7 +227,7 @@ function MapaOdjelaView({ active, truckRows }) {
             )}
             {vozilaResult.unmatched.length > 0 && (
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: vozilaResult.matched.length > 0 ? 8 : 0 }}>
-                ⚠️ Nije pronađeno na mapi (provjeriti naziv odjela u Rasporedu kamiona): {vozilaResult.unmatched.join(', ')}
+                ⚠️ Nije pronađeno na mapi (provjeriti odjel/GJ u Odjelima): {vozilaResult.unmatched.join(', ')}
               </div>
             )}
           </div>
