@@ -4,7 +4,7 @@
 // očekuje i puni imperativno (getElementById + innerHTML/style). Zato JSX ovih čvorova
 // namjerno nema dinamičkog React sadržaja/state-a — spriječava da React na sljedećem
 // re-renderu "vrati" ono što je vanilla skripta upisala (Leaflet panes, modal HTML...).
-function MapaOdjelaView({ active, schedules, departments, workers }) {
+function MapaOdjelaView({ active, schedules, departments, workers, vehicles }) {
   useEffect(() => {
     if (active && typeof window.initKartaOdjela === 'function') {
       window.initKartaOdjela(false);
@@ -13,9 +13,12 @@ function MapaOdjelaView({ active, schedules, departments, workers }) {
 
   // ── Raspored vozača (integracija sa glavnim Rasporedom radnika) ──
   // NIJE vezano za "Raspored kamiona" — ti kamioni su kupčevi i kreću sa svoje
-  // lokacije, ne od Šumarije. Ovdje se gleda ko od VLASTITIH vozača (radnik
-  // kategorije 'vozac', ili row.otherDriverId — pozajmljeni vozač na vozno
-  // vozilo) je raspoređen na koji odjel tog dana u glavnom Rasporedu.
+  // lokacije, ne od Šumarije. Ovdje se gleda ko od VLASTITIH vozača je raspoređen
+  // na koji odjel tog dana. VAŽNO: vozač NIJE član row.allWorkers (kao ostali
+  // radnici) — vezan je za VOZILO dodijeljeno redu (row.vehicleIds/vehicleId →
+  // vehicle.driverId), a row.otherDriverId je samo DNEVNI izuzetak kad tim
+  // vozilom danas vozi neko drugi (isto kao što ScheduleView prikazuje 🧑‍✈️/🔄
+  // ikonom u koloni "Vozilo"). Zato se ovdje mora ići preko vozila, ne allWorkers.
   // Rute/highlight ostaju imperativni (Leaflet, u 20-mapaVozacOverlay.jsx) — samo
   // rezultat (lista za prikaz) se drži u React state-u da se lijepo renderuje.
   const [vozilaDate, setVozilaDate] = useState(today());
@@ -23,7 +26,9 @@ function MapaOdjelaView({ active, schedules, departments, workers }) {
   const [vozilaLoading, setVozilaLoading] = useState(false);
 
   // Grupiši schedules za dati dan po odjelu — samo redovi koji stvarno imaju
-  // vozača dodijeljenog (radnik category==='vozac' u allWorkers, ili otherDriverId).
+  // vozača (preko dodijeljenog vozila → vehicle.driverId, ili otherDriverId ako
+  // je neko drugi vozio tog dana; dodatno i category==='vozac' u allWorkers kao
+  // odbrambeni fallback za slučaj da je negdje ipak direktno upisan).
   const buildVozacGroups = (dateStr) => {
     const dayRows = (schedules || []).filter(s => s.date === dateStr && s.deptId);
     const groups = new Map(); // deptId → { label, drivers:Set, jobTypes:Set }
@@ -34,7 +39,12 @@ function MapaOdjelaView({ active, schedules, departments, workers }) {
         const w = (workers || []).find(x => x.id === wid);
         return w && w.category === 'vozac';
       });
-      if (s.otherDriverId) driverIds.push(s.otherDriverId);
+      const vIds = (s.vehicleIds && s.vehicleIds.length > 0) ? s.vehicleIds : (s.vehicleId ? [s.vehicleId] : []);
+      vIds.forEach(vid => {
+        const v = (vehicles || []).find(x => x.id === vid);
+        const driverId = s.otherDriverId || (v && v.driverId);
+        if (driverId) driverIds.push(driverId);
+      });
       if (!driverIds.length) return;
       if (!groups.has(s.deptId)) {
         groups.set(s.deptId, {
