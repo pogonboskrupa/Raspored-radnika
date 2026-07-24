@@ -19,6 +19,12 @@
   // Lokacija Šumarije Bosanska Krupa — Trg Alije Izetbegovića 1
   const SUMARIJA_LATLNG = [44.883425, 16.154427];
   const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving';
+  // OSRM (javni demo server) računa vrijeme vožnje po opštem "car" profilu i za
+  // makadamske/šumske puteve (dio ovih ruta) pretpostavlja prespore brzine — u praksi
+  // (npr. do odjela 71) stvarno vrijeme je oko 55% OSRM procjene. Empirijski faktor,
+  // korigovan na osnovu poznavanja terena — ne mijenja distancu (ta je geometrijski
+  // tačna preko stvarne putne mreže), samo prikazano trajanje vožnje.
+  const ROUTE_DURATION_FACTOR = 0.55;
 
   let _map          = null;
   let _osmLayer     = null;
@@ -312,7 +318,7 @@
       const route    = data.routes[0];
       const coords   = route.geometry.coordinates.map(c => [c[1],c[0]]);
       const distKm   = (route.distance / 1000).toFixed(1);
-      const durMin   = Math.round(route.duration / 60);
+      const durMin   = Math.round(route.duration / 60 * ROUTE_DURATION_FACTOR);
 
       _routeLine = L.polyline(coords, { color:'#2563eb', weight:4, opacity:0.85, dashArray:'8 4' })
         .bindTooltip(`${distKm} km · ~${durMin} min`, { permanent:true, direction:'center', className:'karta-tooltip' })
@@ -376,7 +382,7 @@
       const route   = data.routes[0];
       const coords  = route.geometry.coordinates.map(c => [c[1],c[0]]);
       const distKm  = (route.distance / 1000).toFixed(1);
-      const durMin  = Math.round(route.duration / 60);
+      const durMin  = Math.round(route.duration / 60 * ROUTE_DURATION_FACTOR);
 
       _routeLine2 = L.polyline(coords, { color:'#dc2626', weight:4, opacity:0.85, dashArray:'8 4' })
         .bindTooltip(`${distKm} km · ~${durMin} min`, { permanent:true, direction:'center', className:'karta-tooltip' })

@@ -16,11 +16,19 @@
   const ROUTE_COLORS = ['#ea580c', '#0891b2', '#7c3aed', '#be123c', '#059669', '#ca8a04', '#4338ca', '#c2410c'];
   const HIGHLIGHT_COLOR = '#ea580c';
 
+  // OSRM (javni demo server) računa vrijeme vožnje po opštem "car" profilu i za
+  // makadamske/šumske puteve (dio ovih ruta) pretpostavlja prespore brzine — u praksi
+  // stvarno vrijeme je oko 55% OSRM procjene. Empirijski faktor, ne mijenja distancu
+  // (ta je geometrijski tačna preko stvarne putne mreže), samo prikazano trajanje.
+  const ROUTE_DURATION_FACTOR = 0.55;
+
   // Udaljenost Šumarija→odjel se praktično ne mijenja (putna mreža je stabilna) — keširaj
   // izračunatu OSRM rutu po odjelu u localStorage da se ne pogađa javni OSRM demo server
   // (spor, rate-limituje) svaki put iznova. Ključ je labelKey(gj+odjel) poligona sa kojim je
   // odjel matchovan (stabilan identitet), ne slobodni tekst koji korisnik unese.
-  const ROUTE_CACHE_KEY = 'mapa_ruta_cache_v1';
+  // v2 (ne v1): stari keš je čuvao NEKORIGOVANO trajanje (prije ROUTE_DURATION_FACTOR) —
+  // bump verzije ključa da se stare, prespore procjene ne serviraju zauvijek iz keša.
+  const ROUTE_CACHE_KEY = 'mapa_ruta_cache_v2';
   function _loadRouteCache() {
     try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY) || '{}'); } catch (e) { return {}; }
   }
@@ -84,7 +92,7 @@
     return {
       coords: route.geometry.coordinates.map(c => [c[1], c[0]]),
       distKm: route.distance / 1000,
-      durMin: Math.round(route.duration / 60),
+      durMin: Math.round(route.duration / 60 * ROUTE_DURATION_FACTOR),
     };
   }
 

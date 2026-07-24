@@ -7192,6 +7192,12 @@ window.fetchWithCache = fetchWithCache;
   // Lokacija Šumarije Bosanska Krupa — Trg Alije Izetbegovića 1
   const SUMARIJA_LATLNG = [44.883425, 16.154427];
   const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving';
+  // OSRM (javni demo server) računa vrijeme vožnje po opštem "car" profilu i za
+  // makadamske/šumske puteve (dio ovih ruta) pretpostavlja prespore brzine — u praksi
+  // (npr. do odjela 71) stvarno vrijeme je oko 55% OSRM procjene. Empirijski faktor,
+  // korigovan na osnovu poznavanja terena — ne mijenja distancu (ta je geometrijski
+  // tačna preko stvarne putne mreže), samo prikazano trajanje vožnje.
+  const ROUTE_DURATION_FACTOR = 0.55;
 
   let _map          = null;
   let _osmLayer     = null;
@@ -7485,7 +7491,7 @@ window.fetchWithCache = fetchWithCache;
       const route    = data.routes[0];
       const coords   = route.geometry.coordinates.map(c => [c[1],c[0]]);
       const distKm   = (route.distance / 1000).toFixed(1);
-      const durMin   = Math.round(route.duration / 60);
+      const durMin   = Math.round(route.duration / 60 * ROUTE_DURATION_FACTOR);
 
       _routeLine = L.polyline(coords, { color:'#2563eb', weight:4, opacity:0.85, dashArray:'8 4' })
         .bindTooltip(`${distKm} km · ~${durMin} min`, { permanent:true, direction:'center', className:'karta-tooltip' })
@@ -7549,7 +7555,7 @@ window.fetchWithCache = fetchWithCache;
       const route   = data.routes[0];
       const coords  = route.geometry.coordinates.map(c => [c[1],c[0]]);
       const distKm  = (route.distance / 1000).toFixed(1);
-      const durMin  = Math.round(route.duration / 60);
+      const durMin  = Math.round(route.duration / 60 * ROUTE_DURATION_FACTOR);
 
       _routeLine2 = L.polyline(coords, { color:'#dc2626', weight:4, opacity:0.85, dashArray:'8 4' })
         .bindTooltip(`${distKm} km · ~${durMin} min`, { permanent:true, direction:'center', className:'karta-tooltip' })
@@ -8776,11 +8782,19 @@ const PLAN_YEAR_LABEL = 2026;
   const ROUTE_COLORS = ['#ea580c', '#0891b2', '#7c3aed', '#be123c', '#059669', '#ca8a04', '#4338ca', '#c2410c'];
   const HIGHLIGHT_COLOR = '#ea580c';
 
+  // OSRM (javni demo server) računa vrijeme vožnje po opštem "car" profilu i za
+  // makadamske/šumske puteve (dio ovih ruta) pretpostavlja prespore brzine — u praksi
+  // stvarno vrijeme je oko 55% OSRM procjene. Empirijski faktor, ne mijenja distancu
+  // (ta je geometrijski tačna preko stvarne putne mreže), samo prikazano trajanje.
+  const ROUTE_DURATION_FACTOR = 0.55;
+
   // Udaljenost Šumarija→odjel se praktično ne mijenja (putna mreža je stabilna) — keširaj
   // izračunatu OSRM rutu po odjelu u localStorage da se ne pogađa javni OSRM demo server
   // (spor, rate-limituje) svaki put iznova. Ključ je labelKey(gj+odjel) poligona sa kojim je
   // odjel matchovan (stabilan identitet), ne slobodni tekst koji korisnik unese.
-  const ROUTE_CACHE_KEY = 'mapa_ruta_cache_v1';
+  // v2 (ne v1): stari keš je čuvao NEKORIGOVANO trajanje (prije ROUTE_DURATION_FACTOR) —
+  // bump verzije ključa da se stare, prespore procjene ne serviraju zauvijek iz keša.
+  const ROUTE_CACHE_KEY = 'mapa_ruta_cache_v2';
   function _loadRouteCache() {
     try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY) || '{}'); } catch (e) { return {}; }
   }
@@ -8844,7 +8858,7 @@ const PLAN_YEAR_LABEL = 2026;
     return {
       coords: route.geometry.coordinates.map(c => [c[1], c[0]]),
       distKm: route.distance / 1000,
-      durMin: Math.round(route.duration / 60),
+      durMin: Math.round(route.duration / 60 * ROUTE_DURATION_FACTOR),
     };
   }
 
