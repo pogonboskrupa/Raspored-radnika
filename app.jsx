@@ -814,13 +814,9 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                         {(() => {
                           const vIds = getVehicleIds(row);
                           if (vIds.length === 0) return <span style={{color:'var(--green)',fontWeight:600,fontSize:'0.75rem'}}>+ Dodijeli vozilo</span>;
-                          const rowWorkerCount = (row.allWorkers || []).length;
-                          const totalCap = vIds.reduce((s, vid) => {
-                            const v = vehicles?.find(v => v.id === vid);
-                            return s + (v?.brojMjesta || 0);
-                          }, 0);
-                          const bezMjesta = Math.max(0, rowWorkerCount - totalCap);
-                          let remaining = rowWorkerCount;
+                          // Popunjenost vozila se računa preko CIJELOG dana (vehicleUsageMap), ne samo
+                          // ovog reda — isto vozilo se često koristi za više primki/otprema istog dana
+                          // (ista ekipa, više odjela), pa popunjenost mora sabrati sve te redove.
                           return (
                             <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
                               {vIds.map(vid => {
@@ -828,8 +824,9 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                                 if (!v) return null;
                                 const driver = workers.find(w => w.id === v.driverId);
                                 const cap = v.brojMjesta || 0;
-                                const fill = Math.min(remaining, cap);
-                                remaining = Math.max(0, remaining - cap);
+                                const usage = vehicleUsageMap[vid];
+                                const totalInVehicle = usage?.total || 0;
+                                const over = totalInVehicle > cap;
                                 return (
                                   <div key={vid} style={{display:'flex',flexDirection:'column',gap:'1px',paddingBottom:'2px',borderBottom: vIds.length > 1 ? '1px dotted var(--border)' : 'none'}}>
                                     <span style={{fontWeight:600}}>🚗 {v.registracija}</span>
@@ -840,17 +837,12 @@ function ScheduleView({ selectedDate, setSelectedDate, daySchedules, schedules, 
                                         <span style={{fontSize:'0.7rem',color:'#b5620a',fontWeight:600}}>🔄 {od.name} <span style={{fontWeight:400,fontSize:'0.62rem'}}>(danas)</span></span>
                                       ) : (driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>);
                                     })() : (driver && <span style={{fontSize:'0.7rem',color:'#2a6478'}}>🧑‍✈️ {driver.name}</span>)}
-                                    <span style={{fontSize:'0.65rem',fontWeight:700,marginTop:'1px',color: fill >= cap ? '#b5620a' : '#2d5a27',background: fill >= cap ? '#fdf0e0' : '#e8f5e9',border: `1px solid ${fill >= cap ? '#e8c17a' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem',display:'inline-block'}}>
-                                      👥 {fill}/{cap}
+                                    <span style={{fontSize:'0.65rem',fontWeight:700,marginTop:'1px',color: over ? '#c53030' : '#2d5a27',background: over ? '#fde8e8' : '#e8f5e9',border: `1px solid ${over ? '#f5b5b5' : '#a5d6a7'}`,borderRadius:3,padding:'0.1rem 0.3rem',display:'inline-block'}}>
+                                      👥 {totalInVehicle}/{cap}{over ? ` +${totalInVehicle-cap}` : ''}
                                     </span>
                                   </div>
                                 );
                               })}
-                              {bezMjesta > 0 && (
-                                <div style={{fontSize:'0.65rem',fontWeight:700,color:'#c53030',background:'#fde8e8',border:'1px solid #f5b5b5',borderRadius:3,padding:'0.15rem 0.3rem',marginTop:'2px'}}>
-                                  ⚠️ {bezMjesta} radnika nema mjesta!
-                                </div>
-                              )}
                             </div>
                           );
                         })()}
@@ -1992,6 +1984,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
   const [workerSearch, setWorkerSearch] = useState('');
+  const [helperSearch, setHelperSearch] = useState('');
+  const [autoCrewNote, setAutoCrewNote] = useState('');
 
   const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -2055,6 +2049,26 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
       setForm(f => ({...f, allWorkers: ws}));
     }
   }, [form.primatWorker, form.extraWorkers, form.jobType]);
+
+  // Uobičajena ekipa: kad se odabere primač, predloži pratioce iz njegove
+  // NAJSKORIJE prošle primke (većinom ide ista ekipa) — samo ako korisnik već
+  // nije ručno birao pratioce, da se ne prepiše ono što je namjerno drugačije.
+  const prevPrimatRef = useRef(form.primatWorker);
+  useEffect(() => {
+    if (!isPrimka) return;
+    if (form.primatWorker === prevPrimatRef.current) return;
+    prevPrimatRef.current = form.primatWorker;
+    setAutoCrewNote('');
+    if (!form.primatWorker || form.extraWorkers.length > 0) return;
+    const past = (schedules || [])
+      .filter(s => s.jobType === 'Primka' && s.primatWorker === form.primatWorker && (!isEdit || s.id !== form.id))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (past.length === 0) return;
+    const lastCrew = (past[0].extraWorkers || []).filter(wId => availableWorkers.some(w => w.id === wId));
+    if (lastCrew.length === 0) return;
+    setForm(f => ({...f, extraWorkers: [...new Set([...f.extraWorkers, ...lastCrew])]}));
+    setAutoCrewNote(`📋 Dodana uobičajena ekipa (kao ${fmtDate(past[0].date)}) — ukloni pojedinačno ispod ako treba drugačije.`);
+  }, [form.primatWorker]);
 
   const toggleWorker = (wId) => {
     setForm(f => {
@@ -2234,10 +2248,16 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               </div>
               <div className="form-group">
                 <label className="form-label">Pratioci primača</label>
+                {autoCrewNote && (
+                  <div style={{fontSize:'0.72rem',color:'var(--green)',fontWeight:600,marginBottom:'0.35rem'}}>{autoCrewNote}</div>
+                )}
+                <input className="form-input" placeholder="🔍 Pretraži pratioce..." value={helperSearch}
+                  onChange={e => setHelperSearch(e.target.value)}
+                  style={{marginBottom:'0.4rem',fontSize:'0.82rem',padding:'0.35rem 0.6rem'}} />
                 <div className="worker-selector">
                   {(() => {
                     const selectedPrimac = form.primatWorker;
-                    const selected12 = [form.helper1Worker, form.helper2Worker].filter(Boolean);
+                    const q = helperSearch.trim().toLowerCase();
                     const radniciPrimka = availableWorkers.filter(w => w.category==='radnik_primka' && w.id!==selectedPrimac);
                     const pomocni = availableWorkers.filter(w => w.category==='pomocni' && w.id!==selectedPrimac);
                     const ostaliPrimaci = availableWorkers.filter(w => w.category==='primac_panj' && w.id!==selectedPrimac);
@@ -2247,15 +2267,18 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                       ...ostaliPrimaci.map(w=>({...w,_group:'Primači (opciono)'})),
                     ];
                     let lastGroup = null;
-                    return allOptions.map(w => {
+                    let anyShown = false;
+                    const rows = allOptions.map(w => {
                       const cat = getCatById(w.category);
                       const isSelected = form.extraWorkers.includes(w.id);
+                      const matchesSearch = !q || w.name.toLowerCase().includes(q);
                       const groupHeader = w._group !== lastGroup ? (lastGroup = w._group, (
                         <div key={'grp-'+w._group} style={{padding:'0.3rem 0.7rem',fontSize:'0.65rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',background:'var(--bg)',borderBottom:'1px solid var(--border)'}}>
                           {w._group}
                         </div>
                       )) : null;
-                      if (isSelected) return [null, null];
+                      if (isSelected || !matchesSearch) return [null, null];
+                      anyShown = true;
                       return [groupHeader, (
                         <div key={w.id} className="worker-option" onClick={() => toggleExtra(w.id)}>
                           <span style={{fontSize:'0.9rem'}}>{cat?.icon||'👤'}</span>
@@ -2264,6 +2287,10 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                         </div>
                       )];
                     });
+                    if (!anyShown) {
+                      return <div style={{padding:'0.6rem 0.75rem',fontSize:'0.78rem',color:'var(--text-muted)',fontStyle:'italic'}}>{q ? `Nema pratioca za "${helperSearch}"` : 'Svi raspoloživi pratioci su odabrani.'}</div>;
+                    }
+                    return rows;
                   })()}
                 </div>
               </div>

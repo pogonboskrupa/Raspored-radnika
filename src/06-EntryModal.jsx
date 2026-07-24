@@ -21,6 +21,8 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
   const [conflicts, setConflicts] = useState([]);
   const [forceOverride, setForceOverride] = useState(false);
   const [workerSearch, setWorkerSearch] = useState('');
+  const [helperSearch, setHelperSearch] = useState('');
+  const [autoCrewNote, setAutoCrewNote] = useState('');
 
   const [showOtherDriver, setShowOtherDriver] = useState(!!data.otherDriverId);
   const OTHER_DRIVER_CATS = ['poslovoda_isk', 'poslovoda_uzg', 'primac_panj', 'otpremac'];
@@ -84,6 +86,26 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
       setForm(f => ({...f, allWorkers: ws}));
     }
   }, [form.primatWorker, form.extraWorkers, form.jobType]);
+
+  // Uobičajena ekipa: kad se odabere primač, predloži pratioce iz njegove
+  // NAJSKORIJE prošle primke (većinom ide ista ekipa) — samo ako korisnik već
+  // nije ručno birao pratioce, da se ne prepiše ono što je namjerno drugačije.
+  const prevPrimatRef = useRef(form.primatWorker);
+  useEffect(() => {
+    if (!isPrimka) return;
+    if (form.primatWorker === prevPrimatRef.current) return;
+    prevPrimatRef.current = form.primatWorker;
+    setAutoCrewNote('');
+    if (!form.primatWorker || form.extraWorkers.length > 0) return;
+    const past = (schedules || [])
+      .filter(s => s.jobType === 'Primka' && s.primatWorker === form.primatWorker && (!isEdit || s.id !== form.id))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (past.length === 0) return;
+    const lastCrew = (past[0].extraWorkers || []).filter(wId => availableWorkers.some(w => w.id === wId));
+    if (lastCrew.length === 0) return;
+    setForm(f => ({...f, extraWorkers: [...new Set([...f.extraWorkers, ...lastCrew])]}));
+    setAutoCrewNote(`📋 Dodana uobičajena ekipa (kao ${fmtDate(past[0].date)}) — ukloni pojedinačno ispod ako treba drugačije.`);
+  }, [form.primatWorker]);
 
   const toggleWorker = (wId) => {
     setForm(f => {
@@ -263,10 +285,16 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
               </div>
               <div className="form-group">
                 <label className="form-label">Pratioci primača</label>
+                {autoCrewNote && (
+                  <div style={{fontSize:'0.72rem',color:'var(--green)',fontWeight:600,marginBottom:'0.35rem'}}>{autoCrewNote}</div>
+                )}
+                <input className="form-input" placeholder="🔍 Pretraži pratioce..." value={helperSearch}
+                  onChange={e => setHelperSearch(e.target.value)}
+                  style={{marginBottom:'0.4rem',fontSize:'0.82rem',padding:'0.35rem 0.6rem'}} />
                 <div className="worker-selector">
                   {(() => {
                     const selectedPrimac = form.primatWorker;
-                    const selected12 = [form.helper1Worker, form.helper2Worker].filter(Boolean);
+                    const q = helperSearch.trim().toLowerCase();
                     const radniciPrimka = availableWorkers.filter(w => w.category==='radnik_primka' && w.id!==selectedPrimac);
                     const pomocni = availableWorkers.filter(w => w.category==='pomocni' && w.id!==selectedPrimac);
                     const ostaliPrimaci = availableWorkers.filter(w => w.category==='primac_panj' && w.id!==selectedPrimac);
@@ -276,15 +304,18 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                       ...ostaliPrimaci.map(w=>({...w,_group:'Primači (opciono)'})),
                     ];
                     let lastGroup = null;
-                    return allOptions.map(w => {
+                    let anyShown = false;
+                    const rows = allOptions.map(w => {
                       const cat = getCatById(w.category);
                       const isSelected = form.extraWorkers.includes(w.id);
+                      const matchesSearch = !q || w.name.toLowerCase().includes(q);
                       const groupHeader = w._group !== lastGroup ? (lastGroup = w._group, (
                         <div key={'grp-'+w._group} style={{padding:'0.3rem 0.7rem',fontSize:'0.65rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--text-light)',background:'var(--bg)',borderBottom:'1px solid var(--border)'}}>
                           {w._group}
                         </div>
                       )) : null;
-                      if (isSelected) return [null, null];
+                      if (isSelected || !matchesSearch) return [null, null];
+                      anyShown = true;
                       return [groupHeader, (
                         <div key={w.id} className="worker-option" onClick={() => toggleExtra(w.id)}>
                           <span style={{fontSize:'0.9rem'}}>{cat?.icon||'👤'}</span>
@@ -293,6 +324,10 @@ function EntryModal({ data, isEdit, workers, departments, setDepartments, schedu
                         </div>
                       )];
                     });
+                    if (!anyShown) {
+                      return <div style={{padding:'0.6rem 0.75rem',fontSize:'0.78rem',color:'var(--text-muted)',fontStyle:'italic'}}>{q ? `Nema pratioca za "${helperSearch}"` : 'Svi raspoloživi pratioci su odabrani.'}</div>;
+                    }
+                    return rows;
                   })()}
                 </div>
               </div>
