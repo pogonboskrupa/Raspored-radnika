@@ -15136,19 +15136,13 @@ function MapaOdjelaView(_ref60) {
       padding: '1rem 1rem 0'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "section-header",
     style: {
-      marginBottom: '0.75rem'
+      display: 'flex',
+      justifyContent: 'flex-end',
+      marginBottom: '0.5rem'
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "section-title"
-  }, "\uD83D\uDDFA\uFE0F Mapa odjela ", PLAN_YEAR_LABEL), /*#__PURE__*/React.createElement("span", {
-    className: "tag"
-  }, "Prostorni prikaz odjela po statusu realizacije plana sje\u010De"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm no-print",
-    style: {
-      marginLeft: 'auto'
-    },
     onClick: () => window.initKartaOdjela && window.initKartaOdjela(true)
   }, "\uD83D\uDD04 Osvje\u017Ei")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -15741,7 +15735,6 @@ function MapaOdjelaView(_ref60) {
     }
   })))));
 }
-const PLAN_YEAR_LABEL = 2026;
 // ─── MAPA ODJELA — RASPORED VOZAČA (integracija sa glavnim Rasporedom radnika) ─
 // Novo, samostalno od 18-karta-odjela.jsx (koji ostaje neizmijenjen) — čita
 // window.__mapaOdjelaInternal (aditivni export iz karta-odjela.jsx) da poveže

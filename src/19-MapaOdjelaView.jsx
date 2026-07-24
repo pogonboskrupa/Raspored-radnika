@@ -112,10 +112,8 @@ function MapaOdjelaView({ active, schedules, departments, workers, vehicles }) {
       `}</style>
 
       <div style={{ padding: '1rem 1rem 0' }}>
-        <div className="section-header" style={{ marginBottom: '0.75rem' }}>
-          <div className="section-title">🗺️ Mapa odjela {PLAN_YEAR_LABEL}</div>
-          <span className="tag">Prostorni prikaz odjela po statusu realizacije plana sječe</span>
-          <button className="btn btn-primary btn-sm no-print" style={{ marginLeft: 'auto' }}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+          <button className="btn btn-primary btn-sm no-print"
             onClick={() => window.initKartaOdjela && window.initKartaOdjela(true)}>🔄 Osvježi</button>
         </div>
 
@@ -272,5 +270,3 @@ function MapaOdjelaView({ active, schedules, departments, workers, vehicles }) {
     </div>
   );
 }
-
-const PLAN_YEAR_LABEL = 2026;
