@@ -15105,9 +15105,9 @@ function MapaOdjelaView(_ref60) {
   return /*#__PURE__*/React.createElement("div", {
     id: "karta-odjela-content"
   }, /*#__PURE__*/React.createElement("style", null, `
-        #karta-odjela-map { width:100%; height:calc(100vh - 260px); min-height:400px; background:#f1f5f9; }
-        @media (max-width:1024px) { #karta-odjela-map { height:calc(100vh - 240px); min-height:320px; } }
-        @media (max-width:640px)  { #karta-odjela-map { height:calc(100vh - 270px); min-height:260px; } }
+        #karta-odjela-map { width:100%; height:calc(100vh - 210px); min-height:400px; background:#f1f5f9; }
+        @media (max-width:1024px) { #karta-odjela-map { height:calc(100vh - 190px); min-height:320px; } }
+        @media (max-width:640px)  { #karta-odjela-map { height:calc(100vh - 220px); min-height:260px; } }
 
         body.mapa-fokus .app-header { padding:4px 16px !important; min-height:0 !important; }
         body.mapa-fokus .app-header .app-title { display:none !important; }
@@ -15133,18 +15133,9 @@ function MapaOdjelaView(_ref60) {
         .leaflet-marker-icon.karta-tooltip-slucajni { background:#7c3aed; border-color:#6d28d9; color:white; }
       `), /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: '1rem 1rem 0'
+      padding: '0.5rem 1rem 0'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      marginBottom: '0.5rem'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-primary btn-sm no-print",
-    onClick: () => window.initKartaOdjela && window.initKartaOdjela(true)
-  }, "\uD83D\uDD04 Osvje\u017Ei")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexWrap: 'wrap',
@@ -15156,7 +15147,10 @@ function MapaOdjelaView(_ref60) {
       borderRadius: 10,
       padding: '10px 14px'
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm no-print",
+    onClick: () => window.initKartaOdjela && window.initKartaOdjela(true)
+  }, "\uD83D\uDD04 Osvje\u017Ei"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',

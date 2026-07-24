@@ -8573,9 +8573,9 @@ function MapaOdjelaView({ active, schedules, departments, workers, vehicles }) {
   return (
     <div id="karta-odjela-content">
       <style>{`
-        #karta-odjela-map { width:100%; height:calc(100vh - 260px); min-height:400px; background:#f1f5f9; }
-        @media (max-width:1024px) { #karta-odjela-map { height:calc(100vh - 240px); min-height:320px; } }
-        @media (max-width:640px)  { #karta-odjela-map { height:calc(100vh - 270px); min-height:260px; } }
+        #karta-odjela-map { width:100%; height:calc(100vh - 210px); min-height:400px; background:#f1f5f9; }
+        @media (max-width:1024px) { #karta-odjela-map { height:calc(100vh - 190px); min-height:320px; } }
+        @media (max-width:640px)  { #karta-odjela-map { height:calc(100vh - 220px); min-height:260px; } }
 
         body.mapa-fokus .app-header { padding:4px 16px !important; min-height:0 !important; }
         body.mapa-fokus .app-header .app-title { display:none !important; }
@@ -8601,14 +8601,11 @@ function MapaOdjelaView({ active, schedules, departments, workers, vehicles }) {
         .leaflet-marker-icon.karta-tooltip-slucajni { background:#7c3aed; border-color:#6d28d9; color:white; }
       `}</style>
 
-      <div style={{ padding: '1rem 1rem 0' }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-          <button className="btn btn-primary btn-sm no-print"
-            onClick={() => window.initKartaOdjela && window.initKartaOdjela(true)}>🔄 Osvježi</button>
-        </div>
-
+      <div style={{ padding: '0.5rem 1rem 0' }}>
         {/* Filter traka */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px' }}>
+          <button className="btn btn-primary btn-sm no-print"
+            onClick={() => window.initKartaOdjela && window.initKartaOdjela(true)}>🔄 Osvježi</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>GJ:</label>
             <select id="karta-filter-gj" onChange={() => window.applyKartaFilter && window.applyKartaFilter()} style={{ fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, background: 'white' }}>
